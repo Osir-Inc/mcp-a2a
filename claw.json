@@ -1,0 +1,39 @@
+{
+  "name": "OSIR Domain Registrar",
+  "version": "2.0.0",
+  "description": "AI-powered domain registrar with 71 MCP tools and 7 A2A specialist agents for domain, DNS, VPS, billing, contact, and account management.",
+  "provider": {
+    "name": "OSIR",
+    "url": "https://osir.com"
+  },
+  "servers": {
+    "mcp": {
+      "transport": "sse",
+      "url": "/mcp/sse",
+      "port": 8081,
+      "tools": 71,
+      "prompts": 10
+    },
+    "a2a": {
+      "transport": "json-rpc",
+      "url": "/a2a",
+      "port": 8082,
+      "agents": 7,
+      "skills": 50,
+      "discovery": "/.well-known/agent.json"
+    }
+  },
+  "authentication": {
+    "type": "oauth2",
+    "provider": "keycloak",
+    "flows": ["device_code", "password"],
+    "realm": "osir"
+  },
+  "categories": [
+    "domain-registrar",
+    "dns-management",
+    "vps-hosting",
+    "billing",
+    "contact-management"
+  ]
+}

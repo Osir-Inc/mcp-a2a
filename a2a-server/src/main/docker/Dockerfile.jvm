@@ -1,0 +1,19 @@
+FROM eclipse-temurin:21-jre-alpine
+
+RUN apk add --no-cache curl
+
+WORKDIR /work/
+
+COPY build/quarkus-app/lib/ lib/
+COPY build/quarkus-app/*.jar .
+COPY build/quarkus-app/app/ app/
+COPY build/quarkus-app/quarkus/ quarkus/
+
+EXPOSE 8082
+
+ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0"
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=30s \
+    CMD curl -f http://localhost:8082/q/health/ready || exit 1
+
+ENTRYPOINT ["java", "-jar", "quarkus-run.jar"]

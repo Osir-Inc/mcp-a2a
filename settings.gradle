@@ -1,0 +1,14 @@
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+        mavenLocal()
+    }
+    plugins {
+        id "${quarkusPluginId}" version "${quarkusPluginVersion}"
+        id 'org.kordamp.gradle.jandex' version '2.1.0'
+    }
+}
+rootProject.name = 'com-osir-agent'
+
+include 'common', 'mcp-server', 'a2a-server'
