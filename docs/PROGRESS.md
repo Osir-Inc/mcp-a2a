@@ -1,5 +1,36 @@
 # OSIR MCP & A2A Server — Progress
 
+## Public Open-Source Release (2026-06-25)
+
+Published to **https://github.com/Osir-Inc/mcp-a2a** (branch `main`), mirrored to the
+team's private Gitea (`main`). History is a single squashed orphan commit, author
+`Armand <noreply@osir.com>`, **no Claude/Anthropic references** (commit policy — see CLAUDE.md).
+
+Release prep done:
+- Secret/leak audit: clean (no keys/tokens/certs). Scrubbed internal Ollama IP →
+  `localhost:11434`, CI registry → `registry.example.com`. Untracked `.claude/` (gitignored).
+- Apache-2.0 `LICENSE`; usage-focused `README.md` (custom-connector + `What is MCP?`).
+- All non-README docs moved into `docs/` to keep the repo root clean.
+- `master` and stale feature branches deleted on both remotes; `main` is default.
+
+Hardening + fixes (2026-06-26, commit after release):
+- Removed rogue `CorsFilter` (`*` + credentials, overrode CORS allow-list); expose
+  `Mcp-Session-Id` via Quarkus config.
+- JWT issuer now matched **exactly** vs `${KEYCLOAK_URL}/realms/${realm}` (was substring).
+- `CatalogService` caches only **successful** responses (was caching failures for the TTL).
+- Chat path fixed: `loginWithDevice`/`checkDeviceLoginStatus` dispatch + inverted availability result.
+- Repaired stale `VpsServiceTest`/`DnsServiceTest` (didn't compile on committed `main`).
+  **Test count is now 372** (was documented as 351).
+
+Known but NOT yet done (from the review — candidates for next session):
+- A2A token isolation: request-scoped `AuthContext` is read on `executor.submit()` worker
+  threads (no context propagation) — pass the token explicitly instead. (High)
+- A2A: client-supplied task IDs have no ownership check (cross-user task access). (High)
+- `/api/chat/*` MCP chat surface is unauthenticated. (High)
+- Ollama `HttpClient` has no timeouts; webhook push runs blocking `Thread.sleep` retries on
+  the request thread + no SSRF allowlist; orchestrator marks partial success as FAILED.
+- No GitHub Actions CI (only `.gitea/workflows` exists) — build can go red unnoticed.
+
 ## Complete — Production Ready
 
 ### Platform (Gradle 8.14.1, Quarkus 3.34.2, 351 tests)
