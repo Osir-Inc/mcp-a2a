@@ -40,6 +40,12 @@ public class AuthService {
     @ConfigProperty(name = "auth.token.refresh-buffer-seconds", defaultValue = "60")
     long refreshBufferSeconds;
 
+    @ConfigProperty(name = "keycloak.auth-server-url", defaultValue = "https://auth.osir.com")
+    String keycloakUrl;
+
+    @ConfigProperty(name = "keycloak.realm", defaultValue = "osir")
+    String keycloakRealm;
+
     @Inject
     jakarta.enterprise.inject.Instance<AuthContext> authContextInstance;
 
@@ -386,12 +392,13 @@ public class AuthService {
             }
         }
 
-        // Check issuer matches KeyCloak (if configured)
+        // Check issuer matches the configured KeyCloak realm exactly
         Object iss = claims.get("iss");
         if (iss instanceof String && !((String) iss).isBlank()) {
             String issuer = (String) iss;
-            if (!issuer.contains("osir") && !issuer.contains("keycloak") && !issuer.contains("auth")) {
-                LOG.warnf("Unexpected token issuer: %s", issuer);
+            String expected = keycloakUrl.replaceAll("/+$", "") + "/realms/" + keycloakRealm;
+            if (!issuer.equals(expected)) {
+                LOG.warnf("Unexpected token issuer: %s (expected %s)", issuer, expected);
                 return false;
             }
         }

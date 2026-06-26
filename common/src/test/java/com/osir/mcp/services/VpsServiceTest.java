@@ -127,11 +127,11 @@ class VpsServiceTest {
         when(authService.getCurrentToken()).thenReturn(TEST_TOKEN);
 
         VpsOrderResponse response = new VpsOrderResponse();
-        response.setSuccess(true);
-        response.setMessage("VPS ordered");
-        response.setInstanceId("vps-new");
-        response.setHostname("myserver.example.com");
-        response.setStatus("PENDING");
+        VpsInstanceSummary instance = new VpsInstanceSummary();
+        instance.setId("vps-new");
+        instance.setHostname("myserver.example.com");
+        instance.setStatus("PENDING");
+        response.setInstance(instance);
         when(backendClient.orderVps(any(VpsOrderRequest.class), eq(TEST_TOKEN))).thenReturn(response);
 
         VpsOrderResult result = vpsService.orderVps(TEST_PACKAGE_ID, "myserver.example.com", "MONTHLY", null);
@@ -230,7 +230,6 @@ class VpsServiceTest {
         when(authService.getCurrentToken()).thenReturn(TEST_TOKEN);
 
         VpsActionResponse response = new VpsActionResponse();
-        response.setSuccess(true);
         response.setMessage("Instance deletion initiated");
         response.setInstanceId(TEST_INSTANCE_ID);
         response.setStatus("DELETING");
@@ -261,7 +260,6 @@ class VpsServiceTest {
         when(authService.getCurrentToken()).thenReturn(TEST_TOKEN);
 
         VpsActionResponse response = new VpsActionResponse();
-        response.setSuccess(true);
         response.setMessage("Payment term changed");
         response.setInstanceId(TEST_INSTANCE_ID);
         when(backendClient.changePaymentTerm(eq(TEST_INSTANCE_ID), any(VpsPaymentTermRequest.class), eq(TEST_TOKEN)))
@@ -291,7 +289,6 @@ class VpsServiceTest {
         when(authService.getCurrentToken()).thenReturn(TEST_TOKEN);
 
         VpsPanelLoginResponse response = new VpsPanelLoginResponse();
-        response.setSuccess(true);
         response.setMessage("Login URL generated");
         response.setLoginUrl("https://panel.example.com/login?token=abc123");
         when(backendClient.loginToVpsPanel(TEST_INSTANCE_ID, TEST_TOKEN)).thenReturn(response);

@@ -195,7 +195,7 @@ public class JsonModeOllamaService {
     private String executeToolCall(String toolName, JsonNode params, String chatSessionId) {
         try {
             switch (toolName) {
-                case "authenticateUser":
+                case "loginWithDevice":
                     var deviceLogin = sessionAwareAuthService.startDeviceLogin(chatSessionId);
                     if (!deviceLogin.isSuccess()) {
                         return "❌ Could not start login: " + deviceLogin.getMessage();
@@ -204,6 +204,17 @@ public class JsonModeOllamaService {
                             + "** to sign in:\n" + deviceLogin.getVerificationUriComplete()
                             + "\n\nThen call checkDeviceLoginStatus with deviceCode="
                             + deviceLogin.getDeviceCode() + " to complete login.";
+
+                case "checkDeviceLoginStatus":
+                    String deviceCode = params != null && params.hasNonNull("deviceCode")
+                            ? params.get("deviceCode").asText() : null;
+                    if (deviceCode == null) {
+                        return "❌ Missing deviceCode. Start login with loginWithDevice first.";
+                    }
+                    var loginStatus = sessionAwareAuthService.checkDeviceLoginStatus(chatSessionId, deviceCode);
+                    return loginStatus.isSuccess()
+                            ? "✅ " + loginStatus.getMessage()
+                            : "⏳ " + loginStatus.getMessage();
 
                 case "checkDomainAvailability":
                     String domain = params.get("domain").asText();
@@ -223,14 +234,13 @@ public class JsonModeOllamaService {
 
                     // Call domain service with session-aware authentication
                     var domainResult = callDomainServiceWithSession(domain, chatSessionId);
-                    LOG.infof("Domain check result: success=%s, available=%s, message=%s",
-                            domainResult.isAvailable(), domainResult.isAvailable(), domainResult.getMessage());
+                    LOG.infof("Domain check result: available=%s, message=%s",
+                            domainResult.isAvailable(), domainResult.getMessage());
 
-                    return domainResult.isAvailable() ?
-                            (domainResult.isAvailable() ?
-                                    "✅ " + domain + " is available!" :
-                                    "❌ " + domain + " is taken.") :
-                            "❌ Error: " + domainResult.getMessage();
+                    // available=false means either taken or an error — the message carries which.
+                    return domainResult.isAvailable()
+                            ? "✅ " + domain + " is available!"
+                            : "❌ " + domain + ": " + domainResult.getMessage();
 
                 case "getDomainInfo":
                     String infoDomain = params.get("domain").asText();

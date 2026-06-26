@@ -146,10 +146,7 @@ class DnsServiceTest {
         when(authService.isAuthenticated()).thenReturn(true);
         when(authService.getCurrentToken()).thenReturn(TEST_TOKEN);
 
-        DnsActionResponse response = new DnsActionResponse();
-        response.setSuccess(true);
-        when(backendClient.deleteDnsRecord(TEST_DOMAIN, TEST_RECORD_ID, TEST_TOKEN)).thenReturn(response);
-
+        // deleteDnsRecord returns void — Mockito leaves it as a no-op (no exception = success)
         DnsActionResult result = dnsService.deleteRecord(TEST_DOMAIN, TEST_RECORD_ID);
 
         assertTrue(result.isSuccess());

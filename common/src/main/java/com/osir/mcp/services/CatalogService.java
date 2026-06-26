@@ -16,33 +16,56 @@ public class CatalogService {
     @RestClient
     CatalogBackendClient backendClient;
 
-    @CacheResult(cacheName = "product-catalog")
+    // Self-injection so calls to the @CacheResult methods go through the CDI proxy
+    // (interceptors don't fire on same-instance self-invocation). Falls back to `this`
+    // in plain unit tests where the bean isn't CDI-managed (self is null, caching off).
+    @Inject
+    CatalogService self;
+
+    private CatalogService cached() {
+        return self != null ? self : this;
+    }
+
     public ProductCatalogResult getProductCatalog() {
         try {
-            ProductCatalogResponse response = backendClient.getProductCatalog();
-            return new ProductCatalogResult(true, "Product catalog retrieved successfully", response);
+            return new ProductCatalogResult(true, "Product catalog retrieved successfully", cached().fetchProductCatalog());
         } catch (Exception e) {
             return new ProductCatalogResult(false, "Failed to retrieve product catalog: " + e.getMessage());
         }
     }
 
-    @CacheResult(cacheName = "domain-extensions")
     public DomainExtensionsResult getDomainExtensions() {
         try {
-            var response = backendClient.getDomainExtensions();
-            return new DomainExtensionsResult(true, "Domain extensions retrieved successfully", response.getExtensions());
+            return new DomainExtensionsResult(true, "Domain extensions retrieved successfully",
+                    cached().fetchDomainExtensions().getExtensions());
         } catch (Exception e) {
             return new DomainExtensionsResult(false, "Failed to retrieve domain extensions: " + e.getMessage());
         }
     }
 
-    @CacheResult(cacheName = "dedicated-catalog")
     public DedicatedServerCatalogResult getDedicatedServerCatalog() {
         try {
-            List<DedicatedServerConfig> servers = backendClient.getDedicatedServerCatalog();
-            return new DedicatedServerCatalogResult(true, "Dedicated server catalog retrieved successfully", servers);
+            return new DedicatedServerCatalogResult(true, "Dedicated server catalog retrieved successfully",
+                    cached().fetchDedicatedServerCatalog());
         } catch (Exception e) {
             return new DedicatedServerCatalogResult(false, "Failed to retrieve dedicated server catalog: " + e.getMessage());
         }
+    }
+
+    // Only successful backend responses are cached; failures throw and are not cached.
+
+    @CacheResult(cacheName = "product-catalog")
+    public ProductCatalogResponse fetchProductCatalog() {
+        return backendClient.getProductCatalog();
+    }
+
+    @CacheResult(cacheName = "domain-extensions")
+    public DomainExtensionsApiResponse fetchDomainExtensions() {
+        return backendClient.getDomainExtensions();
+    }
+
+    @CacheResult(cacheName = "dedicated-catalog")
+    public List<DedicatedServerConfig> fetchDedicatedServerCatalog() {
+        return backendClient.getDedicatedServerCatalog();
     }
 }
