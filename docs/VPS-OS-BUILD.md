@@ -3,7 +3,7 @@
 How an agent orders a VPS that arrives **with an operating system on it**, and how it reinstalls one.
 
 This document covers the agent's surface. The backend REST contract it calls is documented separately
-in the OSIR backend's own `docs/vps-os-build.md`. Requires backend **v2.9.1+** (v2.9.0 has no
+in the OSIR backend's own `docs/vps-os-build.md`. Requires backend **v2.9.2+** (2.9.1 mis-reports in-flight builds as FAILED; 2.9.0 also has no
 `packageId` template lookup — see [§6](#6-version-compatibility)).
 
 ---
@@ -148,6 +148,15 @@ Poll at **~5 seconds, not 500ms** — every read hits VirtFusion live. Stop on `
 | `COMPLETE` | OS installed. `builtAt` is set. Safe to deploy. |
 | `FAILED` | Retry with `buildVpsInstance` — **free**. Never re-order to recover. |
 
+> **Never re-order on a FAILED read — re-build.** Ordering spends money and leaves the first server
+> behind; building is free and retryable forever. That asymmetry should always decide it.
+>
+> This is not hypothetical. Until backend **v2.9.2**, `getVpsInstanceDetails` returned `FAILED` for the
+> whole ~20s of *every healthy build*: VirtFusion's `buildFailed` flag means "not successfully built
+> yet", not "the build failed", and the backend checked it first. A caller polling mid-build saw FAILED
+> on a server that was seconds from ready. On **v2.9.2+** `FAILED` is trustworthy — the rule stands
+> anyway, because a bad read costs a server either way.
+
 There is **no `queueId`** and no progress percentage. VirtFusion's build response carries no queue id, so
 polling the instance is the only status source. Do not design a progress bar around one.
 
@@ -160,9 +169,11 @@ rather than a rolled-back order the customer has already paid for. Recovery is `
 
 ## 6. Version compatibility
 
-| Backend | `listVpsOsTemplates(packageId:)` |
+| Backend | Behaviour |
 |---|---|
-| ≤ 2.9.0 | **Not supported** — 400. Only `instanceId` works, so a first order cannot install an OS. |
+| ≤ 2.9.0 | `listVpsOsTemplates(packageId:)` **not supported** — 400. Only `instanceId` works, so a first order cannot install an OS. |
+| 2.9.1 | `packageId` supported. **But every in-flight build reports `FAILED` for ~20s** (see §4.3) — polling a build is unreliable. |
+| **2.9.2+** | Both fixed. A build reads `QUEUED` → `BUILDING` → `COMPLETE`, and `FAILED` is trustworthy. **Use this.** |
 | ≥ 2.9.1 | Supported. |
 
 ---
