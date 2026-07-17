@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  com-osir-mcp:
+    image: registry.example.com/com-osir-mcp:latest
+    container_name: com-osir-mcp
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/q/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  com-osir-a2a:
+    image: registry.example.com/com-osir-a2a:latest
+    container_name: com-osir-a2a
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/q/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

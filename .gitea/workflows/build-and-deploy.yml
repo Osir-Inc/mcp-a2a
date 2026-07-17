@@ -1,0 +1,67 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  REGISTRY: registry.example.com
+  JAVA_VERSION: '21'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Build and test
+        run: ./gradlew build
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            common/build/reports/tests/
+            mcp-server/build/reports/tests/
+            a2a-server/build/reports/tests/
+
+  docker:
+    needs: build
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Build JARs (skip tests — already passed)
+        run: ./gradlew build -x test
+
+      - name: Login to registry
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login ${{ env.REGISTRY }} -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build and push MCP server
+        run: |
+          docker build -f mcp-server/src/main/docker/Dockerfile.jvm -t ${{ env.REGISTRY }}/com-osir-mcp:latest mcp-server
+          docker push ${{ env.REGISTRY }}/com-osir-mcp:latest
+
+      - name: Build and push A2A server
+        run: |
+          docker build -f a2a-server/src/main/docker/Dockerfile.jvm -t ${{ env.REGISTRY }}/com-osir-a2a:latest a2a-server
+          docker push ${{ env.REGISTRY }}/com-osir-a2a:latest
