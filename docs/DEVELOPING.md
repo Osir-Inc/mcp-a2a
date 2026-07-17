@@ -106,13 +106,12 @@ docker-compose logs -f             # View logs
   `orderVps` without `operatingSystemId` yields a server with no OS. Needs backend v2.9.1+.
 - `A2A-ARCHITECTURE.md` — A2A architecture design document
 - `A2A-CONFIRMATION-GATE-SPEC.md` — staging destructive ops behind `executeConfirmedAction`
-- `PROGRESS.md` — Completed work + remaining TODO items
 - `SKILL.md` — OpenClaw compatibility manifest
 
 ## Remaining Work
 
-See `PROGRESS.md`. All critical items are complete. Nice-to-haves:
-- Unit tests for DNS/VPS/Billing/Contact/Account agents (currently only Domain agent has unit tests)
+All critical items are complete. Nice-to-haves:
+- Unit tests for DNS/Billing/Contact/Account agents (Domain and VPS agents have them)
 - Unit tests for PromptsMCPServer
 - `AuthContext.refreshedToken` is wired but nothing sets it yet (needs token refresh flow)
 - Docker compose health check directives
