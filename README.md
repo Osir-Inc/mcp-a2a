@@ -28,21 +28,38 @@ registrar rather than a traditional one with a chat box bolted on.
 
 Add OSIR as a custom connector from your Claude settings — no config file or install required:
 
-1. In Claude, open **Customize → Connectors**.
-2. Click **+**, then choose **Add custom connector**.
+1. In Claude, open **Settings → Connectors**.
+2. Click **Add custom connector**.
 3. Set **Name** to `OSIR`.
 4. Set the **Remote MCP server URL** to `https://be.osir.com/mcp/http`.
-5. Save, then authenticate with your OSIR account when prompted.
+5. Set the **OAuth Client ID** to `mcp-client`.
+6. Save, then sign in with your OSIR account when the browser prompt appears.
 
 ```
 Claude · Add custom connector
 
 Name:                OSIR
 Remote MCP server:   https://be.osir.com/mcp/http
+OAuth Client ID:     mcp-client
 ```
 
-The same remote MCP server URL `https://be.osir.com/mcp/http` works in any MCP client that supports
-a remote (streamable HTTP) server.
+**Why the Client ID?** OSIR authenticates over OAuth against KeyCloak (`auth.osir.com`). `mcp-client`
+is a public client — it carries no secret, so it's safe to share, and every user still signs in with
+their own OSIR account. You currently have to set it explicitly because automatic client
+registration isn't wired up yet (see the roadmap note below).
+
+The same remote MCP server URL `https://be.osir.com/mcp/http` (with OAuth Client ID `mcp-client`)
+works in any MCP client that supports a remote (streamable HTTP) server.
+
+> **Roadmap — drop the manual Client ID.** The goal is for the server URL alone to be enough, with
+> no Client ID to type. That needs OAuth **Dynamic Client Registration (DCR)** so the client is
+> registered automatically. DCR currently doesn't work end-to-end against our KeyCloak: a client
+> registered dynamically (with a `scope` parameter, which Claude always sends) is created with
+> **empty default client scopes** — so its token carries no `roles`, and the backend rejects it with
+> `403`. `mcp-client` works only because it has the `roles` scope assigned. **TODO:** research how
+> other KeyCloak-backed public MCP servers issue role-bearing tokens to DCR clients (realm default
+> scope config, a registration protocol mapper, or a client-registration policy) and adopt it, so
+> `mcp-client` is no longer required.
 
 ### What your assistant can do
 
