@@ -41,8 +41,6 @@ public class SessionAwareAuthService {
 
     // connection ID -> SessionAuth
     private final Map<String, SessionAuth> sessionAuths = new ConcurrentHashMap<>();
-    // deviceCode -> DeviceFlowEntry (connectionId + expiry) — for ownership validation
-    private final Map<String, DeviceFlowEntry> pendingDeviceFlows = new ConcurrentHashMap<>();
 
     public enum AuthCheck { AUTHENTICATED, NOT_AUTHENTICATED, EXPIRED }
 
@@ -95,6 +93,24 @@ public class SessionAwareAuthService {
         return new AuthResult(true, "Logged out successfully");
     }
 
+    /**
+     * Log out a caller authenticated purely via a request Bearer token (no device session).
+     * Best-effort revokes the access token at Keycloak; a stateless JWT the client still holds
+     * stays signature-valid until expiry, so the message says so rather than over-promising.
+     */
+    public AuthResult revokeBearer(String bearerToken) {
+        String raw = bearerToken.startsWith("Bearer ") ? bearerToken.substring(7) : bearerToken;
+        try {
+            keycloakClient.revokeToken(raw, "access_token", clientId);
+            LOG.infof("Revoked bearer access token at Keycloak");
+        } catch (Exception e) {
+            LOG.warnf("Failed to revoke bearer token at Keycloak: %s", e.getMessage());
+        }
+        return new AuthResult(true,
+                "Signed out on the server and revoked the token at Keycloak. If your client caches the "
+                        + "access token it stays valid until it expires — remove it there to fully sign out.");
+    }
+
     public String getCurrentToken(String connectionId) {
         SessionAuth sessionAuth = sessionAuths.get(connectionId);
 
@@ -138,8 +154,6 @@ public class SessionAwareAuthService {
             if (response == null) {
                 return new DeviceLoginResult(false, "Failed to initiate device login: no response from KeyCloak");
             }
-            long expiresAt = System.currentTimeMillis() + (response.getExpiresIn() * 1000L);
-            pendingDeviceFlows.put(response.getDeviceCode(), new DeviceFlowEntry(connectionId, expiresAt));
             LOG.infof("Device login initiated for connection %s. User code: %s", connectionId, response.getUserCode());
             return new DeviceLoginResult(
                     true,
@@ -157,26 +171,13 @@ public class SessionAwareAuthService {
         }
     }
 
+    // No local pending-flow state: KeyCloak is the source of truth for device codes (RFC 8628).
+    // Clients like Claude.ai open a new MCP session between loginWithDevice and the poll, so any
+    // connection-scoped bookkeeping here would reject valid codes.
     public DeviceLoginStatusResult checkDeviceLoginStatus(String connectionId, String deviceCode) {
-        DeviceFlowEntry entry = pendingDeviceFlows.get(deviceCode);
-        if (entry == null) {
-            return new DeviceLoginStatusResult(false, "Unknown device code. Please start a new login.", "invalid");
-        }
-        // Ownership check: reject if this device code was issued to a different connection
-        if (!connectionId.equals(entry.connectionId())) {
-            LOG.warnf("Connection %s attempted to poll device code issued for connection %s",
-                    connectionId, entry.connectionId());
-            return new DeviceLoginStatusResult(false, "Unknown device code. Please start a new login.", "invalid");
-        }
-        if (System.currentTimeMillis() > entry.expiresAt()) {
-            pendingDeviceFlows.remove(deviceCode);
-            return new DeviceLoginStatusResult(false, "Device code has expired. Please start a new login.", "expired");
-        }
-
         try {
             AuthTokenResponse tokenResponse = keycloakClient.pollDeviceToken(
                     "urn:ietf:params:oauth:grant-type:device_code", clientId, deviceCode);
-            pendingDeviceFlows.remove(deviceCode);
 
             String username = extractUsername(tokenResponse.getAccessToken());
             SessionAuth sessionAuth = new SessionAuth(
@@ -205,16 +206,15 @@ public class SessionAwareAuthService {
                 case "slow_down" ->
                         new DeviceLoginStatusResult(true,
                                 "Polling too fast. Please wait a few seconds before retrying.", "slow_down");
-                case "expired_token" -> {
-                    pendingDeviceFlows.remove(deviceCode);
-                    yield new DeviceLoginStatusResult(false,
-                            "Device code has expired. Please start a new login.", "expired");
-                }
-                case "access_denied" -> {
-                    pendingDeviceFlows.remove(deviceCode);
-                    yield new DeviceLoginStatusResult(false,
-                            "Authorization was denied by the user.", "denied");
-                }
+                case "expired_token" ->
+                        new DeviceLoginStatusResult(false,
+                                "Device code has expired. Please start a new login.", "expired");
+                case "access_denied" ->
+                        new DeviceLoginStatusResult(false,
+                                "Authorization was denied by the user.", "denied");
+                case "invalid_grant" ->
+                        new DeviceLoginStatusResult(false,
+                                "Unknown or already-used device code. Please start a new login.", "invalid");
                 default -> {
                     LOG.warnf("Unexpected OAuth error during device poll: %s", errorCode);
                     yield new DeviceLoginStatusResult(false,
@@ -254,13 +254,9 @@ public class SessionAwareAuthService {
 
     @Scheduled(every = "1h")
     public void cleanupExpiredSessions() {
-        long now = System.currentTimeMillis();
         int sessionsBefore = sessionAuths.size();
-        int flowsBefore = pendingDeviceFlows.size();
         sessionAuths.entrySet().removeIf(entry -> entry.getValue().isExpired());
-        pendingDeviceFlows.entrySet().removeIf(entry -> now > entry.getValue().expiresAt());
-        LOG.debugf("Cleanup: removed %d expired sessions, %d abandoned device flows",
-                sessionsBefore - sessionAuths.size(), flowsBefore - pendingDeviceFlows.size());
+        LOG.debugf("Cleanup: removed %d expired sessions", sessionsBefore - sessionAuths.size());
     }
 
     private String extractUsername(String accessToken) {
@@ -289,8 +285,6 @@ public class SessionAwareAuthService {
             return "unknown_error";
         }
     }
-
-    private record DeviceFlowEntry(String connectionId, long expiresAt) {}
 
     private static class SessionAuth {
         private final String username;

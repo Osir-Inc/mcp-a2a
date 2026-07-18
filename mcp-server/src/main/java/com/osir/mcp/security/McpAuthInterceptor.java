@@ -45,6 +45,13 @@ public class McpAuthInterceptor {
         }
         if (conn == null) return ctx.proceed();
 
+        // A valid Bearer token on the HTTP request wins over session state: OAuth-connected
+        // clients (Claude.ai) send it on every call and may not reuse the MCP session that
+        // logged in. setupAuth resolves bearer-then-session in one place and reports usability.
+        if (mcpAuthHelper.setupAuth(conn)) {
+            return ctx.proceed();
+        }
+
         return switch (sessionService.checkAuth(conn.id())) {
             case NOT_AUTHENTICATED -> {
                 LOG.debugf("tool=%s conn=%s: no session", ctx.getMethod().getName(), conn.id());

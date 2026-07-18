@@ -1,8 +1,10 @@
 package com.osir.mcp.security;
 
 import com.osir.mcp.models.confirmation.ConfirmationRequiredResult;
+import com.osir.mcp.services.McpAuthHelper;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.util.Optional;
@@ -16,6 +18,9 @@ public class PendingActionStore {
     private static final Logger LOG = Logger.getLogger(PendingActionStore.class);
     private static final long TTL_MS = 300_000; // 5 minutes
 
+    @Inject
+    McpAuthHelper authHelper;
+
     private final ConcurrentHashMap<String, PendingAction> store = new ConcurrentHashMap<>();
 
     public ConfirmationRequiredResult stage(
@@ -27,8 +32,11 @@ public class PendingActionStore {
 
         String actionId = UUID.randomUUID().toString();
         long expiresAt = System.currentTimeMillis() + TTL_MS;
-        store.put(actionId, new PendingAction(actionId, toolName, summary, connectionId, bucket, expiresAt, action));
-        LOG.debugf("Staged action: id=%s tool=%s conn=%s", actionId, toolName, connectionId);
+        // Owner is the authenticated user (stable across MCP sessions), not the connection id —
+        // OAuth clients like Claude.ai stage and execute on different connections.
+        String owner = authHelper.currentPrincipal(connectionId);
+        store.put(actionId, new PendingAction(actionId, toolName, summary, owner, connectionId, bucket, expiresAt, action));
+        LOG.debugf("Staged action: id=%s tool=%s owner=%s conn=%s", actionId, toolName, owner, connectionId);
         ConfirmationRequiredResult result = new ConfirmationRequiredResult(actionId, toolName, summary);
         result.setExpiresIn((TTL_MS / 60_000) + " minutes");
         return result;

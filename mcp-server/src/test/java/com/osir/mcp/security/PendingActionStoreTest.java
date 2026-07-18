@@ -1,6 +1,7 @@
 package com.osir.mcp.security;
 
 import com.osir.mcp.models.confirmation.ConfirmationRequiredResult;
+import com.osir.mcp.services.McpAuthHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +12,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class PendingActionStoreTest {
 
@@ -19,6 +23,9 @@ class PendingActionStoreTest {
     @BeforeEach
     void setUp() {
         store = new PendingActionStore();
+        // stage() derives the owner from the authenticated principal; stub it deterministically.
+        store.authHelper = mock(McpAuthHelper.class);
+        when(store.authHelper.currentPrincipal(anyString())).thenReturn("user:test");
     }
 
     // ===== stage() =====
@@ -155,7 +162,7 @@ class PendingActionStoreTest {
         var internalStore = (ConcurrentHashMap<String, PendingAction>) field.get(store);
 
         PendingAction expired = new PendingAction(
-                "expired-id", "expired", "summary", "conn",
+                "expired-id", "expired", "summary", "user:test", "conn",
                 DestructiveOpRateLimiter.Bucket.DESTRUCTIVE,
                 System.currentTimeMillis() - 1,
                 () -> null);

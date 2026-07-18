@@ -75,11 +75,17 @@ public class DomainRegistrarMCPServer {
 
     @Tool(description = "Check whether the current session is authenticated. Returns authenticated status and token expiry. No parameters required.")
     public AuthStatusResult getAuthStatus(McpConnection connection) {
+        AuthStatusResult bearerStatus = mcpAuthHelper.bearerAuthStatus();
+        if (bearerStatus != null) return bearerStatus;
         return sessionAuthService.getAuthStatus(connection.id());
     }
 
     @Tool(description = "Log out and clear the current session token. No parameters required.")
     public AuthResult logout(McpConnection connection) {
+        String bearer = mcpAuthHelper.bearerToken();
+        if (bearer != null) {
+            return sessionAuthService.revokeBearer(bearer);
+        }
         return sessionAuthService.logout(connection.id());
     }
 

@@ -6,6 +6,7 @@ import com.osir.mcp.security.McpAudited;
 import com.osir.mcp.security.PendingAction;
 import com.osir.mcp.security.PendingActionStore;
 import com.osir.mcp.security.RequiresAuth;
+import com.osir.mcp.services.McpAuthHelper;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkus.logging.Log;
@@ -26,6 +27,9 @@ public class ConfirmationMCPServer {
     @Inject
     DestructiveOpRateLimiter rateLimiter;
 
+    @Inject
+    McpAuthHelper authHelper;
+
     @Tool(description = "Execute a previously staged destructive or financial action after user approval. Required: actionId (the UUID returned by the staging tool). The action expires after 5 minutes and can only be executed once.")
     public ActionExecutionResult executeConfirmedAction(String actionId, McpConnection connection) {
         var opt = pendingActionStore.claim(actionId);
@@ -41,16 +45,19 @@ public class ConfirmationMCPServer {
                     "Action '" + pending.toolName() + "' has expired. Please retry the original operation.");
         }
 
-        if (!pending.connectionId().equals(connection.id())) {
+        // Ownership and rate limiting key on the authenticated user, not the MCP connection —
+        // OAuth clients (Claude.ai) stage and execute on different connections for the same user.
+        String principal = authHelper.currentPrincipal(connection);
+        if (!pending.owner().equals(principal)) {
             return new ActionExecutionResult(false,
-                    "This action was staged by a different session and cannot be executed here.");
+                    "This action was staged by a different user and cannot be executed here.");
         }
 
-        if (!rateLimiter.tryAcquire(connection.id(), pending.bucket())) {
+        if (!rateLimiter.tryAcquire(principal, pending.bucket())) {
             return new ActionExecutionResult(false, "Rate limit exceeded. Please wait before retrying.");
         }
 
-        AUDIT.infof("tool=%s confirmed action_id=%s conn=%s summary=%s", pending.toolName(), actionId, connection.id(), pending.summary());
+        AUDIT.infof("tool=%s confirmed action_id=%s owner=%s conn=%s summary=%s", pending.toolName(), actionId, principal, connection.id(), pending.summary());
 
         try {
             Object result = pending.action().call();
