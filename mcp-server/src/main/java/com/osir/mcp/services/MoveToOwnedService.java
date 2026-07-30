@@ -207,6 +207,15 @@ public class MoveToOwnedService {
 
     private MoveToOwnedResult finishMove(String appName, String moveKey, String instanceId, VpsInstanceSummary instance, String domain) {
         String ip = instance.getIpAddress();
+        // Guard: a box can report COMPLETE before its IP field populates. Shipping ip=null would
+        // just bounce off C2's 422 — wait instead, the tracker keeps the move resumable.
+        if (ip == null || ip.isBlank()) {
+            return new MoveToOwnedResult(false, "BUILDING",
+                    "VPS '" + instanceId + "' is built but has no IP address assigned yet. "
+                            + "The order is placed — nothing more will be charged.",
+                    instanceId, null, domain, null,
+                    "Call osirAppMoveToOwned again with the same arguments in a minute — it resumes and never orders twice.");
+        }
         if (!deploymentService.moveToOwned(appName, instanceId, ip, domain)) {
             // Tracker entry kept; C2's endpoint is idempotent per instanceId, so resuming is safe.
             return new MoveToOwnedResult(false, "FAILED",
@@ -217,20 +226,25 @@ public class MoveToOwnedService {
         }
 
         Boolean dnsBound = null;
-        String nextStep = null;
+        // C2 accepted the move but ships asynchronously (~3-5 min) — the honest instruction is
+        // "poll osirAppStatus until tier reads owned", not "it's done".
+        String nextStep = "Check osirAppStatus for '" + appName
+                + "' until tier reads 'owned' (typically a few minutes).";
         if (domain != null && !domain.isBlank()) {
             dnsBound = bindDomain(domain, ip);
             if (!dnsBound) {
                 nextStep = "The domain '" + domain + "' is not hosted on osir.app nameservers. Point an A record "
-                        + "for it to " + ip + " at your DNS provider (add an AAAA record too if you use IPv6).";
+                        + "for it to " + ip + " at your DNS provider (add an AAAA record too if you use IPv6). "
+                        + nextStep;
             }
         }
 
         // Same key the operation started with — never re-derive identity mid-flight.
         orderedInstances.remove(moveKey);
-        LOG.infof("moveToOwned: app %s moved to instance %s (%s)", appName, instanceId, ip);
-        return new MoveToOwnedResult(true, "MOVED",
-                "App '" + appName + "' now runs on your own VPS '" + instanceId + "' (" + ip + "). "
+        LOG.infof("moveToOwned: app %s handed to C2 for instance %s (%s)", appName, instanceId, ip);
+        return new MoveToOwnedResult(true, "MOVING",
+                "The platform is now moving app '" + appName + "' onto your VPS '" + instanceId + "' (" + ip
+                        + "). This takes a few minutes; the move is complete when osirAppStatus shows tier 'owned'. "
                         + "The shared-tier copy keeps running until you remove it.",
                 instanceId, ip, domain, dnsBound, nextStep);
     }

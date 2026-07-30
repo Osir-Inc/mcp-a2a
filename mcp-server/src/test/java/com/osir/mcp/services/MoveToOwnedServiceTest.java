@@ -150,7 +150,7 @@ class MoveToOwnedServiceTest {
         MoveToOwnedResult second = service.resume("app1", null);
 
         assertTrue(second.success());
-        assertEquals("MOVED", second.status());
+        assertEquals("MOVING", second.status());
         verify(vpsService, times(1)).orderVps(anyString(), anyString(), anyString(), anyInt(), anyList());
         assertFalse(service.hasOrderedInstance("app1"));
     }
@@ -232,6 +232,21 @@ class MoveToOwnedServiceTest {
         assertEquals(Boolean.FALSE, result.dnsBound());
         assertTrue(result.nextStep().contains("1.2.3.4"));
         assertTrue(result.nextStep().contains("A record"));
+    }
+
+    @Test
+    void completeWithoutIpWaitsInsteadOfShippingNull() {
+        when(vpsService.orderVps(anyString(), anyString(), anyString(), anyInt(), anyList()))
+                .thenReturn(orderOk("vps-9"));
+        instanceState("vps-9", "COMPLETE", null); // built, IP not yet populated
+
+        MoveToOwnedResult result = service.orderAndMove("app1", "OSIR-S",
+                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", 20), null);
+
+        assertFalse(result.success());
+        assertEquals("BUILDING", result.status());
+        verify(deploymentService, never()).moveToOwned(anyString(), anyString(), any(), any());
+        assertTrue(service.hasOrderedInstance("app1"), "move must stay resumable");
     }
 
     @Test

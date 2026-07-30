@@ -14,7 +14,8 @@ public final class MoveToOwnedDtos {
 
     /**
      * LLM-facing outcome of osirAppMoveToOwned. {@code status} is one of:
-     * MOVED (done), BUILDING (VPS not ready yet — call the tool again to resume),
+     * MOVING (C2 accepted the move and ships asynchronously — poll osirAppStatus until
+     * tier reads "owned"), BUILDING (VPS not ready yet — call the tool again to resume),
      * BUILD_FAILED (OS install failed — free rebuild via buildVpsInstance, never re-order),
      * FAILED (validation or backend error).
      */
