@@ -63,7 +63,7 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Poll for device login completion. Call this after loginWithDevice() once you have opened the verification URL and signed in. Required: deviceCode (the device_code returned by loginWithDevice). Returns authenticated=true when login is complete.")
+    @Tool(description = "Poll for device login completion. Call this after loginWithDevice() once you have opened the verification URL and signed in. Required: deviceCode (the device_code returned by loginWithDevice). On success returns a sessionKey — pass it as the sessionKey argument on every subsequent authenticated tool call.")
     public DeviceLoginStatusResult checkDeviceLoginStatus(String deviceCode, McpConnection connection) {
         Log.infof("Checking device login status for connection %s", connection.id());
         try {
@@ -73,15 +73,25 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Check whether the current session is authenticated. Returns authenticated status and token expiry. No parameters required.")
-    public AuthStatusResult getAuthStatus(McpConnection connection) {
+    @Tool(description = "Check whether the current session is authenticated. Returns authenticated status and token expiry. Optional: sessionKey (from checkDeviceLoginStatus).")
+    public AuthStatusResult getAuthStatus(
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
+            McpConnection connection) {
         AuthStatusResult bearerStatus = mcpAuthHelper.bearerAuthStatus();
         if (bearerStatus != null) return bearerStatus;
+        if (sessionKey != null && !sessionKey.isBlank()) {
+            return sessionAuthService.getAuthStatus(sessionKey);
+        }
         return sessionAuthService.getAuthStatus(connection.id());
     }
 
-    @Tool(description = "Log out and clear the current session token. No parameters required.")
-    public AuthResult logout(McpConnection connection) {
+    @Tool(description = "Log out: revokes the session's tokens at the identity provider immediately. Optional: sessionKey (from checkDeviceLoginStatus) — pass it to end that conversation session.")
+    public AuthResult logout(
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
+            McpConnection connection) {
+        if (sessionKey != null && !sessionKey.isBlank()) {
+            return sessionAuthService.logout(sessionKey);
+        }
         String bearer = mcpAuthHelper.bearerToken();
         if (bearer != null) {
             return sessionAuthService.revokeBearer(bearer);
@@ -93,8 +103,8 @@ public class DomainRegistrarMCPServer {
 
     // Domain Availability Tools
     @Tool(description = "Check if a domain name is available for registration. Required: domain (e.g., 'example.com')")
-    public DomainAvailabilityResult checkDomainAvailability(String domain, McpConnection connection) {
-        mcpAuthHelper.setupAuth(connection);
+    public DomainAvailabilityResult checkDomainAvailability(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+        mcpAuthHelper.setupAuth(connection, sessionKey);
         try {
             return domainService.checkAvailability(domain);
         } catch (Exception e) {
@@ -121,6 +131,7 @@ public class DomainRegistrarMCPServer {
             List<String> nameservers,
             @ToolArg(required = false) Boolean privacyProtection,
             @ToolArg(required = false) Boolean autoRenew,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection
     ) {
         boolean privacy = privacyProtection != null ? privacyProtection : true;
@@ -137,7 +148,7 @@ public class DomainRegistrarMCPServer {
     // Domain Transfer Tools
     @RequiresAuth
     @Tool(description = "Stage transfer of a domain from another registrar to OSIR. Deducts from account balance. Required: domain (e.g., 'example.com'), authCode (EPP code from current registrar), registrantInfo (contact details). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult transferDomain(String domain, String authCode, RegistrantInfo registrantInfo, McpConnection connection) {
+    public ConfirmationRequiredResult transferDomain(String domain, String authCode, RegistrantInfo registrantInfo, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "transferDomain",
                 "Transfer domain '" + domain + "' to OSIR — deducts transfer fee from account balance",
@@ -150,7 +161,7 @@ public class DomainRegistrarMCPServer {
     // Domain Management Tools
     @RequiresAuth
     @Tool(description = "Update nameservers for a domain. Required: domain (e.g., 'example.com'), nameservers (e.g., ['ns1.example.com', 'ns2.example.com'])")
-    public NameserverUpdateResult updateNameservers(String domain, List<String> nameservers, McpConnection connection) {
+    public NameserverUpdateResult updateNameservers(String domain, List<String> nameservers, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.updateNameservers(domain, nameservers);
         } catch (Exception e) {
@@ -160,7 +171,7 @@ public class DomainRegistrarMCPServer {
 
     @RequiresAuth
     @Tool(description = "Get detailed information about a domain including expiration date, nameservers, and status. Required: domain (e.g., 'example.com')")
-    public DomainInfoResult getDomainInfo(String domain, McpConnection connection) {
+    public DomainInfoResult getDomainInfo(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.getDomainInfo(domain);
         } catch (Exception e) {
@@ -170,7 +181,7 @@ public class DomainRegistrarMCPServer {
 
     @RequiresAuth
     @Tool(description = "List all domains owned by the authenticated user. No parameters required. Must be authenticated first.")
-    public UserDomainsResult listUserDomains(McpConnection connection) {
+    public UserDomainsResult listUserDomains(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.getUserDomains();
         } catch (Exception e) {
@@ -181,7 +192,7 @@ public class DomainRegistrarMCPServer {
     // Domain Renewal
     @RequiresAuth
     @Tool(description = "Stage renewal of a domain for a specified number of years. Deducts from account balance. Required: domain (e.g., 'example.com'), years (1-10). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult renewDomain(String domain, int years, McpConnection connection) {
+    public ConfirmationRequiredResult renewDomain(String domain, int years, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "renewDomain",
                 "Renew domain '" + domain + "' for " + years + " year(s) — deducts renewal fee from account balance",
@@ -194,7 +205,7 @@ public class DomainRegistrarMCPServer {
     // Domain Lock/Unlock
     @RequiresAuth
     @Tool(description = "Enable registrar lock on a domain to prevent unauthorized transfers. Required: domain (e.g., 'example.com')")
-    public DomainActionResult lockDomain(String domain, McpConnection connection) {
+    public DomainActionResult lockDomain(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.lockDomain(domain);
         } catch (Exception e) {
@@ -204,7 +215,7 @@ public class DomainRegistrarMCPServer {
 
     @RequiresAuth
     @Tool(description = "Stage removal of registrar lock from a domain to allow transfers. DESTRUCTIVE — reduces domain security. Required: domain (e.g., 'example.com'). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult unlockDomain(String domain, McpConnection connection) {
+    public ConfirmationRequiredResult unlockDomain(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "unlockDomain",
                 "Remove registrar lock from domain '" + domain + "' — reduces security, enables transfers",
@@ -217,7 +228,7 @@ public class DomainRegistrarMCPServer {
     // Domain Settings
     @RequiresAuth
     @Tool(description = "Enable or disable auto-renewal for a domain. Required: domain (e.g., 'example.com'), enabled (true/false)")
-    public DomainActionResult updateDomainAutoRenew(String domain, boolean enabled, McpConnection connection) {
+    public DomainActionResult updateDomainAutoRenew(String domain, boolean enabled, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.updateAutoRenew(domain, enabled);
         } catch (Exception e) {
@@ -227,7 +238,7 @@ public class DomainRegistrarMCPServer {
 
     @RequiresAuth
     @Tool(description = "Enable or disable WHOIS privacy protection for a domain. Required: domain (e.g., 'example.com'), enabled (true/false)")
-    public DomainActionResult updateDomainPrivacy(String domain, boolean enabled, McpConnection connection) {
+    public DomainActionResult updateDomainPrivacy(String domain, boolean enabled, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.updatePrivacyProtection(domain, enabled);
         } catch (Exception e) {
@@ -243,7 +254,7 @@ public class DomainRegistrarMCPServer {
 
     @RequiresAuth
     @Tool(description = "Suggest alternative domain names if the requested one is unavailable (legacy method). Required: domain (e.g., 'example.com'). Optional: limit (default 10)")
-    public DomainSuggestionsResult suggestAlternatives(String domain, @ToolArg(required = false) Integer limit, McpConnection connection) {
+    public DomainSuggestionsResult suggestAlternatives(String domain, @ToolArg(required = false) Integer limit, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.suggestAlternatives(domain, limit != null ? limit : 10);
         } catch (Exception e) {

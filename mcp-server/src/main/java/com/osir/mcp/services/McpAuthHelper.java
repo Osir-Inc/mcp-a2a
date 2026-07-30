@@ -17,11 +17,14 @@ import java.util.Map;
  * setupAuth, and confirmation ownership) routes through here so the
  * "Bearer header wins over session" precedence lives in exactly one place.
  *
- * Two token sources, in priority order:
+ * Three token sources, in priority order:
  * 1. An {@code Authorization: Bearer} header on the MCP HTTP request — sent by
- *    OAuth connectors (e.g. Claude.ai) on every call. Survives MCP session churn:
- *    such clients may open a new session (new connection id) per call.
- * 2. The per-connection session established via the device-login tools.
+ *    OAuth connectors on every call. Survives MCP session churn: such clients
+ *    may open a new session (new connection id) per call.
+ * 2. A conversation session key ({@code osk_*}) passed as the {@code sessionKey}
+ *    tool argument — minted by checkDeviceLoginStatus and carried in the LLM
+ *    conversation, so it also survives session churn without any OAuth setup.
+ * 3. The per-connection session established via the device-login tools.
  *
  * Signature validation is the backend's job; the only local check here is a
  * provable-expiry gate (a numeric {@code exp} in the past), so getAuthStatus and
@@ -50,8 +53,12 @@ public class McpAuthHelper {
      * downstream services use it. Returns true if a usable token was established.
      */
     public boolean setupAuth(McpConnection connection) {
+        return setupAuth(connection, null);
+    }
+
+    public boolean setupAuth(McpConnection connection, String sessionKey) {
         if (!authContextInstance.isResolvable()) return false;
-        String token = resolveToken(connection);
+        String token = resolveToken(connection, sessionKey);
         if (token != null) {
             authContextInstance.get().setTokenOverride(token);
             return true;
@@ -62,11 +69,15 @@ public class McpAuthHelper {
         return false;
     }
 
-    /** The token to authenticate with: a valid request Bearer header, else the session token. */
-    private String resolveToken(McpConnection connection) {
+    /** The token to authenticate with: Bearer header > conversation session key > connection session. */
+    private String resolveToken(McpConnection connection, String sessionKey) {
         String bearer = bearerToken();
         if (bearer != null && !isLocallyExpired(bearer.substring(BEARER_PREFIX.length()))) {
             return bearer;
+        }
+        if (sessionKey != null && sessionKey.startsWith(SessionAwareAuthService.SESSION_KEY_PREFIX)) {
+            String token = sessionService.getCurrentToken(sessionKey);
+            if (token != null) return token;
         }
         return connection == null ? null : sessionService.getCurrentToken(connection.id());
     }

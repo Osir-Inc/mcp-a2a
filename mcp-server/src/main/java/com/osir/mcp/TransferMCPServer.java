@@ -9,6 +9,7 @@ import com.osir.mcp.security.RequiresAuth;
 import com.osir.mcp.services.TransferService;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -25,7 +26,7 @@ public class TransferMCPServer {
     PendingActionStore pendingActionStore;
 
     @Tool(description = "Get a transfer price quote for a domain. Requires authentication. Required: domain (e.g., 'example.com'). Returns transfer price, currency, extension years, and new expiration date.")
-    public TransferQuoteResult getTransferQuote(String domain, McpConnection connection) {
+    public TransferQuoteResult getTransferQuote(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return transferService.getQuote(domain);
         } catch (Exception e) {
@@ -35,7 +36,7 @@ public class TransferMCPServer {
     }
 
     @Tool(description = "Stage initiation of a domain transfer from another registrar. Deducts from account balance. Requires authentication. Required: domain (e.g., 'example.com'), authCode (EPP authorization code from current registrar). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult initiateTransfer(String domain, String authCode, McpConnection connection) {
+    public ConfirmationRequiredResult initiateTransfer(String domain, String authCode, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "initiateTransfer",
                 "Initiate transfer of '" + domain + "' to OSIR (deducts transfer fee from account balance)",
@@ -46,7 +47,7 @@ public class TransferMCPServer {
     }
 
     @Tool(description = "Check the current status of a domain transfer. Requires authentication. Required: domain (e.g., 'example.com'). Returns status, request date, current registrar, and expected completion.")
-    public TransferStatusResult getTransferStatus(String domain, McpConnection connection) {
+    public TransferStatusResult getTransferStatus(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return transferService.getStatus(domain);
         } catch (Exception e) {
@@ -56,7 +57,7 @@ public class TransferMCPServer {
     }
 
     @Tool(description = "Stage cancellation of a pending domain transfer. DESTRUCTIVE — irreversible. Requires authentication. Required: domain (e.g., 'example.com'). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult cancelTransfer(String domain, McpConnection connection) {
+    public ConfirmationRequiredResult cancelTransfer(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "cancelTransfer",
                 "Cancel pending domain transfer for '" + domain + "'",
@@ -67,7 +68,7 @@ public class TransferMCPServer {
     }
 
     @Tool(description = "List all pending incoming (gaining) domain transfers. Requires authentication. Returns a list of transfers with their status, request date, current registrar, and expected completion.")
-    public PendingTransferListResult listPendingTransfers(McpConnection connection) {
+    public PendingTransferListResult listPendingTransfers(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return transferService.listPending();
         } catch (Exception e) {

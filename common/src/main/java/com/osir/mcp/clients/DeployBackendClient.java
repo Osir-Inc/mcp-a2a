@@ -10,6 +10,7 @@ import com.osir.mcp.models.deploy.DeployDtos.ProvisionDbEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.SecretBody;
 import com.osir.mcp.models.deploy.DeployDtos.StatusEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.UploadEnvelope;
+import com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedBody;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
@@ -69,4 +70,14 @@ public interface DeployBackendClient {
     @POST
     @Path("/v1/apps/{appId}/database")
     ProvisionDbEnvelope provisionDatabase(@PathParam("appId") String appId, @QueryParam("engine") String engine, @HeaderParam("Authorization") String bearer, @HeaderParam("X-Osir-Tenant") String tenant);
+
+    /**
+     * Ship the app onto an already-built customer VPS: C2 runs prep + deploy + node registration
+     * server-side (the image never touches the client). Idempotent per instanceId — a re-POST
+     * re-runs prep (no-op) and deploy (replace). JsonNode because the response contract is not
+     * final while the endpoint is being built.
+     */
+    @POST
+    @Path("/v1/apps/{appId}/move-to-owned")
+    JsonNode moveToOwned(@PathParam("appId") String appId, MoveToOwnedBody body, @HeaderParam("Authorization") String bearer, @HeaderParam("X-Osir-Tenant") String tenant);
 }

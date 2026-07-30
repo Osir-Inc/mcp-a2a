@@ -122,7 +122,7 @@ class VpsHostingMCPServerTest {
         when(pendingActionStore.stage(eq("orderVps"), any(), eq("test-conn-id"),
                 eq(DestructiveOpRateLimiter.Bucket.FINANCIAL), any())).thenReturn(staged);
 
-        ConfirmationRequiredResult result = mcpServer.orderVps("pkg-1", "myserver.com", "MONTHLY", null, null, mockConnection);
+        ConfirmationRequiredResult result = mcpServer.orderVps("pkg-1", "myserver.com", "MONTHLY", null, null, null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("orderVps"), any(), eq("test-conn-id"),
@@ -136,7 +136,7 @@ class VpsHostingMCPServerTest {
         VpsInstanceListResult expected = new VpsInstanceListResult(true, "OK");
         when(vpsService.listMyInstances()).thenReturn(expected);
 
-        VpsInstanceListResult result = mcpServer.listMyVpsInstances(mockConnection);
+        VpsInstanceListResult result = mcpServer.listMyVpsInstances(null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).listMyInstances();
@@ -146,7 +146,7 @@ class VpsHostingMCPServerTest {
     void listMyVpsInstances_handlesException() {
         when(vpsService.listMyInstances()).thenThrow(new RuntimeException("Fail"));
 
-        VpsInstanceListResult result = mcpServer.listMyVpsInstances(mockConnection);
+        VpsInstanceListResult result = mcpServer.listMyVpsInstances(null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -159,7 +159,7 @@ class VpsHostingMCPServerTest {
         VpsInstanceDetailResult expected = new VpsInstanceDetailResult(true, "OK");
         when(vpsService.getInstanceDetails("vps-1")).thenReturn(expected);
 
-        VpsInstanceDetailResult result = mcpServer.getVpsInstanceDetails("vps-1", mockConnection);
+        VpsInstanceDetailResult result = mcpServer.getVpsInstanceDetails("vps-1", null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).getInstanceDetails("vps-1");
@@ -169,7 +169,7 @@ class VpsHostingMCPServerTest {
     void getVpsInstanceDetails_handlesException() {
         when(vpsService.getInstanceDetails("vps-1")).thenThrow(new RuntimeException("Fail"));
 
-        VpsInstanceDetailResult result = mcpServer.getVpsInstanceDetails("vps-1", mockConnection);
+        VpsInstanceDetailResult result = mcpServer.getVpsInstanceDetails("vps-1", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -183,7 +183,7 @@ class VpsHostingMCPServerTest {
         when(pendingActionStore.stage(eq("deleteVpsInstance"), any(), eq("test-conn-id"),
                 eq(DestructiveOpRateLimiter.Bucket.DESTRUCTIVE), any())).thenReturn(staged);
 
-        ConfirmationRequiredResult result = mcpServer.deleteVpsInstance("vps-1", mockConnection);
+        ConfirmationRequiredResult result = mcpServer.deleteVpsInstance("vps-1", null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("deleteVpsInstance"), any(), eq("test-conn-id"),
@@ -197,7 +197,7 @@ class VpsHostingMCPServerTest {
         VpsActionResult expected = new VpsActionResult(true, "Changed");
         when(vpsService.changePaymentTerm("vps-1", "ANNUAL")).thenReturn(expected);
 
-        VpsActionResult result = mcpServer.changeVpsPaymentTerm("vps-1", "ANNUAL", mockConnection);
+        VpsActionResult result = mcpServer.changeVpsPaymentTerm("vps-1", "ANNUAL", null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).changePaymentTerm("vps-1", "ANNUAL");
@@ -207,7 +207,7 @@ class VpsHostingMCPServerTest {
     void changeVpsPaymentTerm_handlesException() {
         when(vpsService.changePaymentTerm("vps-1", "ANNUAL")).thenThrow(new RuntimeException("Fail"));
 
-        VpsActionResult result = mcpServer.changeVpsPaymentTerm("vps-1", "ANNUAL", mockConnection);
+        VpsActionResult result = mcpServer.changeVpsPaymentTerm("vps-1", "ANNUAL", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -220,7 +220,7 @@ class VpsHostingMCPServerTest {
         VpsPanelLoginResult expected = new VpsPanelLoginResult(true, "OK");
         when(vpsService.loginToPanel("vps-1")).thenReturn(expected);
 
-        VpsPanelLoginResult result = mcpServer.loginToVpsPanel("vps-1", mockConnection);
+        VpsPanelLoginResult result = mcpServer.loginToVpsPanel("vps-1", null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).loginToPanel("vps-1");
@@ -230,7 +230,7 @@ class VpsHostingMCPServerTest {
     void loginToVpsPanel_handlesException() {
         when(vpsService.loginToPanel("vps-1")).thenThrow(new RuntimeException("Fail"));
 
-        VpsPanelLoginResult result = mcpServer.loginToVpsPanel("vps-1", mockConnection);
+        VpsPanelLoginResult result = mcpServer.loginToVpsPanel("vps-1", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -243,7 +243,7 @@ class VpsHostingMCPServerTest {
         VpsCountResult expected = new VpsCountResult(true, "OK", 3);
         when(vpsService.countMyInstances()).thenReturn(expected);
 
-        VpsCountResult result = mcpServer.countMyVpsInstances(mockConnection);
+        VpsCountResult result = mcpServer.countMyVpsInstances(null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).countMyInstances();
@@ -253,7 +253,7 @@ class VpsHostingMCPServerTest {
     void countMyVpsInstances_handlesException() {
         when(vpsService.countMyInstances()).thenThrow(new RuntimeException("Fail"));
 
-        VpsCountResult result = mcpServer.countMyVpsInstances(mockConnection);
+        VpsCountResult result = mcpServer.countMyVpsInstances(null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -266,7 +266,7 @@ class VpsHostingMCPServerTest {
         VpsOsTemplateListResult expected = new VpsOsTemplateListResult(true, "ok");
         when(vpsService.listOsTemplates(null, "vps-1", null)).thenReturn(expected);
 
-        VpsOsTemplateListResult result = mcpServer.listVpsOsTemplates(null, "vps-1", null, mockConnection);
+        VpsOsTemplateListResult result = mcpServer.listVpsOsTemplates(null, "vps-1", null, null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).listOsTemplates(null, "vps-1", null);
@@ -278,7 +278,7 @@ class VpsHostingMCPServerTest {
         VpsOsTemplateListResult expected = new VpsOsTemplateListResult(true, "ok");
         when(vpsService.listOsTemplates("pkg-1", null, false)).thenReturn(expected);
 
-        VpsOsTemplateListResult result = mcpServer.listVpsOsTemplates("pkg-1", null, false, mockConnection);
+        VpsOsTemplateListResult result = mcpServer.listVpsOsTemplates("pkg-1", null, false, null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).listOsTemplates("pkg-1", null, false);
@@ -288,7 +288,7 @@ class VpsHostingMCPServerTest {
     void listVpsOsTemplates_handlesException() {
         when(vpsService.listOsTemplates(any(), any(), any())).thenThrow(new RuntimeException("Fail"));
 
-        VpsOsTemplateListResult result = mcpServer.listVpsOsTemplates(null, "vps-1", true, mockConnection);
+        VpsOsTemplateListResult result = mcpServer.listVpsOsTemplates(null, "vps-1", true, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -303,7 +303,7 @@ class VpsHostingMCPServerTest {
                 eq(DestructiveOpRateLimiter.Bucket.DESTRUCTIVE), any())).thenReturn(staged);
 
         ConfirmationRequiredResult result =
-                mcpServer.buildVpsInstance("vps-1", 46, null, null, null, mockConnection);
+                mcpServer.buildVpsInstance("vps-1", 46, null, null, null, null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("buildVpsInstance"), any(), eq("test-conn-id"),
@@ -318,7 +318,7 @@ class VpsHostingMCPServerTest {
     void buildVpsInstance_summarySpellsOutDataLoss() {
         ArgumentCaptor<String> summary = ArgumentCaptor.forClass(String.class);
 
-        mcpServer.buildVpsInstance("vps-1", 46, null, null, null, mockConnection);
+        mcpServer.buildVpsInstance("vps-1", 46, null, null, null, null, mockConnection);
 
         verify(pendingActionStore).stage(eq("buildVpsInstance"), summary.capture(), any(), any(), any());
         assertTrue(summary.getValue().contains("ERASES ALL DATA"),
@@ -337,7 +337,7 @@ class VpsHostingMCPServerTest {
         VpsBuildResult expected = new VpsBuildResult(true, "queued");
         when(vpsService.buildInstance("vps-1", 46, "host.example.com", List.of(3), 512.0)).thenReturn(expected);
 
-        mcpServer.buildVpsInstance("vps-1", 46, List.of(3), "host.example.com", 512.0, mockConnection);
+        mcpServer.buildVpsInstance("vps-1", 46, List.of(3), "host.example.com", 512.0, null, mockConnection);
         verify(pendingActionStore).stage(eq("buildVpsInstance"), any(), any(), any(), action.capture());
 
         // Nothing should have happened until the action is confirmed.
@@ -358,7 +358,7 @@ class VpsHostingMCPServerTest {
         VpsOrderResult expected = new VpsOrderResult(true, "ordered");
         when(vpsService.orderVps("pkg-1", "myserver.com", "MONTHLY", 46, List.of(3))).thenReturn(expected);
 
-        mcpServer.orderVps("pkg-1", "myserver.com", "MONTHLY", 46, List.of(3), mockConnection);
+        mcpServer.orderVps("pkg-1", "myserver.com", "MONTHLY", 46, List.of(3), null, mockConnection);
         verify(pendingActionStore).stage(eq("orderVps"), any(), any(), any(), action.capture());
 
         assertSame(expected, action.getValue().call());
@@ -370,7 +370,7 @@ class VpsHostingMCPServerTest {
     void orderVps_summaryFlagsMissingOs() {
         ArgumentCaptor<String> summary = ArgumentCaptor.forClass(String.class);
 
-        mcpServer.orderVps("pkg-1", "myserver.com", "MONTHLY", null, null, mockConnection);
+        mcpServer.orderVps("pkg-1", "myserver.com", "MONTHLY", null, null, null, mockConnection);
 
         verify(pendingActionStore).stage(eq("orderVps"), summary.capture(), any(), any(), any());
         assertTrue(summary.getValue().contains("NO operating system"),
@@ -384,7 +384,7 @@ class VpsHostingMCPServerTest {
         VpsSshKeyResult expected = new VpsSshKeyResult(true, "SSH key stored.");
         when(vpsService.storeSshKey("laptop", "ssh-ed25519 AAAA")).thenReturn(expected);
 
-        VpsSshKeyResult result = mcpServer.addSshKey("laptop", "ssh-ed25519 AAAA", mockConnection);
+        VpsSshKeyResult result = mcpServer.addSshKey("laptop", "ssh-ed25519 AAAA", null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).storeSshKey("laptop", "ssh-ed25519 AAAA");
@@ -394,7 +394,7 @@ class VpsHostingMCPServerTest {
     void addSshKey_handlesException() {
         when(vpsService.storeSshKey(any(), any())).thenThrow(new RuntimeException("Fail"));
 
-        VpsSshKeyResult result = mcpServer.addSshKey("laptop", "ssh-ed25519 AAAA", mockConnection);
+        VpsSshKeyResult result = mcpServer.addSshKey("laptop", "ssh-ed25519 AAAA", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -405,7 +405,7 @@ class VpsHostingMCPServerTest {
         VpsSshKeyListResult expected = new VpsSshKeyListResult(true, "ok");
         when(vpsService.listSshKeys()).thenReturn(expected);
 
-        VpsSshKeyListResult result = mcpServer.listMySshKeys(mockConnection);
+        VpsSshKeyListResult result = mcpServer.listMySshKeys(null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).listSshKeys();
@@ -415,7 +415,7 @@ class VpsHostingMCPServerTest {
     void listMySshKeys_handlesException() {
         when(vpsService.listSshKeys()).thenThrow(new RuntimeException("Fail"));
 
-        VpsSshKeyListResult result = mcpServer.listMySshKeys(mockConnection);
+        VpsSshKeyListResult result = mcpServer.listMySshKeys(null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -426,7 +426,7 @@ class VpsHostingMCPServerTest {
         VpsActionResult expected = new VpsActionResult(true, "SSH key 3 deleted.");
         when(vpsService.deleteSshKey(3)).thenReturn(expected);
 
-        VpsActionResult result = mcpServer.deleteSshKey(3, mockConnection);
+        VpsActionResult result = mcpServer.deleteSshKey(3, null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).deleteSshKey(3);
@@ -436,7 +436,7 @@ class VpsHostingMCPServerTest {
     void deleteSshKey_handlesException() {
         when(vpsService.deleteSshKey(anyInt())).thenThrow(new RuntimeException("Fail"));
 
-        VpsActionResult result = mcpServer.deleteSshKey(3, mockConnection);
+        VpsActionResult result = mcpServer.deleteSshKey(3, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));

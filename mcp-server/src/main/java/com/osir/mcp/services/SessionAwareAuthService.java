@@ -13,6 +13,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jboss.logging.Logger;
 
+import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,7 +40,20 @@ public class SessionAwareAuthService {
     @ConfigProperty(name = "auth.token.refresh-buffer-seconds", defaultValue = "60")
     long refreshBufferSeconds;
 
-    // connection ID -> SessionAuth
+    /** Conversation session keys go stale after this much inactivity — bounds standing access. */
+    @ConfigProperty(name = "mcp.session.idle-timeout-minutes", defaultValue = "30")
+    long idleTimeoutMinutes;
+
+    /** Absolute ceiling on a conversation session's lifetime, regardless of activity. */
+    @ConfigProperty(name = "mcp.session.max-lifetime-hours", defaultValue = "8")
+    long maxLifetimeHours;
+
+    /** Prefix distinguishing conversation session keys from MCP connection ids in the store. */
+    public static final String SESSION_KEY_PREFIX = "osk_";
+
+    private static final SecureRandom RANDOM = new SecureRandom();
+
+    // connection ID or conversation session key (osk_*) -> SessionAuth
     private final Map<String, SessionAuth> sessionAuths = new ConcurrentHashMap<>();
 
     public enum AuthCheck { AUTHENTICATED, NOT_AUTHENTICATED, EXPIRED }
@@ -76,6 +90,9 @@ public class SessionAwareAuthService {
     public AuthResult logout(String connectionId) {
         SessionAuth removed = sessionAuths.remove(connectionId);
         if (removed != null) {
+            // The same SessionAuth is stored under both the connection id and the osk_ session
+            // key; purge every alias so a logged-out token can't authenticate via the twin entry.
+            sessionAuths.entrySet().removeIf(e -> e.getValue() == removed);
             try {
                 keycloakClient.revokeToken(removed.getAccessToken(), "access_token", clientId);
             } catch (Exception e) {
@@ -117,6 +134,17 @@ public class SessionAwareAuthService {
         if (sessionAuth == null) {
             return null;
         }
+
+        // Conversation session keys carry idle + absolute lifetime limits so access is
+        // bounded even though the refresh token could technically renew indefinitely.
+        if (connectionId.startsWith(SESSION_KEY_PREFIX) && sessionAuth.isStale(
+                idleTimeoutMinutes * 60_000L, maxLifetimeHours * 3_600_000L)) {
+            LOG.infof("Conversation session for user %s expired (idle/lifetime limit), revoking", sessionAuth.getUsername());
+            sessionAuths.entrySet().removeIf(e -> e.getValue() == sessionAuth); // include the conn-id twin
+            revokeQuietly(sessionAuth);
+            return null;
+        }
+        sessionAuth.touch();
 
         long now = System.currentTimeMillis();
         long expiresAt = sessionAuth.getExpiresAt();
@@ -189,14 +217,33 @@ public class SessionAwareAuthService {
                     tokenResponse.getRefreshToken()
             );
             sessionAuths.put(connectionId, sessionAuth);
+
+            // Conversation session key: the stable handle for clients (Claude.ai) that open a
+            // new MCP session per tool call — the key lives in the conversation, not the session.
+            String sessionKey = newSessionKey();
+            sessionAuths.put(sessionKey, sessionAuth);
+
+            // Keycloak's SSO-session idle window (refresh_expires_in) caps how long the refresh
+            // token works regardless of our clock — advertise whichever limit bites first so the
+            // login message never over-promises.
+            long effectiveIdleMinutes = idleTimeoutMinutes;
+            if (tokenResponse.getRefreshExpiresIn() != null && tokenResponse.getRefreshExpiresIn() > 0) {
+                effectiveIdleMinutes = Math.min(idleTimeoutMinutes, tokenResponse.getRefreshExpiresIn() / 60);
+            }
+
             LOG.infof("Device login complete for user %s on connection %s", username, connectionId);
-            return new DeviceLoginStatusResult(
+            DeviceLoginStatusResult result = new DeviceLoginStatusResult(
                     true,
-                    "Authentication successful via device flow.",
+                    "Authentication successful. Your sessionKey is " + sessionKey
+                            + " — pass it as the sessionKey argument on every subsequent tool call. "
+                            + "The session ends after " + effectiveIdleMinutes + " minutes of inactivity ("
+                            + maxLifetimeHours + "h maximum); call logout with the sessionKey to end it immediately.",
                     "complete",
                     tokenResponse.getExpiresIn(),
                     tokenResponse.getTokenType()
             );
+            result.setSessionKey(sessionKey);
+            return result;
         } catch (WebApplicationException e) {
             String errorCode = parseOAuthError(e);
             return switch (errorCode) {
@@ -232,8 +279,9 @@ public class SessionAwareAuthService {
             AuthTokenResponse tokenResponse = keycloakClient.refreshToken(
                     "refresh_token", current.getRefreshToken(), clientId);
             if (tokenResponse != null && tokenResponse.getAccessToken() != null) {
-                SessionAuth refreshed = new SessionAuth(
-                        current.getUsername(),
+                // Keep the original creation/activity clocks: a refresh must not extend the
+                // conversation session's absolute lifetime.
+                SessionAuth refreshed = current.refreshedWith(
                         tokenResponse.getAccessToken(),
                         tokenResponse.getTokenType() != null ? tokenResponse.getTokenType() : "Bearer",
                         System.currentTimeMillis() + (tokenResponse.getExpiresIn() != null
@@ -252,11 +300,50 @@ public class SessionAwareAuthService {
         return null;
     }
 
-    @Scheduled(every = "1h")
+    @Scheduled(every = "15m")
     public void cleanupExpiredSessions() {
         int sessionsBefore = sessionAuths.size();
-        sessionAuths.entrySet().removeIf(entry -> entry.getValue().isExpired());
+        long idleMs = idleTimeoutMinutes * 60_000L;
+        long maxMs = maxLifetimeHours * 3_600_000L;
+
+        // Two passes. Stale osk_ sessions are revoked and removed together with every alias
+        // (the same SessionAuth is also stored under a connection id). Expired connection-keyed
+        // entries are removed individually — their osk_ alias may have refreshed and still be
+        // live, so no alias cascade there.
+        Map<SessionAuth, Boolean> staleConversations = new java.util.IdentityHashMap<>();
+        java.util.List<String> expiredConnKeys = new java.util.ArrayList<>();
+        sessionAuths.forEach((key, auth) -> {
+            if (key.startsWith(SESSION_KEY_PREFIX)) {
+                if (auth.isStale(idleMs, maxMs)) staleConversations.put(auth, true);
+            } else if (auth.isExpired()) {
+                expiredConnKeys.add(key);
+            }
+        });
+        // ponytail: serial blocking revocations on the scheduler thread — batch/async if the
+        // stale set ever grows into the hundreds per sweep.
+        staleConversations.keySet().forEach(this::revokeQuietly);
+        sessionAuths.entrySet().removeIf(entry -> staleConversations.containsKey(entry.getValue()));
+        expiredConnKeys.forEach(sessionAuths::remove);
         LOG.debugf("Cleanup: removed %d expired sessions", sessionsBefore - sessionAuths.size());
+    }
+
+    private String newSessionKey() {
+        byte[] bytes = new byte[24];
+        RANDOM.nextBytes(bytes);
+        return SESSION_KEY_PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    /** Best-effort Keycloak revocation when a conversation session ends without an explicit logout. */
+    private void revokeQuietly(SessionAuth auth) {
+        try {
+            if (auth.getRefreshToken() != null) {
+                keycloakClient.backchannelLogout(auth.getRefreshToken(), clientId);
+            } else {
+                keycloakClient.revokeToken(auth.getAccessToken(), "access_token", clientId);
+            }
+        } catch (Exception e) {
+            LOG.debugf("Best-effort revocation failed: %s", e.getMessage());
+        }
     }
 
     private String extractUsername(String accessToken) {
@@ -292,14 +379,37 @@ public class SessionAwareAuthService {
         private final String tokenType;
         private final long expiresAt;
         private final String refreshToken;
+        private final long createdAt;
+        private volatile long lastUsedAt;
 
         SessionAuth(String username, String accessToken, String tokenType,
                     long expiresAt, String refreshToken) {
+            this(username, accessToken, tokenType, expiresAt, refreshToken, System.currentTimeMillis());
+        }
+
+        private SessionAuth(String username, String accessToken, String tokenType,
+                            long expiresAt, String refreshToken, long createdAt) {
             this.username = username;
             this.accessToken = accessToken;
             this.tokenType = tokenType;
             this.expiresAt = expiresAt;
             this.refreshToken = refreshToken;
+            this.createdAt = createdAt;
+            this.lastUsedAt = createdAt;
+        }
+
+        /** A refreshed copy that keeps the original session's creation time and activity clock. */
+        SessionAuth refreshedWith(String accessToken, String tokenType, long expiresAt, String refreshToken) {
+            SessionAuth copy = new SessionAuth(username, accessToken, tokenType, expiresAt, refreshToken, createdAt);
+            copy.lastUsedAt = this.lastUsedAt;
+            return copy;
+        }
+
+        void touch() { this.lastUsedAt = System.currentTimeMillis(); }
+
+        boolean isStale(long idleMs, long maxLifetimeMs) {
+            long now = System.currentTimeMillis();
+            return now - lastUsedAt > idleMs || now - createdAt > maxLifetimeMs;
         }
 
         boolean isExpired() { return System.currentTimeMillis() > expiresAt; }

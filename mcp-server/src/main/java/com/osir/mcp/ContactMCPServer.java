@@ -26,7 +26,7 @@ public class ContactMCPServer {
     PendingActionStore pendingActionStore;
 
     @Tool(description = "List all contacts for the authenticated user with optional search. Requires authentication. Optional: search (search by name/email/org)")
-    public ContactListResult listContacts(@ToolArg(required = false) String search, McpConnection connection) {
+    public ContactListResult listContacts(@ToolArg(required = false) String search, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.listContacts(search);
         } catch (Exception e) {
@@ -36,7 +36,7 @@ public class ContactMCPServer {
     }
 
     @Tool(description = "Get detailed information about a specific contact. Requires authentication. Required: contactId (string)")
-    public ContactDetailResult getContact(String contactId, McpConnection connection) {
+    public ContactDetailResult getContact(String contactId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.getContact(contactId);
         } catch (Exception e) {
@@ -49,7 +49,7 @@ public class ContactMCPServer {
     public ContactResult createContact(String firstName, String lastName, String email, String phone,
                                         @ToolArg(required = false) String organization, String street1, @ToolArg(required = false) String street2,
                                         String city, @ToolArg(required = false) String state, String postalCode, String country,
-                                        McpConnection connection) {
+                                        @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.createContact(firstName, lastName, email, phone, organization,
                     street1, street2, city, state, postalCode, country);
@@ -63,7 +63,7 @@ public class ContactMCPServer {
     public ContactResult updateContact(String contactId, @ToolArg(required = false) String firstName, @ToolArg(required = false) String lastName, @ToolArg(required = false) String email,
                                         @ToolArg(required = false) String phone, @ToolArg(required = false) String organization, @ToolArg(required = false) String street1, @ToolArg(required = false) String street2,
                                         @ToolArg(required = false) String city, @ToolArg(required = false) String state, @ToolArg(required = false) String postalCode, @ToolArg(required = false) String country,
-                                        McpConnection connection) {
+                                        @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.updateContact(contactId, firstName, lastName, email, phone, organization,
                     street1, street2, city, state, postalCode, country);
@@ -74,7 +74,7 @@ public class ContactMCPServer {
     }
 
     @Tool(description = "Stage deletion of a contact. DESTRUCTIVE — cannot delete if assigned to active domains. Requires authentication. Required: contactId (string). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult deleteContact(String contactId, McpConnection connection) {
+    public ConfirmationRequiredResult deleteContact(String contactId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "deleteContact",
                 "Permanently delete contact '" + contactId + "'",
@@ -85,7 +85,7 @@ public class ContactMCPServer {
     }
 
     @Tool(description = "Get all contacts (registrant, admin, tech, billing) assigned to a domain. Requires authentication. Required: domain (e.g., 'example.com')")
-    public DomainContactsResult getContactsForDomain(String domain, McpConnection connection) {
+    public DomainContactsResult getContactsForDomain(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.getContactsForDomain(domain);
         } catch (Exception e) {

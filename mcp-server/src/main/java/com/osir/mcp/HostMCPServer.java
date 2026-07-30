@@ -9,6 +9,7 @@ import com.osir.mcp.security.RequiresAuth;
 import com.osir.mcp.services.HostService;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -27,7 +28,7 @@ public class HostMCPServer {
     PendingActionStore pendingActionStore;
 
     @Tool(description = "Check if a host/glue record name is available for creation. Requires authentication. Required: hostname (e.g., 'ns1.example.com')")
-    public HostCheckResult checkHostAvailability(String hostname, McpConnection connection) {
+    public HostCheckResult checkHostAvailability(String hostname, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return hostService.checkAvailability(hostname);
         } catch (Exception e) {
@@ -37,7 +38,7 @@ public class HostMCPServer {
     }
 
     @Tool(description = "Create a new host/glue record (e.g., for custom nameservers). Requires authentication. Required: hostname (e.g., 'ns1.example.com'), ipAddresses (e.g., ['192.0.2.1', '198.51.100.1'])")
-    public HostResult createHost(String hostname, List<String> ipAddresses, McpConnection connection) {
+    public HostResult createHost(String hostname, List<String> ipAddresses, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return hostService.createHost(hostname, ipAddresses);
         } catch (Exception e) {
@@ -47,7 +48,7 @@ public class HostMCPServer {
     }
 
     @Tool(description = "List all host/glue records associated with a domain. Requires authentication. Required: domain (e.g., 'example.com')")
-    public HostListResult getHostsForDomain(String domain, McpConnection connection) {
+    public HostListResult getHostsForDomain(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return hostService.getHostsForDomain(domain);
         } catch (Exception e) {
@@ -57,7 +58,7 @@ public class HostMCPServer {
     }
 
     @Tool(description = "Stage deletion of a host/glue record. DESTRUCTIVE — irreversible. Requires authentication. Required: hostname (e.g., 'ns1.example.com'). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult deleteHost(String hostname, McpConnection connection) {
+    public ConfirmationRequiredResult deleteHost(String hostname, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "deleteHost",
                 "Permanently delete host/glue record '" + hostname + "'",

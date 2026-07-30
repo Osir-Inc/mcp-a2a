@@ -46,7 +46,7 @@ class DnsMCPServerTest {
         DnsRecordListResult expected = new DnsRecordListResult(true, "OK");
         when(dnsService.listRecords("example.com")).thenReturn(expected);
 
-        DnsRecordListResult result = mcpServer.listDnsRecords("example.com", mockConnection);
+        DnsRecordListResult result = mcpServer.listDnsRecords("example.com", null, mockConnection);
 
         assertSame(expected, result);
         verify(dnsService).listRecords("example.com");
@@ -56,7 +56,7 @@ class DnsMCPServerTest {
     void listDnsRecords_handlesException() {
         when(dnsService.listRecords("example.com")).thenThrow(new RuntimeException("Fail"));
 
-        DnsRecordListResult result = mcpServer.listDnsRecords("example.com", mockConnection);
+        DnsRecordListResult result = mcpServer.listDnsRecords("example.com", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -67,7 +67,7 @@ class DnsMCPServerTest {
         DnsRecordResult expected = new DnsRecordResult(true, "Created");
         when(dnsService.createRecord("example.com", "www", "A", "1.2.3.4", null, null)).thenReturn(expected);
 
-        DnsRecordResult result = mcpServer.createDnsRecord("example.com", "www", "A", "1.2.3.4", null, null, mockConnection);
+        DnsRecordResult result = mcpServer.createDnsRecord("example.com", "www", "A", "1.2.3.4", null, null, null, mockConnection);
 
         assertSame(expected, result);
     }
@@ -77,7 +77,7 @@ class DnsMCPServerTest {
         when(dnsService.createRecord("example.com", "www", "A", "1.2.3.4", null, null))
                 .thenThrow(new RuntimeException("Fail"));
 
-        DnsRecordResult result = mcpServer.createDnsRecord("example.com", "www", "A", "1.2.3.4", null, null, mockConnection);
+        DnsRecordResult result = mcpServer.createDnsRecord("example.com", "www", "A", "1.2.3.4", null, null, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -88,7 +88,7 @@ class DnsMCPServerTest {
         DnsRecordResult expected = new DnsRecordResult(true, "Updated");
         when(dnsService.updateRecord("example.com", "rec-1", null, null, "1.2.3.4", null, null)).thenReturn(expected);
 
-        DnsRecordResult result = mcpServer.updateDnsRecord("example.com", "rec-1", null, null, "1.2.3.4", null, null, mockConnection);
+        DnsRecordResult result = mcpServer.updateDnsRecord("example.com", "rec-1", null, null, "1.2.3.4", null, null, null, mockConnection);
 
         assertSame(expected, result);
     }
@@ -98,7 +98,7 @@ class DnsMCPServerTest {
         when(dnsService.updateRecord("example.com", "rec-1", null, null, "1.2.3.4", null, null))
                 .thenThrow(new RuntimeException("Fail"));
 
-        DnsRecordResult result = mcpServer.updateDnsRecord("example.com", "rec-1", null, null, "1.2.3.4", null, null, mockConnection);
+        DnsRecordResult result = mcpServer.updateDnsRecord("example.com", "rec-1", null, null, "1.2.3.4", null, null, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -110,7 +110,7 @@ class DnsMCPServerTest {
         when(pendingActionStore.stage(eq("deleteDnsRecord"), any(), eq("test-conn-id"),
                 eq(DestructiveOpRateLimiter.Bucket.DESTRUCTIVE), any())).thenReturn(staged);
 
-        ConfirmationRequiredResult result = mcpServer.deleteDnsRecord("example.com", "rec-1", mockConnection);
+        ConfirmationRequiredResult result = mcpServer.deleteDnsRecord("example.com", "rec-1", null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("deleteDnsRecord"), any(), eq("test-conn-id"),
@@ -122,7 +122,7 @@ class DnsMCPServerTest {
         DnsRecordResult expected = new DnsRecordResult(true, "OK");
         when(dnsService.getRecord("example.com", "rec-1")).thenReturn(expected);
 
-        DnsRecordResult result = mcpServer.getDnsRecord("example.com", "rec-1", mockConnection);
+        DnsRecordResult result = mcpServer.getDnsRecord("example.com", "rec-1", null, mockConnection);
 
         assertSame(expected, result);
     }
@@ -131,7 +131,7 @@ class DnsMCPServerTest {
     void getDnsRecord_handlesException() {
         when(dnsService.getRecord("example.com", "rec-1")).thenThrow(new RuntimeException("Fail"));
 
-        DnsRecordResult result = mcpServer.getDnsRecord("example.com", "rec-1", mockConnection);
+        DnsRecordResult result = mcpServer.getDnsRecord("example.com", "rec-1", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));

@@ -60,7 +60,7 @@ class ConfirmationMCPServerTest {
                 System.currentTimeMillis() + 300_000, () -> serviceResult);
         when(pendingActionStore.claim("action-1")).thenReturn(Optional.of(pending));
 
-        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-1", mockConnection);
+        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-1", null, mockConnection);
 
         assertTrue(result.isSuccess());
         assertSame(serviceResult, result.getResult());
@@ -69,10 +69,39 @@ class ConfirmationMCPServerTest {
     }
 
     @Test
+    void executeConfirmedAction_recordResultFailure_reportsFailure() {
+        // Records expose success(), not isSuccess() — a failed record result must NOT be
+        // wrapped as "executed successfully" (the osirAppMoveToOwned BUILD_FAILED case).
+        record RecordResult(boolean success, String status) {}
+        PendingAction pending = action("action-rec", "osirAppMoveToOwned", PRINCIPAL,
+                DestructiveOpRateLimiter.Bucket.FINANCIAL,
+                System.currentTimeMillis() + 300_000, () -> new RecordResult(false, "BUILD_FAILED"));
+        when(pendingActionStore.claim("action-rec")).thenReturn(Optional.of(pending));
+
+        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-rec", null, mockConnection);
+
+        assertFalse(result.isSuccess());
+        assertTrue(result.getMessage().contains("completed with errors"));
+    }
+
+    @Test
+    void executeConfirmedAction_recordResultSuccess_reportsSuccess() {
+        record RecordResult(boolean success) {}
+        PendingAction pending = action("action-rec-ok", "osirAppMoveToOwned", PRINCIPAL,
+                DestructiveOpRateLimiter.Bucket.FINANCIAL,
+                System.currentTimeMillis() + 300_000, () -> new RecordResult(true));
+        when(pendingActionStore.claim("action-rec-ok")).thenReturn(Optional.of(pending));
+
+        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-rec-ok", null, mockConnection);
+
+        assertTrue(result.isSuccess());
+    }
+
+    @Test
     void executeConfirmedAction_notFound_returnsError() {
         when(pendingActionStore.claim("missing-id")).thenReturn(Optional.empty());
 
-        ActionExecutionResult result = mcpServer.executeConfirmedAction("missing-id", mockConnection);
+        ActionExecutionResult result = mcpServer.executeConfirmedAction("missing-id", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("not found"));
@@ -86,7 +115,7 @@ class ConfirmationMCPServerTest {
                 System.currentTimeMillis() - 1, () -> null);
         when(pendingActionStore.claim("action-exp")).thenReturn(Optional.of(expired));
 
-        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-exp", mockConnection);
+        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-exp", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("expired"));
@@ -102,7 +131,7 @@ class ConfirmationMCPServerTest {
                 System.currentTimeMillis() + 300_000, () -> null);
         when(pendingActionStore.claim("action-2")).thenReturn(Optional.of(pending));
 
-        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-2", mockConnection);
+        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-2", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("different user"));
@@ -118,7 +147,7 @@ class ConfirmationMCPServerTest {
                 System.currentTimeMillis() + 300_000, () -> "ok");
         when(pendingActionStore.claim("action-x")).thenReturn(Optional.of(pending));
 
-        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-x", mockConnection);
+        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-x", null, mockConnection);
 
         assertTrue(result.isSuccess());
         verify(rateLimiter).tryAcquire(PRINCIPAL, DestructiveOpRateLimiter.Bucket.FINANCIAL);
@@ -132,7 +161,7 @@ class ConfirmationMCPServerTest {
         when(pendingActionStore.claim("action-3")).thenReturn(Optional.of(pending));
         when(rateLimiter.tryAcquire(eq(PRINCIPAL), eq(DestructiveOpRateLimiter.Bucket.FINANCIAL))).thenReturn(false);
 
-        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-3", mockConnection);
+        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-3", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Rate limit"));
@@ -146,7 +175,7 @@ class ConfirmationMCPServerTest {
                 () -> { throw new RuntimeException("Backend error"); });
         when(pendingActionStore.claim("action-4")).thenReturn(Optional.of(pending));
 
-        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-4", mockConnection);
+        ActionExecutionResult result = mcpServer.executeConfirmedAction("action-4", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Backend error"));
@@ -156,8 +185,8 @@ class ConfirmationMCPServerTest {
     void executeConfirmedAction_atomicClaim_preventsDoubleExecution() {
         when(pendingActionStore.claim("action-5")).thenReturn(Optional.empty());
 
-        ActionExecutionResult first = mcpServer.executeConfirmedAction("action-5", mockConnection);
-        ActionExecutionResult second = mcpServer.executeConfirmedAction("action-5", mockConnection);
+        ActionExecutionResult first = mcpServer.executeConfirmedAction("action-5", null, mockConnection);
+        ActionExecutionResult second = mcpServer.executeConfirmedAction("action-5", null, mockConnection);
 
         assertFalse(first.isSuccess());
         assertFalse(second.isSuccess());

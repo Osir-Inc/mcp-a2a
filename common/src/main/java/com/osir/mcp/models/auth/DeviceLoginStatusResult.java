@@ -6,6 +6,7 @@ public class DeviceLoginStatusResult {
     private String status; // pending, complete, expired, denied, slow_down
     private Long expiresIn;
     private String tokenType;
+    private String sessionKey;
 
     public DeviceLoginStatusResult(boolean success, String message, String status) {
         this.success = success;
@@ -36,4 +37,7 @@ public class DeviceLoginStatusResult {
 
     public String getTokenType() { return tokenType; }
     public void setTokenType(String tokenType) { this.tokenType = tokenType; }
+
+    public String getSessionKey() { return sessionKey; }
+    public void setSessionKey(String sessionKey) { this.sessionKey = sessionKey; }
 }

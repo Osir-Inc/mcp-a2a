@@ -8,11 +8,13 @@ import com.osir.mcp.models.deploy.DeployDtos.DeployResult;
 import com.osir.mcp.models.deploy.DeployDtos.ProvisionDbResult;
 import com.osir.mcp.models.deploy.DeployDtos.SetSecretResult;
 import com.osir.mcp.models.deploy.DeployDtos.UploadTicketResult;
+import com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedResult;
 import com.osir.mcp.security.DestructiveOpRateLimiter;
 import com.osir.mcp.security.McpAudited;
 import com.osir.mcp.security.PendingActionStore;
 import com.osir.mcp.security.RequiresAuth;
 import com.osir.mcp.services.DeploymentService;
+import com.osir.mcp.services.MoveToOwnedService;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
@@ -34,6 +36,9 @@ public class DeploymentMCPServer {
     DeploymentService deploymentService;
 
     @Inject
+    MoveToOwnedService moveToOwnedService;
+
+    @Inject
     PendingActionStore pendingActionStore;
 
     @RequiresAuth
@@ -41,7 +46,7 @@ public class DeploymentMCPServer {
             description = "Create an upload ticket for deploying app source code to Osir. Returns an uploadTicket, "
                     + "a putUrl, and instructions to zip the project and upload it. After uploading, call osirAppDeploy "
                     + "with the uploadTicket. Requires authentication.")
-    public UploadTicketResult osirAppCreateUpload(McpConnection connection) {
+    public UploadTicketResult osirAppCreateUpload(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.createUpload();
         } catch (Exception e) {
@@ -61,7 +66,8 @@ public class DeploymentMCPServer {
                     + "Optional: region ('us'|'al'; 'al' = Albania/Tirana). Defaults to the platform's home region. "
                     + "Requires authentication.")
     public DeployResult osirAppDeploy(String name, String language, String uploadTicket,
-                                      @ToolArg(required = false) String region, McpConnection connection) {
+                                      @ToolArg(required = false) String region,
+                                      @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.deploy(name, language, region, uploadTicket);
         } catch (Exception e) {
@@ -73,7 +79,7 @@ public class DeploymentMCPServer {
     @RequiresAuth
     @Tool(name = "osirAppList",
             description = "List the authenticated user's deployed Osir apps with their live URLs and status. Requires authentication.")
-    public AppListResult osirAppList(McpConnection connection) {
+    public AppListResult osirAppList(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.listApps();
         } catch (Exception e) {
@@ -91,7 +97,7 @@ public class DeploymentMCPServer {
                     + "FAILED means it deployed but didn't actually work (qa.findings lists the problems — "
                     + "e.g. a server error or blank page — so you can fix and redeploy). Required: appId "
                     + "(string). Requires authentication.")
-    public AppStatusResult osirAppStatus(String appId, McpConnection connection) {
+    public AppStatusResult osirAppStatus(String appId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.getStatus(appId);
         } catch (Exception e) {
@@ -105,7 +111,7 @@ public class DeploymentMCPServer {
             description = "Set an environment secret for an Osir app (e.g. DATABASE_URL, API_KEY). The value is stored "
                     + "encrypted and injected as an env var on the next osirAppDeploy of the app; it is NEVER returned "
                     + "or logged. Required: appId (string), key (env var name), value (string). Requires authentication.")
-    public SetSecretResult osirAppSetSecret(String appId, String key, String value, McpConnection connection) {
+    public SetSecretResult osirAppSetSecret(String appId, String key, String value, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.setSecret(appId, key, value);
         } catch (Exception e) {
@@ -119,7 +125,7 @@ public class DeploymentMCPServer {
             description = "Get recent logs from an Osir app's microVM ('why is my app broken?'). "
                     + "Required: appId (string). Optional: tail (number of recent lines, default 100). "
                     + "Requires authentication.")
-    public AppLogsResult osirAppLogs(String appId, @ToolArg(required = false) Integer tail, McpConnection connection) {
+    public AppLogsResult osirAppLogs(String appId, @ToolArg(required = false) Integer tail, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.getLogs(appId, tail);
         } catch (Exception e) {
@@ -134,6 +140,7 @@ public class DeploymentMCPServer {
                     + "as the app's DATABASE_URL secret (encrypted, injected on the next osirAppDeploy) and is NEVER "
                     + "returned. Required: appId (string). Optional: engine ('postgres', default). Requires authentication.")
     public ProvisionDbResult osirAppProvisionDatabase(String appId, @ToolArg(required = false) String engine,
+                                                      @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
                                                       McpConnection connection) {
         try {
             return deploymentService.provisionDatabase(appId, engine == null ? "postgres" : engine);
@@ -144,11 +151,48 @@ public class DeploymentMCPServer {
     }
 
     @RequiresAuth
+    @Tool(name = "osirAppMoveToOwned",
+            description = "Move a deployed Osir app from the shared free tier onto a paid VPS owned by the user. "
+                    + "First call stages a VPS order (COSTS MONEY — returns an actionId; present the price/summary "
+                    + "to the user and call executeConfirmedAction only if they approve). After confirmation the "
+                    + "platform installs Ubuntu, ships the app onto the box server-side, and binds the domain's DNS "
+                    + "if it is hosted on osir.app nameservers (otherwise returns the IP and manual DNS instructions). "
+                    + "If the result status is BUILDING or BUILD_FAILED, follow its nextStep — calling this tool again "
+                    + "with the same arguments RESUMES the move and never orders a second server. Required: appName, "
+                    + "packageId (from listVpsPackages). Optional: domain (custom domain to serve the app on). "
+                    + "Requires authentication.")
+    public Object osirAppMoveToOwned(String appName, String packageId,
+                                     @ToolArg(required = false) String domain,
+                                     @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
+                                     McpConnection connection) {
+        try {
+            // A VPS was already ordered for this app — resume (poll/ship/DNS), no new spend, no gate.
+            if (moveToOwnedService.hasOrderedInstance(appName)) {
+                return moveToOwnedService.resume(appName, domain);
+            }
+            MoveToOwnedService.Prepared prep = moveToOwnedService.prepare(appName, packageId);
+            return pendingActionStore.stage(
+                    "osirAppMoveToOwned",
+                    "Order a VPS (package '" + packageId + "', " + prep.osDisplayName() + ", monthly) to move app '"
+                            + appName + "' onto an owned server — deducts from account balance",
+                    connection.id(),
+                    DestructiveOpRateLimiter.Bucket.FINANCIAL,
+                    () -> moveToOwnedService.orderAndMove(appName, packageId, prep, domain)
+            );
+        } catch (IllegalStateException e) {
+            return MoveToOwnedResult.fail(e.getMessage());
+        } catch (Exception e) {
+            Log.errorf(e, "osirAppMoveToOwned error for %s: %s", appName, e.getMessage());
+            return MoveToOwnedResult.fail("Could not start the move right now. Please try again.");
+        }
+    }
+
+    @RequiresAuth
     @Tool(name = "osirAppDelete",
             description = "Stage deletion of an Osir app. DESTRUCTIVE and irreversible — removes its microVM, image, "
                     + "route, and data. Required: appId (string). Returns an actionId; present the summary to the user, "
                     + "then call executeConfirmedAction with the actionId if they approve. Requires authentication.")
-    public ConfirmationRequiredResult osirAppDelete(String appId, McpConnection connection) {
+    public ConfirmationRequiredResult osirAppDelete(String appId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "osirAppDelete",
                 "Permanently delete app '" + appId + "' — removes its microVM, image, route, and all data. Irreversible.",

@@ -59,7 +59,7 @@ class DomainRegistrarMCPServerNewToolsTest {
         when(pendingActionStore.stage(eq("renewDomain"), any(), eq("test-connection-id"),
                 eq(DestructiveOpRateLimiter.Bucket.FINANCIAL), any())).thenReturn(staged);
 
-        ConfirmationRequiredResult result = mcpServer.renewDomain(TEST_DOMAIN, 3, mockConnection);
+        ConfirmationRequiredResult result = mcpServer.renewDomain(TEST_DOMAIN, 3, null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("renewDomain"), any(), eq("test-connection-id"),
@@ -73,7 +73,7 @@ class DomainRegistrarMCPServerNewToolsTest {
         DomainActionResult expected = new DomainActionResult(true, "Locked", TEST_DOMAIN, "locked");
         when(domainService.lockDomain(TEST_DOMAIN)).thenReturn(expected);
 
-        DomainActionResult result = mcpServer.lockDomain(TEST_DOMAIN, mockConnection);
+        DomainActionResult result = mcpServer.lockDomain(TEST_DOMAIN, null, mockConnection);
 
         assertSame(expected, result);
         verify(domainService).lockDomain(TEST_DOMAIN);
@@ -83,7 +83,7 @@ class DomainRegistrarMCPServerNewToolsTest {
     void lockDomain_handlesException() {
         when(domainService.lockDomain(TEST_DOMAIN)).thenThrow(new RuntimeException("Fail"));
 
-        DomainActionResult result = mcpServer.lockDomain(TEST_DOMAIN, mockConnection);
+        DomainActionResult result = mcpServer.lockDomain(TEST_DOMAIN, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -97,7 +97,7 @@ class DomainRegistrarMCPServerNewToolsTest {
         when(pendingActionStore.stage(eq("unlockDomain"), any(), eq("test-connection-id"),
                 eq(DestructiveOpRateLimiter.Bucket.DESTRUCTIVE), any())).thenReturn(staged);
 
-        ConfirmationRequiredResult result = mcpServer.unlockDomain(TEST_DOMAIN, mockConnection);
+        ConfirmationRequiredResult result = mcpServer.unlockDomain(TEST_DOMAIN, null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("unlockDomain"), any(), eq("test-connection-id"),
@@ -111,7 +111,7 @@ class DomainRegistrarMCPServerNewToolsTest {
         DomainActionResult expected = new DomainActionResult(true, "Enabled", TEST_DOMAIN, "auto_renew_enabled");
         when(domainService.updateAutoRenew(TEST_DOMAIN, true)).thenReturn(expected);
 
-        DomainActionResult result = mcpServer.updateDomainAutoRenew(TEST_DOMAIN, true, mockConnection);
+        DomainActionResult result = mcpServer.updateDomainAutoRenew(TEST_DOMAIN, true, null, mockConnection);
 
         assertSame(expected, result);
         verify(domainService).updateAutoRenew(TEST_DOMAIN, true);
@@ -121,7 +121,7 @@ class DomainRegistrarMCPServerNewToolsTest {
     void updateDomainAutoRenew_handlesException() {
         when(domainService.updateAutoRenew(TEST_DOMAIN, false)).thenThrow(new RuntimeException("Fail"));
 
-        DomainActionResult result = mcpServer.updateDomainAutoRenew(TEST_DOMAIN, false, mockConnection);
+        DomainActionResult result = mcpServer.updateDomainAutoRenew(TEST_DOMAIN, false, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -134,7 +134,7 @@ class DomainRegistrarMCPServerNewToolsTest {
         DomainActionResult expected = new DomainActionResult(true, "Enabled", TEST_DOMAIN, "privacy_enabled");
         when(domainService.updatePrivacyProtection(TEST_DOMAIN, true)).thenReturn(expected);
 
-        DomainActionResult result = mcpServer.updateDomainPrivacy(TEST_DOMAIN, true, mockConnection);
+        DomainActionResult result = mcpServer.updateDomainPrivacy(TEST_DOMAIN, true, null, mockConnection);
 
         assertSame(expected, result);
         verify(domainService).updatePrivacyProtection(TEST_DOMAIN, true);
@@ -144,7 +144,7 @@ class DomainRegistrarMCPServerNewToolsTest {
     void updateDomainPrivacy_handlesException() {
         when(domainService.updatePrivacyProtection(TEST_DOMAIN, false)).thenThrow(new RuntimeException("Fail"));
 
-        DomainActionResult result = mcpServer.updateDomainPrivacy(TEST_DOMAIN, false, mockConnection);
+        DomainActionResult result = mcpServer.updateDomainPrivacy(TEST_DOMAIN, false, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));

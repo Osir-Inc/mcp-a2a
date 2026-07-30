@@ -22,7 +22,7 @@ public class AuditMCPServer {
     AuditService auditService;
 
     @Tool(description = "Get the audit trail (history of all changes) for a specific domain. Requires authentication. Required: domain (string)")
-    public AuditTrailResult getDomainAuditTrail(String domain, McpConnection connection) {
+    public AuditTrailResult getDomainAuditTrail(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return auditService.getDomainAuditTrail(domain);
         } catch (Exception e) {
@@ -32,7 +32,7 @@ public class AuditMCPServer {
     }
 
     @Tool(description = "Get recent audit logs for the authenticated user across all services. Requires authentication. Optional: page (Integer), size (Integer)")
-    public AuditLogListResult getMyAuditLogs(@ToolArg(required = false) Integer page, @ToolArg(required = false) Integer size, McpConnection connection) {
+    public AuditLogListResult getMyAuditLogs(@ToolArg(required = false) Integer page, @ToolArg(required = false) Integer size, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return auditService.getMyAuditLogs(page, size);
         } catch (Exception e) {
@@ -42,7 +42,7 @@ public class AuditMCPServer {
     }
 
     @Tool(description = "Get the most recent activity across all domains and services for the user. Requires authentication.")
-    public RecentActivityResult getRecentActivity(McpConnection connection) {
+    public RecentActivityResult getRecentActivity(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return auditService.getRecentActivity();
         } catch (Exception e) {

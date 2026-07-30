@@ -4,6 +4,7 @@ import com.osir.mcp.services.McpAuthHelper;
 import com.osir.mcp.services.SessionAwareAuthService;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkiverse.mcp.server.ToolCallException;
 import jakarta.annotation.Priority;
 import jakarta.inject.Inject;
@@ -11,6 +12,8 @@ import jakarta.interceptor.AroundInvoke;
 import jakarta.interceptor.Interceptor;
 import jakarta.interceptor.InvocationContext;
 import org.jboss.logging.Logger;
+
+import java.lang.reflect.Parameter;
 
 @RequiresAuth
 @Interceptor
@@ -20,9 +23,13 @@ public class McpAuthInterceptor {
     private static final Logger LOG = Logger.getLogger(McpAuthInterceptor.class);
 
     private static final String AUTH_REQUIRED_MSG =
-            "Authentication required. Call loginWithDevice and complete the verification flow before retrying this tool.";
+            "Authentication required. Call loginWithDevice and complete the verification flow, then retry this tool "
+                    + "passing the sessionKey returned by checkDeviceLoginStatus.";
     private static final String AUTH_EXPIRED_MSG =
             "Session expired. Call loginWithDevice and complete the verification flow to re-authenticate, then retry this tool.";
+    private static final String SESSION_KEY_INVALID_MSG =
+            "The provided sessionKey is expired, logged out, or unknown. Call loginWithDevice to start a new login, "
+                    + "then retry with the new sessionKey from checkDeviceLoginStatus.";
 
     @Inject
     SessionAwareAuthService sessionService;
@@ -45,11 +52,18 @@ public class McpAuthInterceptor {
         }
         if (conn == null) return ctx.proceed();
 
-        // A valid Bearer token on the HTTP request wins over session state: OAuth-connected
-        // clients (Claude.ai) send it on every call and may not reuse the MCP session that
-        // logged in. setupAuth resolves bearer-then-session in one place and reports usability.
-        if (mcpAuthHelper.setupAuth(conn)) {
+        // Resolution precedence lives in McpAuthHelper: Bearer header (OAuth connectors) >
+        // conversation sessionKey argument (in-chat device login, survives MCP session churn) >
+        // per-connection session. The sessionKey is a declared-but-unused tool parameter; it is
+        // extracted here so individual tools never handle auth themselves.
+        String sessionKey = findSessionKey(ctx);
+        if (mcpAuthHelper.setupAuth(conn, sessionKey)) {
             return ctx.proceed();
+        }
+
+        if (sessionKey != null && !sessionKey.isBlank()) {
+            LOG.debugf("tool=%s conn=%s: sessionKey rejected", ctx.getMethod().getName(), conn.id());
+            throw new ToolCallException(SESSION_KEY_INVALID_MSG);
         }
 
         return switch (sessionService.checkAuth(conn.id())) {
@@ -66,5 +80,19 @@ public class McpAuthInterceptor {
                 yield ctx.proceed();
             }
         };
+    }
+
+    /** The value of the tool's optional sessionKey parameter, or null when absent/undeclared. */
+    private String findSessionKey(InvocationContext ctx) {
+        Parameter[] params = ctx.getMethod().getParameters();
+        for (int i = 0; i < params.length; i++) {
+            ToolArg arg = params[i].getAnnotation(ToolArg.class);
+            boolean named = (arg != null && RequiresAuth.SESSION_KEY.equals(arg.name()))
+                    || RequiresAuth.SESSION_KEY.equals(params[i].getName());
+            if (named && ctx.getParameters()[i] instanceof String s) {
+                return s;
+            }
+        }
+        return null;
     }
 }

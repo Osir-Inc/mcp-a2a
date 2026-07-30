@@ -26,7 +26,7 @@ public class DnsMCPServer {
     PendingActionStore pendingActionStore;
 
     @Tool(description = "Initialize (create) the DNS zone for a domain. Must be called once after domain registration before any DNS records can be added. Safe to call on existing zones — it will not overwrite records. Required: domain (e.g., 'example.com')")
-    public DnsActionResult initializeDnsZone(String domain, McpConnection connection) {
+    public DnsActionResult initializeDnsZone(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.initializeZone(domain);
         } catch (Exception e) {
@@ -36,7 +36,7 @@ public class DnsMCPServer {
     }
 
     @Tool(description = "List all DNS records for a domain. Requires authentication. Required: domain (e.g., 'example.com')")
-    public DnsRecordListResult listDnsRecords(String domain, McpConnection connection) {
+    public DnsRecordListResult listDnsRecords(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.listRecords(domain);
         } catch (Exception e) {
@@ -46,7 +46,7 @@ public class DnsMCPServer {
     }
 
     @Tool(description = "Create a new DNS record for a domain. Requires authentication. For newly registered domains, the zone is initialized automatically if missing. Required: domain (e.g., 'example.com'), name (e.g., 'www', '@', 'mail'), type ('A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV'), content (record value). Optional: ttl (seconds, default 3600), priority (for MX/SRV, default 0)")
-    public DnsRecordResult createDnsRecord(String domain, String name, String type, String content, @ToolArg(required = false) Integer ttl, @ToolArg(required = false) Integer priority, McpConnection connection) {
+    public DnsRecordResult createDnsRecord(String domain, String name, String type, String content, @ToolArg(required = false) Integer ttl, @ToolArg(required = false) Integer priority, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.createRecord(domain, name, type, content, ttl, priority);
         } catch (Exception e) {
@@ -56,7 +56,7 @@ public class DnsMCPServer {
     }
 
     @Tool(description = "Update an existing DNS record. Requires authentication. Required: domain (e.g., 'example.com'), recordId (string). Optional: name, type, content, ttl, priority")
-    public DnsRecordResult updateDnsRecord(String domain, String recordId, @ToolArg(required = false) String name, @ToolArg(required = false) String type, @ToolArg(required = false) String content, @ToolArg(required = false) Integer ttl, @ToolArg(required = false) Integer priority, McpConnection connection) {
+    public DnsRecordResult updateDnsRecord(String domain, String recordId, @ToolArg(required = false) String name, @ToolArg(required = false) String type, @ToolArg(required = false) String content, @ToolArg(required = false) Integer ttl, @ToolArg(required = false) Integer priority, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.updateRecord(domain, recordId, name, type, content, ttl, priority);
         } catch (Exception e) {
@@ -66,7 +66,7 @@ public class DnsMCPServer {
     }
 
     @Tool(description = "Stage deletion of a DNS record. DESTRUCTIVE — irreversible. Requires authentication. Required: domain (e.g., 'example.com'), recordId (string). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult deleteDnsRecord(String domain, String recordId, McpConnection connection) {
+    public ConfirmationRequiredResult deleteDnsRecord(String domain, String recordId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "deleteDnsRecord",
                 "Permanently delete DNS record '" + recordId + "' from domain '" + domain + "'",
@@ -77,7 +77,7 @@ public class DnsMCPServer {
     }
 
     @Tool(description = "Get details of a specific DNS record. Requires authentication. Required: domain (e.g., 'example.com'), recordId (string)")
-    public DnsRecordResult getDnsRecord(String domain, String recordId, McpConnection connection) {
+    public DnsRecordResult getDnsRecord(String domain, String recordId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.getRecord(domain, recordId);
         } catch (Exception e) {

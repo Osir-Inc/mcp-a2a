@@ -55,7 +55,7 @@ class HostMCPServerTest {
         HostCheckResult expected = new HostCheckResult(true, "Available", true, TEST_HOSTNAME);
         when(hostService.checkAvailability(TEST_HOSTNAME)).thenReturn(expected);
 
-        HostCheckResult result = mcpServer.checkHostAvailability(TEST_HOSTNAME, mockConnection);
+        HostCheckResult result = mcpServer.checkHostAvailability(TEST_HOSTNAME, null, mockConnection);
 
         assertSame(expected, result);
         verify(hostService).checkAvailability(TEST_HOSTNAME);
@@ -65,7 +65,7 @@ class HostMCPServerTest {
     void checkHostAvailability_handlesException() {
         when(hostService.checkAvailability(TEST_HOSTNAME)).thenThrow(new RuntimeException("Unexpected"));
 
-        HostCheckResult result = mcpServer.checkHostAvailability(TEST_HOSTNAME, mockConnection);
+        HostCheckResult result = mcpServer.checkHostAvailability(TEST_HOSTNAME, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Unexpected"));
@@ -81,7 +81,7 @@ class HostMCPServerTest {
         HostResult expected = new HostResult(true, "Created", record);
         when(hostService.createHost(TEST_HOSTNAME, TEST_IPS)).thenReturn(expected);
 
-        HostResult result = mcpServer.createHost(TEST_HOSTNAME, TEST_IPS, mockConnection);
+        HostResult result = mcpServer.createHost(TEST_HOSTNAME, TEST_IPS, null, mockConnection);
 
         assertSame(expected, result);
         verify(hostService).createHost(TEST_HOSTNAME, TEST_IPS);
@@ -91,7 +91,7 @@ class HostMCPServerTest {
     void createHost_handlesException() {
         when(hostService.createHost(TEST_HOSTNAME, TEST_IPS)).thenThrow(new RuntimeException("Fail"));
 
-        HostResult result = mcpServer.createHost(TEST_HOSTNAME, TEST_IPS, mockConnection);
+        HostResult result = mcpServer.createHost(TEST_HOSTNAME, TEST_IPS, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -107,7 +107,7 @@ class HostMCPServerTest {
         ));
         when(hostService.getHostsForDomain(TEST_DOMAIN)).thenReturn(expected);
 
-        HostListResult result = mcpServer.getHostsForDomain(TEST_DOMAIN, mockConnection);
+        HostListResult result = mcpServer.getHostsForDomain(TEST_DOMAIN, null, mockConnection);
 
         assertSame(expected, result);
         verify(hostService).getHostsForDomain(TEST_DOMAIN);
@@ -117,7 +117,7 @@ class HostMCPServerTest {
     void getHostsForDomain_handlesException() {
         when(hostService.getHostsForDomain(TEST_DOMAIN)).thenThrow(new RuntimeException("Fail"));
 
-        HostListResult result = mcpServer.getHostsForDomain(TEST_DOMAIN, mockConnection);
+        HostListResult result = mcpServer.getHostsForDomain(TEST_DOMAIN, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -132,7 +132,7 @@ class HostMCPServerTest {
         when(pendingActionStore.stage(eq("deleteHost"), any(), eq("test-conn-id"),
                 eq(DestructiveOpRateLimiter.Bucket.DESTRUCTIVE), any())).thenReturn(staged);
 
-        ConfirmationRequiredResult result = mcpServer.deleteHost(TEST_HOSTNAME, mockConnection);
+        ConfirmationRequiredResult result = mcpServer.deleteHost(TEST_HOSTNAME, null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("deleteHost"), any(), eq("test-conn-id"),

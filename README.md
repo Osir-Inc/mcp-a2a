@@ -26,40 +26,37 @@ registrar rather than a traditional one with a chat box bolted on.
 
 ## Connect OSIR to Claude
 
-Add OSIR as a custom connector from your Claude settings — no config file or install required:
+Add OSIR as a custom connector from your Claude settings — just the URL, no OAuth fields, no
+config file, no install:
 
 1. In Claude, open **Settings → Connectors**.
 2. Click **Add custom connector**.
 3. Set **Name** to `OSIR`.
 4. Set the **Remote MCP server URL** to `https://be.osir.com/mcp/http`.
-5. Set the **OAuth Client ID** to `mcp-client`.
-6. Save, then sign in with your OSIR account when the browser prompt appears.
+5. Save. Leave the Advanced settings (OAuth Client ID / Secret) empty.
 
 ```
 Claude · Add custom connector
 
 Name:                OSIR
 Remote MCP server:   https://be.osir.com/mcp/http
-OAuth Client ID:     mcp-client
 ```
 
-**Why the Client ID?** OSIR authenticates over OAuth against KeyCloak (`auth.osir.com`). `mcp-client`
-is a public client — it carries no secret, so it's safe to share, and every user still signs in with
-their own OSIR account. You currently have to set it explicitly because automatic client
-registration isn't wired up yet (see the roadmap note below).
+**Signing in happens inside the conversation.** The first time your assistant needs an
+authenticated tool, it starts a device login: you get a link to `auth.osir.com` and a short code,
+you approve in your browser, and the assistant continues with a session scoped to that
+conversation. Sessions are deliberately short-lived (they expire after ~30 minutes of inactivity,
+8 hours maximum) and end instantly when you say "log me out" — so a connected chat never holds
+standing access to your domains, servers, and billing.
 
-The same remote MCP server URL `https://be.osir.com/mcp/http` (with OAuth Client ID `mcp-client`)
-works in any MCP client that supports a remote (streamable HTTP) server.
+The same URL works in any MCP client that supports a remote (streamable HTTP) server and can
+drive the in-chat device login.
 
-> **Roadmap — drop the manual Client ID.** The goal is for the server URL alone to be enough, with
-> no Client ID to type. That needs OAuth **Dynamic Client Registration (DCR)** so the client is
-> registered automatically. DCR currently doesn't work end-to-end against our KeyCloak: a client
-> registered dynamically (with a `scope` parameter, which Claude always sends) is created with
-> **empty default client scopes** — so its token carries no `roles`, and the backend rejects it with
-> `403`. `mcp-client` works only because it has the `roles` scope assigned. **TODO:** research how
-> other KeyCloak-backed public MCP servers issue role-bearing tokens to DCR clients (realm default
-> scope config, a registration protocol mapper, or a client-registration policy) and adopt it, so
-> `mcp-client` is no longer required.
+> **Self-hosting note:** URL-only connectors require `MCP_OAUTH_CHALLENGE_ENABLED=false` on the
+> MCP server. Leaving the challenge enabled (the default) switches the server to OAuth mode
+> instead: it answers unauthenticated requests with a `401` + RFC 9728 challenge and clients
+> authenticate against your identity provider with a pre-registered client id. Session lifetimes
+> are tunable via `MCP_SESSION_IDLE_MINUTES` and `MCP_SESSION_MAX_HOURS`.
 
 ### What your assistant can do
 

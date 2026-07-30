@@ -7,6 +7,7 @@ import com.osir.mcp.security.RequiresAuth;
 import com.osir.mcp.services.AccountService;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -20,7 +21,7 @@ public class AccountMCPServer {
     AccountService accountService;
 
     @Tool(description = "Get the authenticated user's profile and account information including name, email, organization, balance, and domain/VPS counts. Requires authentication.")
-    public UserProfileResult getMyProfile(McpConnection connection) {
+    public UserProfileResult getMyProfile(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return accountService.getMyProfile();
         } catch (Exception e) {
@@ -30,7 +31,7 @@ public class AccountMCPServer {
     }
 
     @Tool(description = "Get a comprehensive summary of the user's account: profile, balance, domain count, VPS count, and pending transfers. Requires authentication.")
-    public AccountSummaryResult getAccountSummary(McpConnection connection) {
+    public AccountSummaryResult getAccountSummary(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return accountService.getAccountSummary();
         } catch (Exception e) {

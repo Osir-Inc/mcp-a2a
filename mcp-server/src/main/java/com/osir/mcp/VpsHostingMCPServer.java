@@ -65,6 +65,7 @@ public class VpsHostingMCPServer {
     public ConfirmationRequiredResult orderVps(String packageId, String hostname, String paymentTerm,
             @ToolArg(required = false) Integer operatingSystemId,
             @ToolArg(required = false) List<Integer> sshKeyIds,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection) {
         String osPart = operatingSystemId == null
                 ? " with NO operating system installed"
@@ -93,7 +94,8 @@ public class VpsHostingMCPServer {
     public VpsOsTemplateListResult listVpsOsTemplates(
             @ToolArg(required = false) String packageId,
             @ToolArg(required = false) String instanceId,
-            @ToolArg(required = false) Boolean includeEol, McpConnection connection) {
+            @ToolArg(required = false) Boolean includeEol,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return vpsService.listOsTemplates(packageId, instanceId, includeEol);
         } catch (Exception e) {
@@ -108,6 +110,7 @@ public class VpsHostingMCPServer {
             @ToolArg(required = false) List<Integer> sshKeyIds,
             @ToolArg(required = false) String hostname,
             @ToolArg(required = false) Double swap,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection) {
         return pendingActionStore.stage(
                 "buildVpsInstance",
@@ -123,7 +126,7 @@ public class VpsHostingMCPServer {
 
     @RequiresAuth
     @Tool(description = "Store an SSH public key on your account so it can be injected into VPS installs. Idempotent — storing a key you already have returns the existing one instead of creating a duplicate, so it is safe to call before every order. Requires authentication. Required: name (a label, e.g. 'laptop'), publicKey (a single-line OpenSSH public key, e.g. 'ssh-ed25519 AAAA... user@host'). Returns the key id to pass to orderVps or buildVpsInstance.")
-    public VpsSshKeyResult addSshKey(String name, String publicKey, McpConnection connection) {
+    public VpsSshKeyResult addSshKey(String name, String publicKey, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return vpsService.storeSshKey(name, publicKey);
         } catch (Exception e) {
@@ -134,7 +137,7 @@ public class VpsHostingMCPServer {
 
     @RequiresAuth
     @Tool(description = "List the SSH keys stored on your account, with their ids and SHA256 fingerprints. Use this to check whether a key is already stored and to get the ids to pass to orderVps or buildVpsInstance. Requires authentication.")
-    public VpsSshKeyListResult listMySshKeys(McpConnection connection) {
+    public VpsSshKeyListResult listMySshKeys(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return vpsService.listSshKeys();
         } catch (Exception e) {
@@ -145,7 +148,7 @@ public class VpsHostingMCPServer {
 
     @RequiresAuth
     @Tool(description = "Remove an SSH key from your account. This does not affect servers already built with it, and the key can simply be added again. Requires authentication. Required: keyId (integer key id from listMySshKeys).")
-    public VpsActionResult deleteSshKey(int keyId, McpConnection connection) {
+    public VpsActionResult deleteSshKey(int keyId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return vpsService.deleteSshKey(keyId);
         } catch (Exception e) {
@@ -156,7 +159,7 @@ public class VpsHostingMCPServer {
 
     @RequiresAuth
     @Tool(description = "List all VPS instances owned by the authenticated user. Requires authentication.")
-    public VpsInstanceListResult listMyVpsInstances(McpConnection connection) {
+    public VpsInstanceListResult listMyVpsInstances(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return vpsService.listMyInstances();
         } catch (Exception e) {
@@ -167,7 +170,7 @@ public class VpsHostingMCPServer {
 
     @RequiresAuth
     @Tool(description = "Get detailed information about a specific VPS instance including resource usage. Requires authentication. Required: instanceId (string)")
-    public VpsInstanceDetailResult getVpsInstanceDetails(String instanceId, McpConnection connection) {
+    public VpsInstanceDetailResult getVpsInstanceDetails(String instanceId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return vpsService.getInstanceDetails(instanceId);
         } catch (Exception e) {
@@ -178,7 +181,7 @@ public class VpsHostingMCPServer {
 
     @RequiresAuth
     @Tool(description = "Stage deletion/cancellation of a VPS instance. DESTRUCTIVE — irreversible. Requires authentication. Required: instanceId (string). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult deleteVpsInstance(String instanceId, McpConnection connection) {
+    public ConfirmationRequiredResult deleteVpsInstance(String instanceId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "deleteVpsInstance",
                 "Permanently delete/cancel VPS instance '" + instanceId + "'",
@@ -190,7 +193,7 @@ public class VpsHostingMCPServer {
 
     @RequiresAuth
     @Tool(description = "Change the payment term (billing cycle) for a VPS instance. Requires authentication. Required: instanceId (string), paymentTerm ('MONTHLY', 'SEMI_ANNUAL', 'ANNUAL', 'BIENNIAL', 'TRIENNIAL')")
-    public VpsActionResult changeVpsPaymentTerm(String instanceId, String paymentTerm, McpConnection connection) {
+    public VpsActionResult changeVpsPaymentTerm(String instanceId, String paymentTerm, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return vpsService.changePaymentTerm(instanceId, paymentTerm);
         } catch (Exception e) {
@@ -201,7 +204,7 @@ public class VpsHostingMCPServer {
 
     @RequiresAuth
     @Tool(description = "Generate a one-time login URL to the VPS control panel (VirtFusion) for managing the server. Requires authentication. Required: instanceId (string)")
-    public VpsPanelLoginResult loginToVpsPanel(String instanceId, McpConnection connection) {
+    public VpsPanelLoginResult loginToVpsPanel(String instanceId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return vpsService.loginToPanel(instanceId);
         } catch (Exception e) {
@@ -212,7 +215,7 @@ public class VpsHostingMCPServer {
 
     @RequiresAuth
     @Tool(description = "Get the total count of VPS instances owned by the authenticated user. Requires authentication.")
-    public VpsCountResult countMyVpsInstances(McpConnection connection) {
+    public VpsCountResult countMyVpsInstances(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return vpsService.countMyInstances();
         } catch (Exception e) {

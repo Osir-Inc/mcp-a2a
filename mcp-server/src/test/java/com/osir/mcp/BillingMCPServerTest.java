@@ -48,7 +48,7 @@ class BillingMCPServerTest {
         AccountBalanceResult expected = new AccountBalanceResult(true, "OK");
         when(billingService.getAccountBalance()).thenReturn(expected);
 
-        AccountBalanceResult result = mcpServer.getAccountBalance(mockConnection);
+        AccountBalanceResult result = mcpServer.getAccountBalance(null, mockConnection);
 
         assertSame(expected, result);
         verify(billingService).getAccountBalance();
@@ -58,7 +58,7 @@ class BillingMCPServerTest {
     void getAccountBalance_handlesException() {
         when(billingService.getAccountBalance()).thenThrow(new RuntimeException("Fail"));
 
-        AccountBalanceResult result = mcpServer.getAccountBalance(mockConnection);
+        AccountBalanceResult result = mcpServer.getAccountBalance(null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -71,7 +71,7 @@ class BillingMCPServerTest {
         InvoiceListResult expected = new InvoiceListResult(true, "OK");
         when(billingService.listInvoices(null, null, null)).thenReturn(expected);
 
-        InvoiceListResult result = mcpServer.listInvoices(null, null, null, mockConnection);
+        InvoiceListResult result = mcpServer.listInvoices(null, null, null, null, mockConnection);
 
         assertSame(expected, result);
         verify(billingService).listInvoices(null, null, null);
@@ -81,7 +81,7 @@ class BillingMCPServerTest {
     void listInvoices_handlesException() {
         when(billingService.listInvoices(null, null, null)).thenThrow(new RuntimeException("Fail"));
 
-        InvoiceListResult result = mcpServer.listInvoices(null, null, null, mockConnection);
+        InvoiceListResult result = mcpServer.listInvoices(null, null, null, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -94,7 +94,7 @@ class BillingMCPServerTest {
         InvoiceDetailResult expected = new InvoiceDetailResult(true, "OK");
         when(billingService.getInvoiceDetails("inv-1")).thenReturn(expected);
 
-        InvoiceDetailResult result = mcpServer.getInvoiceDetails("inv-1", mockConnection);
+        InvoiceDetailResult result = mcpServer.getInvoiceDetails("inv-1", null, mockConnection);
 
         assertSame(expected, result);
         verify(billingService).getInvoiceDetails("inv-1");
@@ -104,7 +104,7 @@ class BillingMCPServerTest {
     void getInvoiceDetails_handlesException() {
         when(billingService.getInvoiceDetails("inv-1")).thenThrow(new RuntimeException("Fail"));
 
-        InvoiceDetailResult result = mcpServer.getInvoiceDetails("inv-1", mockConnection);
+        InvoiceDetailResult result = mcpServer.getInvoiceDetails("inv-1", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -118,7 +118,7 @@ class BillingMCPServerTest {
         when(pendingActionStore.stage(eq("payInvoice"), any(), eq("test-conn-id"),
                 eq(DestructiveOpRateLimiter.Bucket.FINANCIAL), any())).thenReturn(staged);
 
-        ConfirmationRequiredResult result = mcpServer.payInvoice("inv-1", mockConnection);
+        ConfirmationRequiredResult result = mcpServer.payInvoice("inv-1", null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("payInvoice"), any(), eq("test-conn-id"),
@@ -132,7 +132,7 @@ class BillingMCPServerTest {
         InvoiceStatisticsResult expected = new InvoiceStatisticsResult(true, "OK");
         when(billingService.getInvoiceStatistics()).thenReturn(expected);
 
-        InvoiceStatisticsResult result = mcpServer.getInvoiceStatistics(mockConnection);
+        InvoiceStatisticsResult result = mcpServer.getInvoiceStatistics(null, mockConnection);
 
         assertSame(expected, result);
         verify(billingService).getInvoiceStatistics();
@@ -142,7 +142,7 @@ class BillingMCPServerTest {
     void getInvoiceStatistics_handlesException() {
         when(billingService.getInvoiceStatistics()).thenThrow(new RuntimeException("Fail"));
 
-        InvoiceStatisticsResult result = mcpServer.getInvoiceStatistics(mockConnection);
+        InvoiceStatisticsResult result = mcpServer.getInvoiceStatistics(null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -156,7 +156,7 @@ class BillingMCPServerTest {
         when(pendingActionStore.stage(eq("createPaymentSession"), any(), eq("test-conn-id"),
                 eq(DestructiveOpRateLimiter.Bucket.FINANCIAL), any())).thenReturn(staged);
 
-        ConfirmationRequiredResult result = mcpServer.createPaymentSession(50.0, "USD", mockConnection);
+        ConfirmationRequiredResult result = mcpServer.createPaymentSession(50.0, "USD", null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("createPaymentSession"), any(), eq("test-conn-id"),
@@ -170,7 +170,7 @@ class BillingMCPServerTest {
         TransactionListResult expected = new TransactionListResult(true, "OK");
         when(billingService.getPaymentTransactions(null, null)).thenReturn(expected);
 
-        TransactionListResult result = mcpServer.getPaymentTransactions(null, null, mockConnection);
+        TransactionListResult result = mcpServer.getPaymentTransactions(null, null, null, mockConnection);
 
         assertSame(expected, result);
         verify(billingService).getPaymentTransactions(null, null);
@@ -180,7 +180,7 @@ class BillingMCPServerTest {
     void getPaymentTransactions_handlesException() {
         when(billingService.getPaymentTransactions(null, null)).thenThrow(new RuntimeException("Fail"));
 
-        TransactionListResult result = mcpServer.getPaymentTransactions(null, null, mockConnection);
+        TransactionListResult result = mcpServer.getPaymentTransactions(null, null, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -193,7 +193,7 @@ class BillingMCPServerTest {
         FeePreviewResult expected = new FeePreviewResult(true, "OK");
         when(billingService.previewPaymentFees(50.0, "USD")).thenReturn(expected);
 
-        FeePreviewResult result = mcpServer.previewPaymentFees(50.0, "USD", mockConnection);
+        FeePreviewResult result = mcpServer.previewPaymentFees(50.0, "USD", null, mockConnection);
 
         assertSame(expected, result);
         verify(billingService).previewPaymentFees(50.0, "USD");
@@ -203,7 +203,7 @@ class BillingMCPServerTest {
     void previewPaymentFees_handlesException() {
         when(billingService.previewPaymentFees(50.0, "USD")).thenThrow(new RuntimeException("Fail"));
 
-        FeePreviewResult result = mcpServer.previewPaymentFees(50.0, "USD", mockConnection);
+        FeePreviewResult result = mcpServer.previewPaymentFees(50.0, "USD", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -216,7 +216,7 @@ class BillingMCPServerTest {
         DomainPricingResult expected = new DomainPricingResult(true, "OK");
         when(billingService.getDomainPricing("com")).thenReturn(expected);
 
-        DomainPricingResult result = mcpServer.getDomainPricing("com", mockConnection);
+        DomainPricingResult result = mcpServer.getDomainPricing("com", null, mockConnection);
 
         assertSame(expected, result);
         verify(billingService).getDomainPricing("com");
@@ -226,7 +226,7 @@ class BillingMCPServerTest {
     void getDomainPricing_handlesException() {
         when(billingService.getDomainPricing("com")).thenThrow(new RuntimeException("Fail"));
 
-        DomainPricingResult result = mcpServer.getDomainPricing("com", mockConnection);
+        DomainPricingResult result = mcpServer.getDomainPricing("com", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));

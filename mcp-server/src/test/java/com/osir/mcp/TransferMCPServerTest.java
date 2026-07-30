@@ -48,7 +48,7 @@ class TransferMCPServerTest {
         TransferQuoteResult expected = new TransferQuoteResult(true, "OK");
         when(transferService.getQuote("example.com")).thenReturn(expected);
 
-        TransferQuoteResult result = mcpServer.getTransferQuote("example.com", mockConnection);
+        TransferQuoteResult result = mcpServer.getTransferQuote("example.com", null, mockConnection);
 
         assertSame(expected, result);
         verify(transferService).getQuote("example.com");
@@ -58,7 +58,7 @@ class TransferMCPServerTest {
     void getTransferQuote_handlesException() {
         when(transferService.getQuote("example.com")).thenThrow(new RuntimeException("Fail"));
 
-        TransferQuoteResult result = mcpServer.getTransferQuote("example.com", mockConnection);
+        TransferQuoteResult result = mcpServer.getTransferQuote("example.com", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -72,7 +72,7 @@ class TransferMCPServerTest {
         when(pendingActionStore.stage(eq("initiateTransfer"), any(), eq("test-conn-id"),
                 eq(DestructiveOpRateLimiter.Bucket.FINANCIAL), any())).thenReturn(staged);
 
-        ConfirmationRequiredResult result = mcpServer.initiateTransfer("example.com", "EPP-123", mockConnection);
+        ConfirmationRequiredResult result = mcpServer.initiateTransfer("example.com", "EPP-123", null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("initiateTransfer"), any(), eq("test-conn-id"),
@@ -86,7 +86,7 @@ class TransferMCPServerTest {
         TransferStatusResult expected = new TransferStatusResult(true, "OK");
         when(transferService.getStatus("example.com")).thenReturn(expected);
 
-        TransferStatusResult result = mcpServer.getTransferStatus("example.com", mockConnection);
+        TransferStatusResult result = mcpServer.getTransferStatus("example.com", null, mockConnection);
 
         assertSame(expected, result);
         verify(transferService).getStatus("example.com");
@@ -96,7 +96,7 @@ class TransferMCPServerTest {
     void getTransferStatus_handlesException() {
         when(transferService.getStatus("example.com")).thenThrow(new RuntimeException("Fail"));
 
-        TransferStatusResult result = mcpServer.getTransferStatus("example.com", mockConnection);
+        TransferStatusResult result = mcpServer.getTransferStatus("example.com", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));
@@ -110,7 +110,7 @@ class TransferMCPServerTest {
         when(pendingActionStore.stage(eq("cancelTransfer"), any(), eq("test-conn-id"),
                 eq(DestructiveOpRateLimiter.Bucket.DESTRUCTIVE), any())).thenReturn(staged);
 
-        ConfirmationRequiredResult result = mcpServer.cancelTransfer("example.com", mockConnection);
+        ConfirmationRequiredResult result = mcpServer.cancelTransfer("example.com", null, mockConnection);
 
         assertSame(staged, result);
         verify(pendingActionStore).stage(eq("cancelTransfer"), any(), eq("test-conn-id"),
@@ -124,7 +124,7 @@ class TransferMCPServerTest {
         PendingTransferListResult expected = new PendingTransferListResult(true, "OK");
         when(transferService.listPending()).thenReturn(expected);
 
-        PendingTransferListResult result = mcpServer.listPendingTransfers(mockConnection);
+        PendingTransferListResult result = mcpServer.listPendingTransfers(null, mockConnection);
 
         assertSame(expected, result);
         verify(transferService).listPending();
@@ -134,7 +134,7 @@ class TransferMCPServerTest {
     void listPendingTransfers_handlesException() {
         when(transferService.listPending()).thenThrow(new RuntimeException("Fail"));
 
-        PendingTransferListResult result = mcpServer.listPendingTransfers(mockConnection);
+        PendingTransferListResult result = mcpServer.listPendingTransfers(null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));

@@ -9,6 +9,7 @@ import com.osir.mcp.security.RequiresAuth;
 import com.osir.mcp.services.McpAuthHelper;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -31,7 +32,7 @@ public class ConfirmationMCPServer {
     McpAuthHelper authHelper;
 
     @Tool(description = "Execute a previously staged destructive or financial action after user approval. Required: actionId (the UUID returned by the staging tool). The action expires after 5 minutes and can only be executed once.")
-    public ActionExecutionResult executeConfirmedAction(String actionId, McpConnection connection) {
+    public ActionExecutionResult executeConfirmedAction(String actionId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         var opt = pendingActionStore.claim(actionId);
         if (opt.isEmpty()) {
             return new ActionExecutionResult(false,
@@ -75,10 +76,14 @@ public class ConfirmationMCPServer {
 
     private static boolean extractSuccess(Object result) {
         if (result == null) return true;
-        try {
-            return (boolean) result.getClass().getMethod("isSuccess").invoke(result);
-        } catch (Exception ignored) {
-            return true;
+        // Beans expose isSuccess(), records expose success() — check both before assuming success.
+        for (String accessor : new String[]{"isSuccess", "success"}) {
+            try {
+                return (boolean) result.getClass().getMethod(accessor).invoke(result);
+            } catch (Exception ignored) {
+                // try next accessor
+            }
         }
+        return true;
     }
 }

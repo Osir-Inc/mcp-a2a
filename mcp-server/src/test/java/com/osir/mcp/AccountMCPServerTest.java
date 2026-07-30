@@ -37,25 +37,25 @@ class AccountMCPServerTest {
     void getMyProfile_delegatesToService() {
         UserProfileResult expected = new UserProfileResult(true, "OK");
         when(accountService.getMyProfile()).thenReturn(expected);
-        assertSame(expected, mcpServer.getMyProfile(mockConnection));
+        assertSame(expected, mcpServer.getMyProfile(null, mockConnection));
     }
 
     @Test
     void getMyProfile_handlesException() {
         when(accountService.getMyProfile()).thenThrow(new RuntimeException("Fail"));
-        assertFalse(mcpServer.getMyProfile(mockConnection).isSuccess());
+        assertFalse(mcpServer.getMyProfile(null, mockConnection).isSuccess());
     }
 
     @Test
     void getAccountSummary_delegatesToService() {
         AccountSummaryResult expected = new AccountSummaryResult(true, "OK");
         when(accountService.getAccountSummary()).thenReturn(expected);
-        assertSame(expected, mcpServer.getAccountSummary(mockConnection));
+        assertSame(expected, mcpServer.getAccountSummary(null, mockConnection));
     }
 
     @Test
     void getAccountSummary_handlesException() {
         when(accountService.getAccountSummary()).thenThrow(new RuntimeException("Fail"));
-        assertFalse(mcpServer.getAccountSummary(mockConnection).isSuccess());
+        assertFalse(mcpServer.getAccountSummary(null, mockConnection).isSuccess());
     }
 }

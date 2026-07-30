@@ -146,6 +146,22 @@ public class DeploymentService {
         }
     }
 
+    /**
+     * Hand C2 a ready VPS to move the app onto. Returns false on failure (retry-safe: the
+     * endpoint is idempotent per instanceId, so the orchestrator may call again).
+     */
+    public boolean moveToOwned(String appId, String instanceId, String ip, String domain) {
+        try {
+            client.moveToOwned(appId,
+                    new com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedBody(instanceId, ip, domain),
+                    bearer(), tenant());
+            return true;
+        } catch (Exception ex) {
+            LOG.errorf(ex, "moveToOwned failed for app=%s instance=%s", appId, instanceId);
+            return false;
+        }
+    }
+
     private String bearer() {
         // AuthService returns "<type> <token>" (e.g. "Bearer eyJ..."), ready for the header.
         return authService.getCurrentToken();
