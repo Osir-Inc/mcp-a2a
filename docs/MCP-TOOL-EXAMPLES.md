@@ -1308,7 +1308,17 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 | 70 | `getDomainAuditTrail` | Yes | Audit |
 | 71 | `getMyAuditLogs` | Yes | Audit |
 | 72 | `getRecentActivity` | Yes | Audit |
-| 73 | DomainRegistrarMCPServer has 26 `@Tool` methods (tools #1-25 above) | - | - |
+| 73 | `osirAppCreateUpload` | Yes | Deploy |
+| 74 | `osirAppDeploy` | Yes | Deploy |
+| 75 | `osirAppList` | Yes | Deploy |
+| 76 | `osirAppStatus` | Yes | Deploy |
+| 77 | `osirAppSetSecret` | Yes | Deploy |
+| 78 | `osirAppLogs` | Yes | Deploy |
+| 79 | `osirAppProvisionDatabase` | Yes | Deploy |
+| 80 | `osirAppDelete` | Yes | Deploy |
+| 81 | `osirAppMoveToOwned` | Yes | Deploy |
+| 82 | `osirAppGetSource` | Yes | Deploy |
+| - | DomainRegistrarMCPServer has 26 `@Tool` methods (tools #1-25 above) | - | - |
 
 ---
 
