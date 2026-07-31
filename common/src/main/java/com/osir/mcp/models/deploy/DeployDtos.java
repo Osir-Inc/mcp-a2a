@@ -46,6 +46,17 @@ public final class DeployDtos {
     public record UploadEnvelope(String uploadTicket, String putUrl) {
     }
 
+    /** C2's answer to GET /v1/apps/{appId}/source — a short-lived signed download URL. */
+    public record SourceEnvelope(String getUrl, String expiresAt) {
+    }
+
+    public record AppSourceResult(boolean success, String message, String getUrl,
+                                  String expiresAt, String instructions) {
+        public static AppSourceResult fail(String msg) {
+            return new AppSourceResult(false, msg, null, null, null);
+        }
+    }
+
     public record ProvisionDbEnvelope(String secretKey, String message) {
     }
 

@@ -97,10 +97,12 @@ class VpsServiceTest {
 
     @Test
     void getPackageDetails_success() {
+        when(authService.isAuthenticated()).thenReturn(true);
+        when(authService.getCurrentToken()).thenReturn(TEST_TOKEN);
         VpsPackageSummary pkg = new VpsPackageSummary();
         pkg.setId(TEST_PACKAGE_ID);
         pkg.setName("VPS Pro");
-        when(backendClient.getVpsPackageDetails(TEST_PACKAGE_ID)).thenReturn(pkg);
+        when(backendClient.getVpsPackageDetails(TEST_PACKAGE_ID, TEST_TOKEN)).thenReturn(pkg);
 
         VpsPackageDetailResult result = vpsService.getPackageDetails(TEST_PACKAGE_ID);
 
@@ -110,13 +112,42 @@ class VpsServiceTest {
     }
 
     @Test
+    void getPackageDetails_notAuthenticated() {
+        when(authService.isAuthenticated()).thenReturn(false);
+
+        VpsPackageDetailResult result = vpsService.getPackageDetails(TEST_PACKAGE_ID);
+
+        assertFalse(result.isSuccess());
+        assertTrue(result.getMessage().contains("Authentication required"));
+        verifyNoInteractions(backendClient);
+    }
+
+    @Test
     void getPackageDetails_notFound() {
-        when(backendClient.getVpsPackageDetails("nonexistent")).thenThrow(new RuntimeException("Not found"));
+        when(authService.isAuthenticated()).thenReturn(true);
+        when(authService.getCurrentToken()).thenReturn(TEST_TOKEN);
+        when(backendClient.getVpsPackageDetails("nonexistent", TEST_TOKEN)).thenThrow(new RuntimeException("Not found"));
 
         VpsPackageDetailResult result = vpsService.getPackageDetails("nonexistent");
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Not found"));
+    }
+
+    @Test
+    void orderVps_normalizesPaymentTermForBackendEnum() {
+        when(authService.isAuthenticated()).thenReturn(true);
+        when(authService.getCurrentToken()).thenReturn(TEST_TOKEN);
+        VpsOrderResponse response = new VpsOrderResponse();
+        when(backendClient.orderVps(any(VpsOrderRequest.class), eq(TEST_TOKEN))).thenReturn(response);
+
+        vpsService.orderVps(TEST_PACKAGE_ID, "h.example.com", "monthly", null, null);
+        vpsService.orderVps(TEST_PACKAGE_ID, "h.example.com", " semi-annual ", null, null);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(VpsOrderRequest.class);
+        verify(backendClient, times(2)).orderVps(captor.capture(), eq(TEST_TOKEN));
+        assertEquals("MONTHLY", captor.getAllValues().get(0).getPaymentTerm());
+        assertEquals("SEMI_ANNUAL", captor.getAllValues().get(1).getPaymentTerm());
     }
 
     // ===== orderVps =====

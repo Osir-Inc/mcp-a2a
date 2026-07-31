@@ -2,6 +2,7 @@ package com.osir.mcp;
 
 import com.osir.mcp.models.confirmation.ConfirmationRequiredResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppListResult;
+import com.osir.mcp.models.deploy.DeployDtos.AppSourceResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppLogsResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
 import com.osir.mcp.models.deploy.DeployDtos.DeployResult;
@@ -147,6 +148,24 @@ public class DeploymentMCPServer {
         } catch (Exception e) {
             Log.errorf("osirAppProvisionDatabase error for %s: %s", appId, e.getClass().getSimpleName());
             return ProvisionDbResult.fail("Failed to provision the database. Please try again.");
+        }
+    }
+
+    @RequiresAuth
+    @Tool(name = "osirAppGetSource",
+            description = "Get a short-lived signed download URL for an Osir app's current source zip — use this to "
+                    + "make edits to a deployed app without the user re-attaching the project: download, patch the "
+                    + "files, then osirAppCreateUpload (PUT the new zip) and osirAppDeploy under the SAME name; the "
+                    + "platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box. "
+                    + "Required: appName. Requires authentication.")
+    public AppSourceResult osirAppGetSource(String appName,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
+            McpConnection connection) {
+        try {
+            return deploymentService.getSource(appName);
+        } catch (Exception e) {
+            Log.errorf(e, "osirAppGetSource error for %s: %s", appName, e.getMessage());
+            return AppSourceResult.fail("Failed to get the source URL. Please try again.");
         }
     }
 

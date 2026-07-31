@@ -46,8 +46,11 @@ public class VpsService {
     }
 
     public VpsPackageDetailResult getPackageDetails(String packageId) {
+        if (!authService.isAuthenticated()) {
+            return new VpsPackageDetailResult(false, "Authentication required. Please use loginWithDevice to authenticate.");
+        }
         try {
-            VpsPackageSummary pkg = backendClient.getVpsPackageDetails(packageId);
+            VpsPackageSummary pkg = backendClient.getVpsPackageDetails(packageId, authService.getCurrentToken());
             VpsPackageDetailResult result = new VpsPackageDetailResult(true, "Package details retrieved successfully");
             result.setPackageDetail(pkg);
             return result;
@@ -72,7 +75,9 @@ public class VpsService {
 
         try {
             String token = authService.getCurrentToken();
-            VpsOrderRequest request = new VpsOrderRequest(packageId, hostname, paymentTerm,
+            // The backend's PaymentTerm is a strict enum (MONTHLY, ANNUAL, ...); LLM callers send
+            // arbitrary casing, so normalize here instead of bouncing a 400.
+            VpsOrderRequest request = new VpsOrderRequest(packageId, hostname, normalizeTerm(paymentTerm),
                     operatingSystemId, sshKeyIds);
             VpsOrderResponse response = backendClient.orderVps(request, token);
 
@@ -153,7 +158,7 @@ public class VpsService {
 
         try {
             String token = authService.getCurrentToken();
-            VpsPaymentTermRequest request = new VpsPaymentTermRequest(paymentTerm);
+            VpsPaymentTermRequest request = new VpsPaymentTermRequest(normalizeTerm(paymentTerm));
             VpsActionResponse response = backendClient.changePaymentTerm(instanceId, request, token);
             VpsActionResult result = new VpsActionResult(response.isSuccess(), response.getMessage());
             result.setInstanceId(response.getInstanceId());
@@ -163,6 +168,13 @@ public class VpsService {
             LOG.errorf(e, "Error changing payment term for VPS %s: %s", instanceId, e.getMessage());
             return new VpsActionResult(false, "Payment term change failed: " + e.getMessage());
         }
+    }
+
+    /** Backend PaymentTerm enum values are uppercase (MONTHLY, ANNUAL, ...) — be liberal in what we accept.
+     *  Locale.ROOT: a Turkish default locale would turn BIENNIAL's 'i' into a dotted İ and re-break the enum. */
+    private static String normalizeTerm(String paymentTerm) {
+        return paymentTerm == null ? null
+                : paymentTerm.trim().toUpperCase(java.util.Locale.ROOT).replace('-', '_').replace(' ', '_');
     }
 
     public VpsPanelLoginResult loginToPanel(String instanceId) {

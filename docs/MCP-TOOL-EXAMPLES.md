@@ -1268,7 +1268,7 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 | 30 | `getDnsRecord` | Yes | DNS |
 | 31 | `listVpsPackages` | No | VPS |
 | 32 | `listVpsLocations` | No | VPS |
-| 33 | `getVpsPackageDetails` | No | VPS |
+| 33 | `getVpsPackageDetails` | Yes | VPS |
 | 34 | `orderVps` | Yes | VPS |
 | 35 | `listMyVpsInstances` | Yes | VPS |
 | 36 | `getVpsInstanceDetails` | Yes | VPS |

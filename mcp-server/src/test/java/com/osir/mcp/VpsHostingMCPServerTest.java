@@ -98,7 +98,7 @@ class VpsHostingMCPServerTest {
         VpsPackageDetailResult expected = new VpsPackageDetailResult(true, "OK");
         when(vpsService.getPackageDetails("pkg-1")).thenReturn(expected);
 
-        VpsPackageDetailResult result = mcpServer.getVpsPackageDetails("pkg-1", mockConnection);
+        VpsPackageDetailResult result = mcpServer.getVpsPackageDetails("pkg-1", null, mockConnection);
 
         assertSame(expected, result);
         verify(vpsService).getPackageDetails("pkg-1");
@@ -108,7 +108,7 @@ class VpsHostingMCPServerTest {
     void getVpsPackageDetails_handlesException() {
         when(vpsService.getPackageDetails("pkg-1")).thenThrow(new RuntimeException("Fail"));
 
-        VpsPackageDetailResult result = mcpServer.getVpsPackageDetails("pkg-1", mockConnection);
+        VpsPackageDetailResult result = mcpServer.getVpsPackageDetails("pkg-1", null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));

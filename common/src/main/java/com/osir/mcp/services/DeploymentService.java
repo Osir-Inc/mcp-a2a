@@ -3,6 +3,8 @@ package com.osir.mcp.services;
 import com.osir.mcp.clients.DeployBackendClient;
 import com.osir.mcp.models.deploy.DeployDtos.AppEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.AppListResult;
+import com.osir.mcp.models.deploy.DeployDtos.AppSourceResult;
+import com.osir.mcp.models.deploy.DeployDtos.SourceEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppsEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.ConfirmationEnvelope;
@@ -143,6 +145,35 @@ public class DeploymentService {
         } catch (Exception ex) {
             LOG.errorf(ex, "delete failed for %s", appId);
             throw new RuntimeException("Could not delete the app. Please try again.");
+        }
+    }
+
+    /**
+     * Signed download URL for the app's current source zip. 404 covers both "no such app" and
+     * "no retained source" (apps deployed before retention shipped) — one honest message for both,
+     * since the fix is the same: (re)deploy once.
+     */
+    public AppSourceResult getSource(String appId) {
+        try {
+            SourceEnvelope e = client.source(appId, bearer(), tenant());
+            return new AppSourceResult(true,
+                    "Signed source download URL for '" + appId + "' (expires " + e.expiresAt() + ").",
+                    e.getUrl(), e.expiresAt(),
+                    "Download the zip, edit the files, then osirAppCreateUpload (PUT the new zip) and "
+                            + "osirAppDeploy under the same name — the platform rebuilds and, for owned apps, "
+                            + "auto-ships to the box.");
+        } catch (jakarta.ws.rs.WebApplicationException ex) {
+            if (ex.getResponse() != null && ex.getResponse().getStatus() == 404) {
+                return AppSourceResult.fail(
+                        "No retained source for '" + appId + "' — either the app doesn't exist on your account, "
+                                + "or it was last deployed before source retention shipped. Redeploying it once "
+                                + "(osirAppCreateUpload + osirAppDeploy) enables source retrieval.");
+            }
+            LOG.errorf(ex, "getSource failed for %s", appId);
+            return AppSourceResult.fail("Could not get the source URL right now. Please try again.");
+        } catch (Exception ex) {
+            LOG.errorf(ex, "getSource failed for %s", appId);
+            return AppSourceResult.fail("Could not get the source URL right now. Please try again.");
         }
     }
 

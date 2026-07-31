@@ -25,12 +25,13 @@ public interface VpsBackendClient {
     @Path("/v1/public/catalog/vps/locations")
     VpsLocationListApiResponse getVpsLocations();
 
-    // Package details (no auth required)
+    // Package details — /v1/hosting/* requires the customer role (unlike /v1/public/catalog/*)
 
     @GET
     @Path("/v1/hosting/vps/packages/{packageId}")
     VpsPackageSummary getVpsPackageDetails(
-            @PathParam("packageId") String packageId
+            @PathParam("packageId") String packageId,
+            @HeaderParam("Authorization") String bearerToken
     );
 
     // Authenticated VPS operations

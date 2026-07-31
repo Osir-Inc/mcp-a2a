@@ -8,6 +8,7 @@ import com.osir.mcp.models.deploy.DeployDtos.DeployAppBody;
 import com.osir.mcp.models.deploy.DeployDtos.LogsEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.ProvisionDbEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.SecretBody;
+import com.osir.mcp.models.deploy.DeployDtos.SourceEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.StatusEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.UploadEnvelope;
 import com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedBody;
@@ -62,6 +63,11 @@ public interface DeployBackendClient {
     @POST
     @Path("/v1/uploads")
     UploadEnvelope createUpload(@HeaderParam("Authorization") String bearer, @HeaderParam("X-Osir-Tenant") String tenant);
+
+    /** Signed download URL for the app's current source zip — the zip itself never flows through the MCP. */
+    @GET
+    @Path("/v1/apps/{appId}/source")
+    SourceEnvelope source(@PathParam("appId") String appId, @HeaderParam("Authorization") String bearer, @HeaderParam("X-Osir-Tenant") String tenant);
 
     @POST
     @Path("/v1/apps/{appId}/secrets")

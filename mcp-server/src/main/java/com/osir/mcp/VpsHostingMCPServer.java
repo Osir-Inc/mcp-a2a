@@ -48,8 +48,9 @@ public class VpsHostingMCPServer {
         }
     }
 
-    @Tool(description = "Get detailed information about a specific VPS package including all pricing tiers. Required: packageId (string)")
-    public VpsPackageDetailResult getVpsPackageDetails(String packageId, McpConnection connection) {
+    @RequiresAuth
+    @Tool(description = "Get detailed information about a specific VPS package including all pricing tiers. Requires authentication. Required: packageId (string). For anonymous browsing use listVpsPackages, which already includes per-term pricing.")
+    public VpsPackageDetailResult getVpsPackageDetails(String packageId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return vpsService.getPackageDetails(packageId);
         } catch (Exception e) {

@@ -138,7 +138,7 @@ public class MoveToOwnedService {
 
         VpsOrderResult order;
         try {
-            order = vpsService.orderVps(packageId, appName + "-owned.osir.app", "monthly",
+            order = vpsService.orderVps(packageId, appName + "-owned.osir.app", "MONTHLY",
                     prep.osTemplateId(), List.of(prep.sshKeyId()));
         } catch (RuntimeException e) {
             orderedInstances.remove(moveKey, ORDER_PENDING); // release reservation — retry allowed
