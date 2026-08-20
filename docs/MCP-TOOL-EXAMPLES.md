@@ -1232,7 +1232,7 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 
 ---
 
-## Quick Reference: All 93 Tools
+## Quick Reference: All 101 Tools
 
 | # | Tool | Auth | Category |
 |---|------|:----:|----------|
@@ -1329,6 +1329,14 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 | 91 | `setMailboxPassword` | Yes | Mail |
 | 92 | `deleteMailbox` | Yes | Mail |
 | 93 | `getMailboxUsage` | Yes | Mail |
+| 94 | `initializeDnsZone` | Yes | DNS |
+| 95 | `listVpsOsTemplates` | Yes | VPS |
+| 96 | `buildVpsInstance` | Yes | VPS |
+| 97 | `addSshKey` | Yes | VPS |
+| 98 | `listMySshKeys` | Yes | VPS |
+| 99 | `deleteSshKey` | Yes | VPS |
+| 100 | `listCategorizedTlds` | No | Catalog |
+| 101 | `executeConfirmedAction` | Yes | Confirmation |
 | - | DomainRegistrarMCPServer has 26 `@Tool` methods (tools #1-25 above) | - | - |
 
 ---

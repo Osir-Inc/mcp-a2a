@@ -8,7 +8,7 @@ Two servers, one shared backend client library:
 
 | Server | Port | Protocol | What it gives an AI |
 |--------|------|----------|---------------------|
-| **MCP Server** | 8081 | [Model Context Protocol](https://modelcontextprotocol.io) (SSE + Streamable HTTP) | 88 fine-grained tools (`checkDomainAvailability`, `registerDomain`, `createDnsRecord`, …) + 8 guided prompts |
+| **MCP Server** | 8081 | [Model Context Protocol](https://modelcontextprotocol.io) (SSE + Streamable HTTP) | 101 fine-grained tools (`checkDomainAvailability`, `registerDomain`, `createDnsRecord`, `createMailbox`, …) + 8 guided prompts |
 | **A2A Server** | 8082 | [Google Agent-to-Agent](https://google.github.io/A2A/) (JSON-RPC 2.0) | 7 specialist agents with 50+ skills and an orchestrator for multi-step workflows |
 
 Use **MCP** when one assistant should call individual operations. Use **A2A** when you want to hand
@@ -67,6 +67,7 @@ drive the in-chat device login.
 | Manage DNS | "Point it at 192.0.2.10 and add my email records." |
 | Renew and transfer | "Renew everything expiring in the next 30 days." |
 | Provision a VPS | "Spin up a 2 vCPU server in Frankfurt running Ubuntu." |
+| Host email | "Enable email on example.com and create info@ with a 10 GB mailbox." |
 
 ---
 
@@ -175,7 +176,7 @@ See [`.env.example`](.env.example) for the full list.
 
 ```
 common/      Shared library — 12 services, 9 REST clients, ~174 models
-mcp-server/  Quarkus MCP server — 88 tools, 8 prompts, chat UI
+mcp-server/  Quarkus MCP server — 101 tools, 8 prompts, chat UI
 a2a-server/  Quarkus A2A server — 7 agents, JSON-RPC, JPA task persistence
 ```
 
