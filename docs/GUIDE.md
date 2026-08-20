@@ -136,6 +136,14 @@ Most tools require authentication. Use one of these methods:
 > `operatingSystemId` with `listVpsOsTemplates(packageId:…)` and store a key with `addSshKey`, then pass
 > both to `orderVps`. Full flow: **[VPS-OS-BUILD.md](VPS-OS-BUILD.md)**.
 
+#### Email Hosting (11)
+`listMailPlans`, `getMailboxQuote`, `enableMailDomain`, `listMailDomains`, `getMailDnsRecords`, `verifyMailDns`, `createMailbox`, `listMailboxes`, `setMailboxPassword`, `deleteMailbox`, `getMailboxUsage`
+
+> Enabling a domain for email is free; mailboxes are billable. Flow: `enableMailDomain` (DNS published
+> automatically when the domain is on our nameservers, otherwise publish the returned records and
+> `verifyMailDns`), then `getMailboxQuote` → confirm with the user → `createMailbox`. The generated
+> mailbox password is returned **exactly once** — show it to the user immediately.
+
 #### Billing (9)
 `getAccountBalance`, `listInvoices`, `getInvoiceDetails`, `payInvoice`, `getInvoiceStatistics`, `createPaymentSession`, `getPaymentTransactions`, `previewPaymentFees`, `getDomainPricing`
 

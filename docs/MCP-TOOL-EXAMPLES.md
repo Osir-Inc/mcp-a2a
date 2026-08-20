@@ -1232,7 +1232,7 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 
 ---
 
-## Quick Reference: All 73 Tools
+## Quick Reference: All 93 Tools
 
 | # | Tool | Auth | Category |
 |---|------|:----:|----------|
@@ -1318,6 +1318,17 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 | 80 | `osirAppDelete` | Yes | Deploy |
 | 81 | `osirAppMoveToOwned` | Yes | Deploy |
 | 82 | `osirAppGetSource` | Yes | Deploy |
+| 83 | `listMailPlans` | Yes | Mail |
+| 84 | `getMailboxQuote` | Yes | Mail |
+| 85 | `enableMailDomain` | Yes | Mail |
+| 86 | `listMailDomains` | Yes | Mail |
+| 87 | `getMailDnsRecords` | Yes | Mail |
+| 88 | `verifyMailDns` | Yes | Mail |
+| 89 | `createMailbox` | Yes | Mail |
+| 90 | `listMailboxes` | Yes | Mail |
+| 91 | `setMailboxPassword` | Yes | Mail |
+| 92 | `deleteMailbox` | Yes | Mail |
+| 93 | `getMailboxUsage` | Yes | Mail |
 | - | DomainRegistrarMCPServer has 26 `@Tool` methods (tools #1-25 above) | - | - |
 
 ---
