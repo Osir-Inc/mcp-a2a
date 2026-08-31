@@ -2,7 +2,7 @@
 
 ## How MCP and A2A Complement Each Other
 
-- **MCP** is tool-level: lets a single agent discover and call 71 tools. The "hands" of an agent.
+- **MCP** is tool-level: lets a single agent discover and call 103 tools. The "hands" of an agent.
 - **A2A** is task-level: lets agents discover each other, delegate tasks, and exchange results. The "organizational layer."
 
 Each specialist agent is an A2A server that internally uses the existing `common` services (same ones the MCP server uses). The orchestrator discovers specialists via A2A Agent Cards and sends them tasks.

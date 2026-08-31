@@ -6,7 +6,7 @@ the design decisions worth knowing before you change something.
 ## Project Overview
 
 OSIR domain registrar AI platform with two servers:
-- **MCP Server** (Quarkus, port 8081) — 88 tools + 8 prompts via Model Context Protocol
+- **MCP Server** (Quarkus, port 8081) — 103 tools + 11 prompts via Model Context Protocol
 - **A2A Server** (Quarkus, port 8082) — 7 specialist agents via Google Agent-to-Agent protocol
 
 **Note:** CLI tools moved to `../com.osir.cli`.
@@ -16,7 +16,7 @@ OSIR domain registrar AI platform with two servers:
 ```
 com.osir.agent/
 ├── common/          # Java library: 12 services, 9 REST clients, ~174 models
-├── mcp-server/      # Quarkus: 13 MCP servers (12 tools + 1 prompts), chat UI, health
+├── mcp-server/      # Quarkus: 15 *MCPServer classes (tools + prompts), chat UI, health
 ├── a2a-server/      # Quarkus: A2A protocol, 7 agents, audit logging
 │   ├── protocol/    # AgentCard, A2ATask, Message/Part, Artifact, JSON-RPC, TaskStore
 │   ├── agents/      # BaseSpecialistAgent + 6 specialists + OrchestratorAgent
@@ -45,9 +45,10 @@ docker-compose logs -f             # View logs
 ## Architecture
 
 ### MCP Server
-- 13 `*MCPServer.java` classes with `@Tool` and `@Prompt` annotations at `/mcp` (SSE)
-- 88 tools: domain+suggestions (25), VPS (15), billing (9), deployment (8), DNS (6), contacts (6), transfer (5), catalog (4), host (4), audit (3), account (2), confirmation (1)
-- 8 prompts: getting_started, vps_setup_guide, dns_setup_guide, billing_overview, domain_management_guide, hosting_comparison, troubleshooting, security_best_practices
+- 15 `*MCPServer.java` classes with `@Tool` and `@Prompt` annotations at `/mcp` (SSE)
+- 103 tools: domain+suggestions (25), VPS (20), mail (11), deployment (10), billing (9), DNS (7), contacts (6), transfer (5), catalog (5), host (4), audit (3), account (2), website design (2), confirmation (1) — canonical list in `MCP-TOOL-EXAMPLES.md`
+- 11 prompts: getting_started, vps_setup_guide, dns_setup_guide, billing_overview, domain_management_guide, hosting_comparison, troubleshooting, security_best_practices (PromptsMCPServer); domain_registration_guide, domain_transfer_checklist (DomainRegistrarMCPServer); website_designer (WebsiteDesignMCPServer)
+- Website design: the calling LLM designs; `osirSiteDesignBrief` returns the prompt, `osirSitePublish` gates + zips + deploys. Open items in [TODO.md](TODO.md)
 - Caching: CatalogService + domain pricing (15min TTL via `@CacheResult`)
 
 ### A2A Server

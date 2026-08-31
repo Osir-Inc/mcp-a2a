@@ -49,6 +49,9 @@ View audit trails, activity logs, and domain history.
 ### Catalog (3 tools)
 Browse domain extensions, VPS packages, and dedicated server configurations.
 
+### Website Design (2 tools)
+`osirSiteDesignBrief` (brief → design prompt you follow to write one self-contained HTML page), `osirSitePublish` (name + html → live *.osir.app URL; same name redeploys). Prompt: `website_designer`.
+
 ### Account (2 tools)
 User profile and account summary.
 

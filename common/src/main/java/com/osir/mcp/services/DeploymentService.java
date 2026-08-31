@@ -72,10 +72,81 @@ public class DeploymentService {
             var a = e.app();
             return new DeployResult(true, "Deploy started for '" + a.name() + "'. Poll osirAppStatus until READY.",
                     a.appId(), a.liveUrl(), a.status());
+        } catch (jakarta.ws.rs.WebApplicationException ex) {
+            // Surface C2's 4xx reason — it's written for the caller (e.g. invalid name/region) and
+            // the LLM needs it to fix the call. 5xx stays generic.
+            String detail = readErrorMessage(ex.getResponse());
+            LOG.errorf("deploy failed for name=%s: %s", name, detail);
+            int status = ex.getResponse() == null ? 0 : ex.getResponse().getStatus();
+            if (status >= 400 && status < 500) {
+                return DeployResult.fail("Deploy rejected by the platform: " + detail);
+            }
+            return DeployResult.fail("Deploy could not be started. Check the app name/language and try again.");
         } catch (Exception ex) {
             LOG.errorf(ex, "deploy failed for name=%s", name);
             return DeployResult.fail("Deploy could not be started. Check the app name/language and try again.");
         }
+    }
+
+    /** Pulls the backend's {"error"|"message": "..."} out of a failed response, else the status line. */
+    static String readErrorMessage(jakarta.ws.rs.core.Response response) {
+        if (response == null) {
+            return "unknown error";
+        }
+        try {
+            String body = response.readEntity(String.class);
+            if (body != null && !body.isBlank()) {
+                var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+                for (String key : new String[]{"error", "message", "detail"}) {
+                    if (node.hasNonNull(key)) {
+                        return node.get(key).asText();
+                    }
+                }
+                return body.length() > 300 ? body.substring(0, 300) : body;   // non-JSON body, truncated
+            }
+        } catch (Exception ignored) {
+            // Fall through to the status line.
+        }
+        return "HTTP " + response.getStatus();
+    }
+
+    /**
+     * Publish a single self-contained HTML page as a static site: gate → upload ticket → zip
+     * (index.html) → PUT → deploy. Exists because chat clients (Claude.ai) cannot run zip/curl, so
+     * the bytes must pass through here. Same app name = redeploy (revision).
+     */
+    public DeployResult publishStatic(String name, String html, String region, boolean designContract) {
+        html = StaticSiteGate.normalize(html);
+        String problem = StaticSiteGate.check(html, designContract);
+        if (problem != null) {
+            return DeployResult.fail("HTML rejected — fix and call osirSitePublish again: " + problem);
+        }
+        UploadTicketResult ticket = createUpload();
+        if (!ticket.success()) return DeployResult.fail(ticket.message());
+        try {
+            var zip = new java.io.ByteArrayOutputStream();
+            try (var zos = new java.util.zip.ZipOutputStream(zip)) {
+                zos.putNextEntry(new java.util.zip.ZipEntry("index.html"));
+                zos.write(html.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                zos.closeEntry();
+            }
+            var resp = java.net.http.HttpClient.newBuilder()
+                    .connectTimeout(java.time.Duration.ofSeconds(5)).build().send(
+                    java.net.http.HttpRequest.newBuilder(java.net.URI.create(ticket.putUrl()))
+                            .timeout(java.time.Duration.ofSeconds(30))
+                            .header("Content-Type", "application/zip")
+                            .PUT(java.net.http.HttpRequest.BodyPublishers.ofByteArray(zip.toByteArray()))
+                            .build(),
+                    java.net.http.HttpResponse.BodyHandlers.discarding());
+            if (resp.statusCode() / 100 != 2) {
+                LOG.errorf("publishStatic upload failed: HTTP %d", resp.statusCode());
+                return DeployResult.fail("Upload of the site failed. Please try again.");
+            }
+        } catch (Exception ex) {
+            LOG.errorf(ex, "publishStatic upload failed for name=%s", name);
+            return DeployResult.fail("Upload of the site failed. Please try again.");
+        }
+        return deploy(name, "node", region, ticket.uploadTicket());   // static is auto-detected by C2
     }
 
     public AppListResult listApps() {

@@ -8,7 +8,7 @@ Two servers, one shared backend client library:
 
 | Server | Port | Protocol | What it gives an AI |
 |--------|------|----------|---------------------|
-| **MCP Server** | 8081 | [Model Context Protocol](https://modelcontextprotocol.io) (SSE + Streamable HTTP) | 101 fine-grained tools (`checkDomainAvailability`, `registerDomain`, `createDnsRecord`, `createMailbox`, …) + 8 guided prompts |
+| **MCP Server** | 8081 | [Model Context Protocol](https://modelcontextprotocol.io) (SSE + Streamable HTTP) | 103 fine-grained tools (`checkDomainAvailability`, `registerDomain`, `createDnsRecord`, `createMailbox`, `osirSitePublish`, …) + 11 guided prompts |
 | **A2A Server** | 8082 | [Google Agent-to-Agent](https://google.github.io/A2A/) (JSON-RPC 2.0) | 7 specialist agents with 50+ skills and an orchestrator for multi-step workflows |
 
 Use **MCP** when one assistant should call individual operations. Use **A2A** when you want to hand
@@ -176,7 +176,7 @@ See [`.env.example`](.env.example) for the full list.
 
 ```
 common/      Shared library — 12 services, 9 REST clients, ~174 models
-mcp-server/  Quarkus MCP server — 101 tools, 8 prompts, chat UI
+mcp-server/  Quarkus MCP server — 103 tools, 11 prompts, chat UI
 a2a-server/  Quarkus A2A server — 7 agents, JSON-RPC, JPA task persistence
 ```
 
@@ -185,6 +185,7 @@ Both servers depend on `common`, so a backend operation is implemented once and 
 ## Documentation
 
 - **[GUIDE.md](docs/GUIDE.md)** — complete usage guide, tool reference, walkthroughs
+- **[WEBSITE-DESIGN.md](docs/WEBSITE-DESIGN.md)** — AI website design: customer guide, use cases, frontend integration
 - **[DEVELOPING.md](docs/DEVELOPING.md)** — repo layout, build/run commands, architecture notes
 - **[VPS-OS-BUILD.md](docs/VPS-OS-BUILD.md)** — ordering a VPS **with an OS**, SSH keys, reinstall, and
   the OSIR APP DEPLOY flow. Read this before touching the VPS tools: ordering and building are two

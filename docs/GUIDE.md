@@ -87,7 +87,7 @@ Most tools require authentication. Use one of these methods:
 **Option B: Username/Password**
 1. Call `authenticateUser` with username and password
 
-### Available Tools (88 total)
+### Available Tools (103 total)
 
 #### Authentication (5)
 | Tool | Description |
@@ -149,6 +149,10 @@ Most tools require authentication. Use one of these methods:
 
 #### Contacts (6), Transfers (5), Hosts (4), Audit (3), Catalog (3), Account (2)
 
+#### Website Design (2)
+- `osirSiteDesignBrief` — validate the brief, get the design prompt (no auth)
+- `osirSitePublish` — publish the LLM-written HTML as a static site (auth)
+
 ### Example Conversations with Claude
 
 **Find and register a domain:**
@@ -173,6 +177,17 @@ Claude will:
 Claude will:
 1. Call `createDnsRecord("example.al", "@", "A", "203.0.113.10", 3600, null)`
 2. Call `createDnsRecord("example.al", "www", "CNAME", "example.al", 3600, null)`
+
+**Design and publish a website (the LLM is the designer — the server never calls a model):**
+> "Design a one-page site for my seafood bar in Vlora and put it online."
+
+Claude will (or use the `website_designer` prompt to drive this):
+1. Interview you: business, what it does, audience, the page's single job, the one CTA — then offer optionals (logo, colours, photos, sites you like *and what you like about them*, real content, language, tone)
+2. Call `osirSiteDesignBrief(businessName, whatItIs, audience, pageJob, primaryAction, briefJson)` → returns `systemPrompt` (design instructions) + `editRules`
+3. Write one self-contained HTML page following `systemPrompt` — never pasted into the chat (saves tokens): it goes straight to `osirSitePublish(name, html)` → zipped + deployed as a static site; `osirAppStatus(appId)` until READY → `liveUrl` is the preview
+4. Revise on request following `editRules`: `osirSitePublish` again with the same `name`
+
+`osirSitePublish` rejects HTML that breaks the contract (external scripts, non-Google-Fonts `<link>`, `<iframe>`, ≠1 `<h1>`, >1 MiB) with a message the LLM fixes and retries. Contact forms: **TODO** — no OSIR form endpoint yet; sites use `tel:`/`mailto:`/WhatsApp links unless `constraints.form_endpoint` is supplied.
 
 ---
 
@@ -456,8 +471,8 @@ docker-compose logs -f
 ┌──────▼──────┐ ┌─▼──────────────────────────┐
 │ MCP Server  │ │ A2A Server                  │
 │ :8081       │ │ :8082                       │
-│ 88 tools    │ │ Orchestrator                │
-│  8 prompts  │ │  ├─ Domain Agent (13 skills)│
+│ 103 tools   │ │ Orchestrator                │
+│  11 prompts │ │  ├─ Domain Agent (13 skills)│
 │             │ │  ├─ DNS Agent (5 skills)    │
 │             │ │  ├─ VPS Agent (12 skills)   │
 │             │ │  ├─ Billing Agent (9 skills)│
