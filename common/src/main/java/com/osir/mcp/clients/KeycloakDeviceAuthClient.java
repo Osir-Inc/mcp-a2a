@@ -11,11 +11,15 @@ import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 @Produces(MediaType.APPLICATION_JSON)
 public interface KeycloakDeviceAuthClient {
 
+    // PKCE params are mandatory: Keycloak's public-client policy (2026-09-01) rejects
+    // device authorization requests without S256 code_challenge.
     @POST
     @Path("/protocol/openid-connect/auth/device")
     DeviceCodeResponse requestDeviceCode(
             @FormParam("client_id") String clientId,
-            @FormParam("scope") String scope
+            @FormParam("scope") String scope,
+            @FormParam("code_challenge") String codeChallenge,
+            @FormParam("code_challenge_method") String codeChallengeMethod
     );
 
     @POST
@@ -23,7 +27,8 @@ public interface KeycloakDeviceAuthClient {
     AuthTokenResponse pollDeviceToken(
             @FormParam("grant_type") String grantType,
             @FormParam("client_id") String clientId,
-            @FormParam("device_code") String deviceCode
+            @FormParam("device_code") String deviceCode,
+            @FormParam("code_verifier") String codeVerifier
     );
 
     @POST

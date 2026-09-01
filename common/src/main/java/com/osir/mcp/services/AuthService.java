@@ -56,6 +56,10 @@ public class AuthService {
     // Track pending device flows: deviceCode -> expiresAtMillis
     private final Map<String, Long> pendingDeviceFlows = new ConcurrentHashMap<>();
 
+    // PKCE code_verifier per pending device code (Keycloak enforces S256 on public clients).
+    // Keyed by device code, not connection/session — entries die with the device code.
+    private final Map<String, String> deviceCodeVerifiers = new ConcurrentHashMap<>();
+
     public AuthResult authenticate(String username, String password) {
         try {
             AuthRequest authRequest = new AuthRequest(username, password);
@@ -95,7 +99,9 @@ public class AuthService {
 
     public DeviceLoginResult startDeviceLogin() {
         try {
-            DeviceCodeResponse response = keycloakClient.requestDeviceCode(clientId, "openid");
+            String codeVerifier = com.osir.mcp.util.Pkce.newVerifier();
+            DeviceCodeResponse response = keycloakClient.requestDeviceCode(clientId, "openid",
+                    com.osir.mcp.util.Pkce.challengeS256(codeVerifier), com.osir.mcp.util.Pkce.METHOD_S256);
 
             if (response == null) {
                 return new DeviceLoginResult(false, "Failed to initiate device login: No response from KeyCloak");
@@ -104,6 +110,7 @@ public class AuthService {
             // Track the pending flow with its expiry time
             pendingDeviceFlows.put(response.getDeviceCode(),
                     System.currentTimeMillis() + (response.getExpiresIn() * 1000L));
+            deviceCodeVerifiers.put(response.getDeviceCode(), codeVerifier);
 
             LOG.infof("Device login initiated. User code: %s, Verification URI: %s",
                     response.getUserCode(), response.getVerificationUri());
@@ -130,15 +137,18 @@ public class AuthService {
         Long expiresAt = pendingDeviceFlows.get(deviceCode);
         if (expiresAt != null && System.currentTimeMillis() > expiresAt) {
             pendingDeviceFlows.remove(deviceCode);
+            deviceCodeVerifiers.remove(deviceCode);
             return new DeviceLoginStatusResult(false, "Device code has expired. Please start a new login.", "expired");
         }
 
         try {
             AuthTokenResponse tokenResponse = keycloakClient.pollDeviceToken(
-                    "urn:ietf:params:oauth:grant-type:device_code", clientId, deviceCode);
+                    "urn:ietf:params:oauth:grant-type:device_code", clientId, deviceCode,
+                    deviceCodeVerifiers.get(deviceCode));
 
             // Success - we got a token
             pendingDeviceFlows.remove(deviceCode);
+            deviceCodeVerifiers.remove(deviceCode);
 
             String username = extractUsernameFromToken(tokenResponse.getAccessToken());
 
@@ -175,10 +185,12 @@ public class AuthService {
                         new DeviceLoginStatusResult(true, "Polling too fast. Please increase the interval between checks.", "slow_down");
                 case "expired_token" -> {
                     pendingDeviceFlows.remove(deviceCode);
+                    deviceCodeVerifiers.remove(deviceCode);
                     yield new DeviceLoginStatusResult(false, "Device code has expired. Please start a new login.", "expired");
                 }
                 case "access_denied" -> {
                     pendingDeviceFlows.remove(deviceCode);
+                    deviceCodeVerifiers.remove(deviceCode);
                     yield new DeviceLoginStatusResult(false, "Authorization was denied by the user.", "denied");
                 }
                 default -> {

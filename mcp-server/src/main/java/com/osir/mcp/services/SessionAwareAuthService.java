@@ -56,6 +56,13 @@ public class SessionAwareAuthService {
     // connection ID or conversation session key (osk_*) -> SessionAuth
     private final Map<String, SessionAuth> sessionAuths = new ConcurrentHashMap<>();
 
+    // PKCE code_verifier per pending device code (Keycloak enforces S256 on public clients,
+    // including the device grant). Keyed by DEVICE CODE, not connection — Claude.ai opens a new
+    // MCP session between loginWithDevice and the poll, so connection-scoped state would be lost.
+    // If the MCP server restarts mid-login the verifier is gone and the user restarts the login.
+    private record PendingPkce(String verifier, long expiresAtMillis) {}
+    private final Map<String, PendingPkce> devicePkce = new ConcurrentHashMap<>();
+
     public enum AuthCheck { AUTHENTICATED, NOT_AUTHENTICATED, EXPIRED }
 
     public AuthCheck checkAuth(String connectionId) {
@@ -178,10 +185,18 @@ public class SessionAwareAuthService {
 
     public DeviceLoginResult startDeviceLogin(String connectionId) {
         try {
-            DeviceCodeResponse response = keycloakClient.requestDeviceCode(clientId, "openid");
+            // Lazy purge of abandoned logins (device codes expire in ~10 min).
+            long now = System.currentTimeMillis();
+            devicePkce.entrySet().removeIf(e -> e.getValue().expiresAtMillis() < now);
+
+            String codeVerifier = com.osir.mcp.util.Pkce.newVerifier();
+            DeviceCodeResponse response = keycloakClient.requestDeviceCode(clientId, "openid",
+                    com.osir.mcp.util.Pkce.challengeS256(codeVerifier), com.osir.mcp.util.Pkce.METHOD_S256);
             if (response == null) {
                 return new DeviceLoginResult(false, "Failed to initiate device login: no response from KeyCloak");
             }
+            devicePkce.put(response.getDeviceCode(),
+                    new PendingPkce(codeVerifier, now + response.getExpiresIn() * 1000L));
             LOG.infof("Device login initiated for connection %s. User code: %s", connectionId, response.getUserCode());
             return new DeviceLoginResult(
                     true,
@@ -199,14 +214,22 @@ public class SessionAwareAuthService {
         }
     }
 
-    // No local pending-flow state: KeyCloak is the source of truth for device codes (RFC 8628).
-    // Clients like Claude.ai open a new MCP session between loginWithDevice and the poll, so any
-    // connection-scoped bookkeeping here would reject valid codes.
+    // KeyCloak stays the source of truth for device codes (RFC 8628); the only local state is
+    // the PKCE verifier, keyed by device code (see devicePkce) so it survives Claude.ai opening
+    // a new MCP session between loginWithDevice and the poll.
     public DeviceLoginStatusResult checkDeviceLoginStatus(String connectionId, String deviceCode) {
         try {
+            PendingPkce pkce = devicePkce.get(deviceCode);
+            if (pkce == null) {
+                // Server restarted (or code never issued here): the verifier is unrecoverable.
+                return new DeviceLoginStatusResult(false,
+                        "This login attempt is no longer valid (server restarted). Please start a new login.",
+                        "invalid");
+            }
             AuthTokenResponse tokenResponse = keycloakClient.pollDeviceToken(
-                    "urn:ietf:params:oauth:grant-type:device_code", clientId, deviceCode);
+                    "urn:ietf:params:oauth:grant-type:device_code", clientId, deviceCode, pkce.verifier());
 
+            devicePkce.remove(deviceCode);
             String username = extractUsername(tokenResponse.getAccessToken());
             SessionAuth sessionAuth = new SessionAuth(
                     username,
@@ -253,15 +276,21 @@ public class SessionAwareAuthService {
                 case "slow_down" ->
                         new DeviceLoginStatusResult(true,
                                 "Polling too fast. Please wait a few seconds before retrying.", "slow_down");
-                case "expired_token" ->
-                        new DeviceLoginStatusResult(false,
-                                "Device code has expired. Please start a new login.", "expired");
-                case "access_denied" ->
-                        new DeviceLoginStatusResult(false,
-                                "Authorization was denied by the user.", "denied");
-                case "invalid_grant" ->
-                        new DeviceLoginStatusResult(false,
-                                "Unknown or already-used device code. Please start a new login.", "invalid");
+                case "expired_token" -> {
+                    devicePkce.remove(deviceCode);
+                    yield new DeviceLoginStatusResult(false,
+                            "Device code has expired. Please start a new login.", "expired");
+                }
+                case "access_denied" -> {
+                    devicePkce.remove(deviceCode);
+                    yield new DeviceLoginStatusResult(false,
+                            "Authorization was denied by the user.", "denied");
+                }
+                case "invalid_grant" -> {
+                    devicePkce.remove(deviceCode);
+                    yield new DeviceLoginStatusResult(false,
+                            "Unknown or already-used device code. Please start a new login.", "invalid");
+                }
                 default -> {
                     LOG.warnf("Unexpected OAuth error during device poll: %s", errorCode);
                     yield new DeviceLoginStatusResult(false,

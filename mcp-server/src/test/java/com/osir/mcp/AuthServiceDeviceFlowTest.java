@@ -50,7 +50,7 @@ class AuthServiceDeviceFlowTest {
         response.setExpiresIn(600);
         response.setInterval(5);
 
-        when(keycloakClient.requestDeviceCode("osir-mcp-agent", "openid")).thenReturn(response);
+        when(keycloakClient.requestDeviceCode(eq("osir-mcp-agent"), eq("openid"), anyString(), eq("S256"))).thenReturn(response);
 
         DeviceLoginResult result = authService.startDeviceLogin();
 
@@ -68,7 +68,7 @@ class AuthServiceDeviceFlowTest {
 
     @Test
     void startDeviceLogin_nullResponse() {
-        when(keycloakClient.requestDeviceCode("osir-mcp-agent", "openid")).thenReturn(null);
+        when(keycloakClient.requestDeviceCode(eq("osir-mcp-agent"), eq("openid"), anyString(), eq("S256"))).thenReturn(null);
 
         DeviceLoginResult result = authService.startDeviceLogin();
 
@@ -78,7 +78,7 @@ class AuthServiceDeviceFlowTest {
 
     @Test
     void startDeviceLogin_exception() {
-        when(keycloakClient.requestDeviceCode("osir-mcp-agent", "openid"))
+        when(keycloakClient.requestDeviceCode(eq("osir-mcp-agent"), eq("openid"), anyString(), eq("S256")))
                 .thenThrow(new RuntimeException("Connection refused"));
 
         DeviceLoginResult result = authService.startDeviceLogin();
@@ -102,7 +102,7 @@ class AuthServiceDeviceFlowTest {
                 .thenReturn("{\"error\":\"authorization_pending\",\"error_description\":\"waiting\"}");
 
         when(keycloakClient.pollDeviceToken(
-                "urn:ietf:params:oauth:grant-type:device_code", "osir-mcp-agent", "dev-code-123"))
+                eq("urn:ietf:params:oauth:grant-type:device_code"), eq("osir-mcp-agent"), eq("dev-code-123"), any()))
                 .thenThrow(wae);
 
         DeviceLoginStatusResult result = authService.checkDeviceLoginStatus("dev-code-123");
@@ -130,7 +130,7 @@ class AuthServiceDeviceFlowTest {
         tokenResponse.setRefreshToken("refresh-abc");
 
         when(keycloakClient.pollDeviceToken(
-                "urn:ietf:params:oauth:grant-type:device_code", "osir-mcp-agent", "dev-code-123"))
+                eq("urn:ietf:params:oauth:grant-type:device_code"), eq("osir-mcp-agent"), eq("dev-code-123"), any()))
                 .thenReturn(tokenResponse);
 
         DeviceLoginStatusResult result = authService.checkDeviceLoginStatus("dev-code-123");
@@ -159,7 +159,7 @@ class AuthServiceDeviceFlowTest {
                 .thenReturn("{\"error\":\"expired_token\",\"error_description\":\"code expired\"}");
 
         when(keycloakClient.pollDeviceToken(
-                "urn:ietf:params:oauth:grant-type:device_code", "osir-mcp-agent", "dev-code-123"))
+                eq("urn:ietf:params:oauth:grant-type:device_code"), eq("osir-mcp-agent"), eq("dev-code-123"), any()))
                 .thenThrow(wae);
 
         DeviceLoginStatusResult result = authService.checkDeviceLoginStatus("dev-code-123");
@@ -181,7 +181,7 @@ class AuthServiceDeviceFlowTest {
                 .thenReturn("{\"error\":\"access_denied\",\"error_description\":\"denied by user\"}");
 
         when(keycloakClient.pollDeviceToken(
-                "urn:ietf:params:oauth:grant-type:device_code", "osir-mcp-agent", "dev-code-123"))
+                eq("urn:ietf:params:oauth:grant-type:device_code"), eq("osir-mcp-agent"), eq("dev-code-123"), any()))
                 .thenThrow(wae);
 
         DeviceLoginStatusResult result = authService.checkDeviceLoginStatus("dev-code-123");
@@ -203,7 +203,7 @@ class AuthServiceDeviceFlowTest {
                 .thenReturn("{\"error\":\"slow_down\",\"error_description\":\"too fast\"}");
 
         when(keycloakClient.pollDeviceToken(
-                "urn:ietf:params:oauth:grant-type:device_code", "osir-mcp-agent", "dev-code-123"))
+                eq("urn:ietf:params:oauth:grant-type:device_code"), eq("osir-mcp-agent"), eq("dev-code-123"), any()))
                 .thenThrow(wae);
 
         DeviceLoginStatusResult result = authService.checkDeviceLoginStatus("dev-code-123");

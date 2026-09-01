@@ -2,6 +2,7 @@ package com.osir.mcp.services;
 
 import com.osir.mcp.clients.KeycloakDeviceAuthClient;
 import com.osir.mcp.models.auth.AuthTokenResponse;
+import com.osir.mcp.models.auth.DeviceCodeResponse;
 import com.osir.mcp.models.auth.DeviceLoginStatusResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,21 @@ class SessionKeyLifecycleTest {
         service.maxLifetimeHours = 8;
     }
 
+    /** Seeds the PKCE verifier for "dev-code" — checkDeviceLoginStatus refuses codes it never issued. */
+    private void startLogin() {
+        DeviceCodeResponse dcr = new DeviceCodeResponse();
+        dcr.setDeviceCode("dev-code");
+        dcr.setUserCode("ABCD-EFGH");
+        dcr.setVerificationUri("https://auth.osir.com/device");
+        dcr.setExpiresIn(600);
+        dcr.setInterval(5);
+        when(keycloakClient.requestDeviceCode(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(dcr);
+        service.startDeviceLogin("conn-1");
+    }
+
     private DeviceLoginStatusResult login() {
+        startLogin();
         String payload = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString("{\"preferred_username\":\"alice\"}".getBytes(StandardCharsets.UTF_8));
         AuthTokenResponse tokenResponse = new AuthTokenResponse();
@@ -46,7 +61,7 @@ class SessionKeyLifecycleTest {
         tokenResponse.setTokenType("Bearer");
         tokenResponse.setExpiresIn(300L);
         tokenResponse.setRefreshToken("refresh-abc");
-        when(keycloakClient.pollDeviceToken(anyString(), anyString(), anyString())).thenReturn(tokenResponse);
+        when(keycloakClient.pollDeviceToken(anyString(), anyString(), anyString(), anyString())).thenReturn(tokenResponse);
         return service.checkDeviceLoginStatus("conn-1", "dev-code");
     }
 
@@ -102,6 +117,7 @@ class SessionKeyLifecycleTest {
 
     @Test
     void loginMessageAdvertisesKeycloakIdleWhenShorter() {
+        startLogin();
         String payload = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString("{\"preferred_username\":\"alice\"}".getBytes(StandardCharsets.UTF_8));
         AuthTokenResponse tokenResponse = new AuthTokenResponse();
@@ -110,7 +126,7 @@ class SessionKeyLifecycleTest {
         tokenResponse.setExpiresIn(300L);
         tokenResponse.setRefreshToken("refresh-abc");
         tokenResponse.setRefreshExpiresIn(300L); // Keycloak SSO idle: 5 min — shorter than our 30
-        when(keycloakClient.pollDeviceToken(anyString(), anyString(), anyString())).thenReturn(tokenResponse);
+        when(keycloakClient.pollDeviceToken(anyString(), anyString(), anyString(), anyString())).thenReturn(tokenResponse);
 
         DeviceLoginStatusResult result = service.checkDeviceLoginStatus("conn-1", "dev-code");
 
