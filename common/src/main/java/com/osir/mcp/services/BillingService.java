@@ -146,6 +146,9 @@ public class BillingService {
             PaymentSessionResult result = new PaymentSessionResult(response.isSuccess(), response.getMessage());
             result.setSessionId(response.getSessionId());
             result.setCheckoutUrl(response.getCheckoutUrl());
+            result.setExpiresAt(response.getExpiresAt());
+            result.setPollTool(response.getPollTool());
+            result.setPollEndpoint(response.getPollEndpoint());
             return result;
         } catch (Exception e) {
             LOG.errorf(e, "Error creating payment session: %s", e.getMessage());

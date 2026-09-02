@@ -31,4 +31,10 @@ public interface CatalogBackendClient {
     @GET
     @Path("/v1/public/catalog/dedicated")
     List<DedicatedServerConfig> getDedicatedServerCatalog();
+
+    @GET
+    @Path("/v1/public/catalog/bundle")
+    com.osir.mcp.models.catalog.HostingBundleResponse getHostingBundle(
+            @jakarta.ws.rs.QueryParam("domain") String domain
+    );
 }

@@ -55,6 +55,26 @@ public interface DomainBackendClient {
             @HeaderParam("Authorization") String bearerToken
     );
 
+    // Public (anonymous) catalog availability — same response shape, list pricing.
+    @GET
+    @Path("/v1/public/catalog/domains/{domain}/availability")
+    DomainAvailabilityResponse checkAvailabilityPublic(
+            @PathParam("domain") String domain
+    );
+
+    // Public (anonymous) account onboarding — backend v2.11.0
+    @POST
+    @Path("/v1/public/account")
+    com.osir.mcp.models.account.CreateAccountResponse createAccount(
+            com.osir.mcp.models.account.CreateAccountRequest request
+    );
+
+    @POST
+    @Path("/v1/public/account/verify")
+    com.osir.mcp.models.account.VerifyAccountResponse verifyAccount(
+            com.osir.mcp.models.account.VerifyAccountRequest request
+    );
+
     // Domain Registration Endpoints
     @POST
     @Path("/v2/domains/register")

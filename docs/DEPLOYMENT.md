@@ -74,6 +74,10 @@ CORS_ORIGINS=https://osir.com,https://agent.osir.com
 # Sets the card's absolute `url`. Omit to derive from the request.
 A2A_PUBLIC_URL=https://be.osir.com
 
+# Agent telemetry funnel (POST /v1/agent/telemetry). API key with role api-user,
+# issued for the MCP service; sent as X-API-Key. Leave empty to disable telemetry.
+OSIR_TELEMETRY_API_KEY=
+
 # Rate limiting
 A2A_RATE_LIMIT_GLOBAL=50
 A2A_RATE_LIMIT_PER_USER=10

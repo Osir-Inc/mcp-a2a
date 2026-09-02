@@ -87,7 +87,7 @@ Most tools require authentication. Use one of these methods:
 **Option B: Username/Password**
 1. Call `authenticateUser` with username and password
 
-### Available Tools (103 total)
+### Available Tools (106 total)
 
 #### Authentication (5)
 | Tool | Description |
@@ -147,7 +147,12 @@ Most tools require authentication. Use one of these methods:
 #### Billing (9)
 `getAccountBalance`, `listInvoices`, `getInvoiceDetails`, `payInvoice`, `getInvoiceStatistics`, `createPaymentSession`, `getPaymentTransactions`, `previewPaymentFees`, `getDomainPricing`
 
-#### Contacts (6), Transfers (5), Hosts (4), Audit (3), Catalog (3), Account (2)
+#### Contacts (6), Transfers (5), Hosts (4), Audit (3), Catalog (4), Account (2)
+
+`getHostingBundle` (catalog, anonymous) — per-domain hosting offer: recommended VPS packages, mail plans, web forwarding, free app builds. Call once after an availability or registration result.
+
+#### Account Onboarding (2) — anonymous
+`createAccount` (principal's ICANN contact + terms acceptance → PENDING_VERIFICATION account, sends verification email), `verifyAccount` (emailed code → ACTIVE). The autonomous-agent path to an account with no browser.
 
 #### Website Design (2)
 - `osirSiteDesignBrief` — validate the brief, get the design prompt (no auth)
@@ -471,7 +476,7 @@ docker-compose logs -f
 ┌──────▼──────┐ ┌─▼──────────────────────────┐
 │ MCP Server  │ │ A2A Server                  │
 │ :8081       │ │ :8082                       │
-│ 103 tools   │ │ Orchestrator                │
+│ 106 tools   │ │ Orchestrator                │
 │  11 prompts │ │  ├─ Domain Agent (13 skills)│
 │             │ │  ├─ DNS Agent (5 skills)    │
 │             │ │  ├─ VPS Agent (12 skills)   │

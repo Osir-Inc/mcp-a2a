@@ -26,33 +26,25 @@ public class SessionAwareDomainService {
      * Check domain availability using session-based authentication
      */
     public DomainAvailabilityResult checkAvailability(String domain, String chatSessionId) {
-        if (!sessionAwareAuthService.isAuthenticated(chatSessionId)) {
-            return new DomainAvailabilityResult(domain, false, "Authentication required");
-        }
+        // Availability needs no auth: anonymous sessions use the public catalog endpoint
+        // (list pricing). Errors propagate — never a fabricated available:false (audit F1).
+        String token = sessionAwareAuthService.getCurrentToken(chatSessionId);
+        DomainAvailabilityResponse response = token != null
+                ? backendClient.checkAvailability(domain, token)
+                : backendClient.checkAvailabilityPublic(domain);
 
-        try {
-            String token = sessionAwareAuthService.getCurrentToken(chatSessionId);
-            LOG.infof("Checking domain %s with session token for session %s", domain, chatSessionId);
+        DomainAvailabilityResult result = new DomainAvailabilityResult(
+                domain,
+                response.isAvailable(),
+                response.isAvailable() ? "Domain is available" : response.getReason()
+        );
 
-            DomainAvailabilityResponse response = backendClient.checkAvailability(domain, token);
+        result.setPrice(response.getPrice());
+        result.setCurrency(response.getCurrency());
+        result.setPremium(response.isPremium());
 
-            DomainAvailabilityResult result = new DomainAvailabilityResult(
-                    domain,
-                    response.isAvailable(),
-                    response.isAvailable() ? "Domain is available" : response.getReason()
-            );
-
-            result.setPrice(response.getPrice());
-            result.setCurrency(response.getCurrency());
-            result.setPremium(response.isPremium());
-
-            LOG.infof("Domain check completed: %s is %s", domain, response.isAvailable() ? "available" : "taken");
-            return result;
-
-        } catch (Exception e) {
-            LOG.errorf(e, "Error checking domain availability for session %s", chatSessionId);
-            return new DomainAvailabilityResult(domain, false, "Error checking availability: " + e.getMessage());
-        }
+        LOG.infof("Domain check completed: %s is %s", domain, response.isAvailable() ? "available" : "taken");
+        return result;
     }
 
     /**
@@ -99,10 +91,6 @@ public class SessionAwareDomainService {
      * Bulk check domains using session-based authentication
      */
     public BulkAvailabilityResult bulkCheckAvailability(List<String> domains, String chatSessionId) {
-        if (!sessionAwareAuthService.isAuthenticated(chatSessionId)) {
-            return new BulkAvailabilityResult(false, "Authentication required");
-        }
-
         try {
             List<DomainAvailabilityResult> results = domains.stream()
                     .map(domain -> checkAvailability(domain, chatSessionId))

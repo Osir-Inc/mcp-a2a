@@ -51,6 +51,9 @@ public class SessionAwareAuthService {
     /** Prefix distinguishing conversation session keys from MCP connection ids in the store. */
     public static final String SESSION_KEY_PREFIX = "osk_";
 
+    /** Scopes requested at device login — shared with the common AuthService. */
+    private static final String DEVICE_SCOPES = AuthService.DEVICE_SCOPES;
+
     private static final SecureRandom RANDOM = new SecureRandom();
 
     // connection ID or conversation session key (osk_*) -> SessionAuth
@@ -190,7 +193,7 @@ public class SessionAwareAuthService {
             devicePkce.entrySet().removeIf(e -> e.getValue().expiresAtMillis() < now);
 
             String codeVerifier = com.osir.mcp.util.Pkce.newVerifier();
-            DeviceCodeResponse response = keycloakClient.requestDeviceCode(clientId, "openid",
+            DeviceCodeResponse response = keycloakClient.requestDeviceCode(clientId, DEVICE_SCOPES,
                     com.osir.mcp.util.Pkce.challengeS256(codeVerifier), com.osir.mcp.util.Pkce.METHOD_S256);
             if (response == null) {
                 return new DeviceLoginResult(false, "Failed to initiate device login: no response from KeyCloak");
@@ -318,7 +321,11 @@ public class SessionAwareAuthService {
                         tokenResponse.getRefreshToken() != null
                                 ? tokenResponse.getRefreshToken() : current.getRefreshToken()
                 );
-                sessionAuths.put(connectionId, refreshed);
+                // Update EVERY alias (osk_ key + connection id share one SessionAuth). Keycloak
+                // rotates refresh tokens (maxReuse=2): a twin left holding the rotated-out token
+                // would die on its next refresh. Deliberately no put/putIfAbsent — if a concurrent
+                // logout just removed the entries, re-inserting a revoked session would be wrong.
+                sessionAuths.replaceAll((k, v) -> v == current ? refreshed : v);
                 LOG.infof("Token refreshed for user %s on connection %s", current.getUsername(), connectionId);
                 return refreshed.getTokenType() + " " + refreshed.getAccessToken();
             }

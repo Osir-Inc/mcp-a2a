@@ -25,7 +25,7 @@ public class DnsMCPServer {
     @Inject
     PendingActionStore pendingActionStore;
 
-    @Tool(description = "Initialize (create) the DNS zone for a domain. Must be called once after domain registration before any DNS records can be added. Safe to call on existing zones — it will not overwrite records. Required: domain (e.g., 'example.com')")
+    @Tool(description = "Initialize (create) the DNS zone for a domain. NOT needed after registerDomain — registration initialises the zone automatically. Use this only for pre-existing domains without a zone (e.g. after a transfer, or if registration opted out with initializeDnsZone:false). Safe to call on existing zones — it will not overwrite records. Required: domain (e.g., 'example.com')")
     public DnsActionResult initializeDnsZone(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.initializeZone(domain);

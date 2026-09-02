@@ -21,6 +21,9 @@ public class PaymentSessionResponse {
 
     public String getSessionId() { return data != null ? data.sessionId : null; }
     public String getCheckoutUrl() { return data != null ? data.checkoutUrl : null; }
+    public String getExpiresAt() { return data != null ? data.expiresAt : null; }
+    public String getPollTool() { return data != null ? data.pollTool : null; }
+    public String getPollEndpoint() { return data != null ? data.pollEndpoint : null; }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Data {
@@ -30,6 +33,9 @@ public class PaymentSessionResponse {
         private Double amount;
         private String currency;
         private String expiresAt;
+        // Backend v2.12: how to poll for completion after handing the checkout URL to the human
+        private String pollTool;
+        private String pollEndpoint;
 
         public String getSessionId() { return sessionId; }
         public void setSessionId(String sessionId) { this.sessionId = sessionId; }
@@ -48,5 +54,11 @@ public class PaymentSessionResponse {
 
         public String getExpiresAt() { return expiresAt; }
         public void setExpiresAt(String expiresAt) { this.expiresAt = expiresAt; }
+
+        public String getPollTool() { return pollTool; }
+        public void setPollTool(String pollTool) { this.pollTool = pollTool; }
+
+        public String getPollEndpoint() { return pollEndpoint; }
+        public void setPollEndpoint(String pollEndpoint) { this.pollEndpoint = pollEndpoint; }
     }
 }

@@ -34,51 +34,47 @@ public class DomainService {
             "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.[a-zA-Z]{2,}$"
     );
 
+    /**
+     * Availability needs no authentication: anonymous callers use the public catalog endpoint
+     * (same response shape, list pricing). Backend errors PROPAGATE — never report
+     * available:false for a non-domain reason (audit F1).
+     */
     public DomainAvailabilityResult checkAvailability(String domain) {
-        if (!authService.isAuthenticated()) {
-            return new DomainAvailabilityResult(domain, false, "Authentication required");
-        }
+        DomainAvailabilityResponse response = authService.isAuthenticated()
+                ? backendClient.checkAvailability(domain, authService.getCurrentToken())
+                : backendClient.checkAvailabilityPublic(domain);
 
-        try {
-            String token = authService.getCurrentToken();
-            DomainAvailabilityResponse response = backendClient.checkAvailability(domain, token);
+        DomainAvailabilityResult result = new DomainAvailabilityResult(
+                domain,
+                response.isAvailable(),
+                response.isAvailable() ? "Domain is available" : response.getReason()
+        );
 
-            DomainAvailabilityResult result = new DomainAvailabilityResult(
-                    domain,
-                    response.isAvailable(),
-                    response.isAvailable() ? "Domain is available" : response.getReason()
-            );
+        result.setPrice(response.getPrice());
+        result.setCurrency(response.getCurrency());
+        result.setPremium(response.isPremium());
 
-            result.setPrice(response.getPrice());
-            result.setCurrency(response.getCurrency());
-            result.setPremium(response.isPremium());
-
-            return result;
-        } catch (Exception e) {
-            return new DomainAvailabilityResult(domain, false, "Error checking availability: " + e.getMessage());
-        }
+        return result;
     }
 
     public BulkAvailabilityResult bulkCheckAvailability(List<String> domains) {
-        if (!authService.isAuthenticated()) {
-            return new BulkAvailabilityResult(false, "Authentication required");
-        }
+        List<DomainAvailabilityResult> results = domains.stream()
+                .map(this::checkAvailability)
+                .collect(Collectors.toList());
 
-        try {
-            List<DomainAvailabilityResult> results = domains.stream()
-                    .map(this::checkAvailability)
-                    .collect(Collectors.toList());
-
-            BulkAvailabilityResult result = new BulkAvailabilityResult(true, "Bulk check completed");
-            result.setResults(results);
-            return result;
-        } catch (Exception e) {
-            return new BulkAvailabilityResult(false, "Bulk check failed: " + e.getMessage());
-        }
+        BulkAvailabilityResult result = new BulkAvailabilityResult(true, "Bulk check completed");
+        result.setResults(results);
+        return result;
     }
 
     public DomainRegistrationResult registerDomain(String domain, int years, RegistrantInfo registrantInfo,
                                                    List<String> nameservers, boolean privacyProtection, boolean autoRenew) {
+        return registerDomain(domain, years, registrantInfo, nameservers, privacyProtection, autoRenew, null);
+    }
+
+    public DomainRegistrationResult registerDomain(String domain, int years, RegistrantInfo registrantInfo,
+                                                   List<String> nameservers, boolean privacyProtection,
+                                                   boolean autoRenew, Boolean initializeDnsZone) {
         if (!authService.isAuthenticated()) {
             return new DomainRegistrationResult(domain, false, "Authentication required");
         }
@@ -90,6 +86,9 @@ public class DomainService {
             request.setNameservers(nameservers);
             request.setPrivacyProtection(privacyProtection);
             request.setAutoRenew(autoRenew);
+            if (Boolean.FALSE.equals(initializeDnsZone)) {
+                request.setInitializeDnsZone(false); // zone auto-init is the backend default
+            }
 
             DomainRegistrationResponse response = backendClient.registerDomain(request, token);
 

@@ -5,6 +5,9 @@ public class PaymentSessionResult {
     private String message;
     private String sessionId;
     private String checkoutUrl;
+    private String expiresAt;
+    private String pollTool;
+    private String pollEndpoint;
 
     public PaymentSessionResult() {}
 
@@ -24,4 +27,13 @@ public class PaymentSessionResult {
 
     public String getCheckoutUrl() { return checkoutUrl; }
     public void setCheckoutUrl(String checkoutUrl) { this.checkoutUrl = checkoutUrl; }
+
+    public String getExpiresAt() { return expiresAt; }
+    public void setExpiresAt(String expiresAt) { this.expiresAt = expiresAt; }
+
+    public String getPollTool() { return pollTool; }
+    public void setPollTool(String pollTool) { this.pollTool = pollTool; }
+
+    public String getPollEndpoint() { return pollEndpoint; }
+    public void setPollEndpoint(String pollEndpoint) { this.pollEndpoint = pollEndpoint; }
 }

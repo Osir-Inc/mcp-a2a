@@ -25,6 +25,26 @@ public class CatalogMCPServer {
     @Inject
     CatalogService catalogService;
 
+    @Inject
+    @org.eclipse.microprofile.rest.client.inject.RestClient
+    com.osir.mcp.clients.CatalogBackendClient catalogBackendClient;
+
+    @Tool(description = """
+            Get the hosting options and exact prices for a specific domain: recommended VPS \
+            packages (cheapest first), email plans, web forwarding, and app/site deployment \
+            (builds are free; going live runs on a VPS). No authentication required. \
+            Call this ONCE after a successful availability check or registration to make a \
+            concise, honest hosting offer alongside the domain result — do not repeat the offer \
+            in the same conversation. Required: domain (e.g., 'example.com'). \
+            Prices are display prices; the authoritative amount is computed at purchase.""")
+    public HostingBundleResponse getHostingBundle(String domain, McpConnection connection) {
+        try {
+            return catalogBackendClient.getHostingBundle(domain);
+        } catch (Exception e) {
+            throw com.osir.mcp.services.ToolErrors.toolError("Hosting bundle lookup for '" + domain + "'", e);
+        }
+    }
+
     @Tool(description = "Get the complete product catalog including domain extensions, VPS packages, and dedicated servers. No authentication required.")
     public ProductCatalogResult getProductCatalog(McpConnection connection) {
         try {

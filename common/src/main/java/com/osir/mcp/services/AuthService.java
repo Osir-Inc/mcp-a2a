@@ -49,6 +49,14 @@ public class AuthService {
     @Inject
     jakarta.enterprise.inject.Instance<AuthContext> authContextInstance;
 
+    /**
+     * Scopes requested at device login. The osir:* scopes are OPTIONAL on the Keycloak clients
+     * (realm rework 2026-09-01) — requesting them here puts them in the token so calls keep
+     * working once the backend starts enforcing per-scope authorization.
+     */
+    public static final String DEVICE_SCOPES =
+            "openid osir:read osir:domains osir:dns osir:apps osir:vps osir:mail osir:billing osir:account";
+
     // In-memory session storage
     private final Map<String, SessionInfo> sessions = new ConcurrentHashMap<>();
     private volatile String currentSessionId;
@@ -100,7 +108,7 @@ public class AuthService {
     public DeviceLoginResult startDeviceLogin() {
         try {
             String codeVerifier = com.osir.mcp.util.Pkce.newVerifier();
-            DeviceCodeResponse response = keycloakClient.requestDeviceCode(clientId, "openid",
+            DeviceCodeResponse response = keycloakClient.requestDeviceCode(clientId, DEVICE_SCOPES,
                     com.osir.mcp.util.Pkce.challengeS256(codeVerifier), com.osir.mcp.util.Pkce.METHOD_S256);
 
             if (response == null) {

@@ -76,7 +76,7 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Stage creation of a Stripe payment checkout session to add funds to account balance. Requires authentication. Required: amount (double, in USD). Optional: currency (string, default 'USD'). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
+    @Tool(description = "Stage creation of a Stripe payment checkout session to add funds to account balance. Requires authentication. Required: amount (double, in USD). Optional: currency (string, default 'USD'). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve. The executed result includes checkoutUrl (hand it to the human to pay), expiresAt, and pollTool — after the human opens the URL, poll with that tool (getPaymentTransactions) until the balance credit appears.")
     public ConfirmationRequiredResult createPaymentSession(double amount, @ToolArg(required = false) String currency, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         String currencyLabel = currency != null ? currency : "USD";
         return pendingActionStore.stage(

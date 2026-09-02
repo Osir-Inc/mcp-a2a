@@ -16,6 +16,9 @@ public class DomainRegistrationRequest {
     private List<String> nameservers;
     private boolean autoRenew;
     private boolean privacyProtection;
+    // Backend v2.11.0: zone auto-init is the default; only sent when the caller opts out.
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private Boolean initializeDnsZone;
 
     public DomainRegistrationRequest() {}
 
@@ -53,4 +56,7 @@ public class DomainRegistrationRequest {
 
     public boolean isPrivacyProtection() { return privacyProtection; }
     public void setPrivacyProtection(boolean privacyProtection) { this.privacyProtection = privacyProtection; }
+
+    public Boolean getInitializeDnsZone() { return initializeDnsZone; }
+    public void setInitializeDnsZone(Boolean initializeDnsZone) { this.initializeDnsZone = initializeDnsZone; }
 }

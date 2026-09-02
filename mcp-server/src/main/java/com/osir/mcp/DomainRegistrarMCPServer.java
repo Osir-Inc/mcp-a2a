@@ -14,6 +14,7 @@ import com.osir.mcp.services.DomainService;
 import com.osir.mcp.services.DomainSuggestionService;
 import com.osir.mcp.services.McpAuthHelper;
 import com.osir.mcp.services.SessionAwareAuthService;
+import com.osir.mcp.services.ToolErrors;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -77,12 +78,22 @@ public class DomainRegistrarMCPServer {
     public AuthStatusResult getAuthStatus(
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection) {
+        // Mirror resolveToken's precedence exactly: an EXPIRED bearer must fall through to the
+        // sessionKey and then the per-connection session (which every other tool would use), not
+        // short-circuit as authenticated:false. Only when nothing authenticates do we report the
+        // most specific negative status.
         AuthStatusResult bearerStatus = mcpAuthHelper.bearerAuthStatus();
-        if (bearerStatus != null) return bearerStatus;
+        if (bearerStatus != null && bearerStatus.isAuthenticated()) return bearerStatus;
+        AuthStatusResult sessionStatus = null;
         if (sessionKey != null && !sessionKey.isBlank()) {
-            return sessionAuthService.getAuthStatus(sessionKey);
+            sessionStatus = sessionAuthService.getAuthStatus(sessionKey);
+            if (sessionStatus.isAuthenticated()) return sessionStatus;
         }
-        return sessionAuthService.getAuthStatus(connection.id());
+        AuthStatusResult connStatus = sessionAuthService.getAuthStatus(connection.id());
+        if (connStatus.isAuthenticated()) return connStatus;
+        if (sessionStatus != null) return sessionStatus;
+        if (bearerStatus != null) return bearerStatus;
+        return connStatus;
     }
 
     @Tool(description = "Log out: revokes the session's tokens at the identity provider immediately. Optional: sessionKey (from checkDeviceLoginStatus) — pass it to end that conversation session.")
@@ -102,13 +113,14 @@ public class DomainRegistrarMCPServer {
     // ── Domain Availability ───────────────────────────────────────────────────
 
     // Domain Availability Tools
-    @Tool(description = "Check if a domain name is available for registration. Required: domain (e.g., 'example.com')")
+    @Tool(description = "Check if a domain name is available for registration, with price. No authentication required — anonymous callers get list pricing; authenticated callers get their account pricing. Required: domain (e.g., 'example.com')")
     public DomainAvailabilityResult checkDomainAvailability(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         mcpAuthHelper.setupAuth(connection, sessionKey);
         try {
             return domainService.checkAvailability(domain);
         } catch (Exception e) {
-            return new DomainAvailabilityResult(domain, false, "Error checking availability: " + e.getMessage());
+            // Honest error, never a fabricated available:false (audit F1).
+            throw ToolErrors.toolError("Availability check for '" + domain + "'", e);
         }
     }
 
@@ -123,7 +135,7 @@ public class DomainRegistrarMCPServer {
 
     // Domain Registration Tools
     @RequiresAuth
-    @Tool(description = "Stage registration of a new domain name. Deducts from account balance. Required: domain (e.g., 'example.com'), years (1-10), registrantInfo (contact details), nameservers (e.g., ['ns1.example.com', 'ns2.example.com']). Optional: privacyProtection (true/false), autoRenew (true/false). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
+    @Tool(description = "Stage registration of a new domain name. Deducts from account balance. The DNS zone is initialised automatically after registration (asynchronously — if a createDnsRecord call right after registration reports a missing zone, retry after a few seconds); no separate initializeDnsZone call needed (pass initializeDnsZone:false to opt out). Required: domain (e.g., 'example.com'), years (1-10), registrantInfo (contact details), nameservers (e.g., ['ns1.example.com', 'ns2.example.com']). Optional: privacyProtection (true/false), autoRenew (true/false), initializeDnsZone (default true). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
     public ConfirmationRequiredResult registerDomain(
             String domain,
             int years,
@@ -131,6 +143,7 @@ public class DomainRegistrarMCPServer {
             List<String> nameservers,
             @ToolArg(required = false) Boolean privacyProtection,
             @ToolArg(required = false) Boolean autoRenew,
+            @ToolArg(required = false) Boolean initializeDnsZone,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection
     ) {
@@ -141,7 +154,7 @@ public class DomainRegistrarMCPServer {
                 "Register domain '" + domain + "' for " + years + " year(s) — deducts registration fee from account balance",
                 connection.id(),
                 DestructiveOpRateLimiter.Bucket.FINANCIAL,
-                () -> domainService.registerDomain(domain, years, registrantInfo, nameservers, privacy, renew)
+                () -> domainService.registerDomain(domain, years, registrantInfo, nameservers, privacy, renew, initializeDnsZone)
         );
     }
 
