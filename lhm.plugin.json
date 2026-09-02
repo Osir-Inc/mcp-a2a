@@ -1,0 +1,2441 @@
+{
+  "identifier": "osir-inc-mcp-a2a",
+  "name": "OSIR Domain Name MCP Server",
+  "version": "2.1.0",
+  "description": "Domain registrar MCP server from OSIR (ICANN-accredited): 105 tools and 11 prompts to search, register, renew, transfer, and manage domains, DNS, VPS, email, and websites from Claude, ChatGPT, Cursor, or any MCP client. Remote Streamable HTTP, no local install.",
+  "author": "OSIR",
+  "authorUrl": "https://github.com/Osir-Inc",
+  "homepage": "https://github.com/Osir-Inc/mcp-a2a",
+  "cloudEndpoint": "https://be.osir.com/mcp/http",
+  "category": "developer",
+  "icon": "https://osir.com/og-image.png",
+  "tags": [
+    "domain",
+    "domain-registrar",
+    "dns",
+    "domain-search",
+    "vps",
+    "email-hosting",
+    "website-builder",
+    "remote-mcp",
+    "icann",
+    "a2a"
+  ],
+  "tools": [
+    {
+      "name": "addPrefixToDomain",
+      "description": "Generate domain suggestions by adding prefixes. Required: name (e.g., 'mycompany'). Optional: vocabulary ('@prefixes' or custom), tlds ('com,net'), lang ('eng'), maxResults (20)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "vocabulary": {
+            "type": "string"
+          },
+          "tlds": {
+            "type": "string"
+          },
+          "lang": {
+            "type": "string"
+          },
+          "maxResults": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "addSshKey",
+      "description": "Store an SSH public key on your account so it can be injected into VPS installs. Idempotent - storing a key you already have returns the existing one instead of creating a duplicate, so it is safe to call before every order. Requires authentication. Required: name (a label, e.g. 'laptop'), publicKey (a single-line OpenSSH public key, e.g. 'ssh-ed25519 AAAA... user@host'). Returns the key id to pass to orderVps or buildVpsInstance.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "publicKey": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "name",
+          "publicKey"
+        ]
+      }
+    },
+    {
+      "name": "addSuffixToDomain",
+      "description": "Generate domain suggestions by adding suffixes. Required: name (e.g., 'mycompany'). Optional: vocabulary ('@suffixes' or custom), tlds ('com,net'), lang ('eng'), maxResults (20)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "vocabulary": {
+            "type": "string"
+          },
+          "tlds": {
+            "type": "string"
+          },
+          "lang": {
+            "type": "string"
+          },
+          "maxResults": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "buildVpsInstance",
+      "description": "Stage an operating system install on a VPS instance. DESTRUCTIVE - ERASES ALL DATA on the server, including any deployed application, and cannot be undone. This is also how a reinstall works. Requires authentication. Required: instanceId (VPS instance ID), operatingSystemId (integer template id from listVpsOsTemplates). Optional: sshKeyIds (integer key ids from listMySshKeys - without one you may not be able to log in), hostname (defaults to the instance's current hostname), swap (256, 512, 768 in MB, or 1, 1.5, 2, 3, 4, 5, 6, 8 in GB). The install is asynchronous - afterwards poll getVpsInstanceDetails until buildState is COMPLETE. Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "operatingSystemId": {
+            "type": "integer"
+          },
+          "sshKeyIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "swap": {
+            "type": "number"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "instanceId",
+          "operatingSystemId"
+        ]
+      }
+    },
+    {
+      "name": "bulkDomainSuggestions",
+      "description": "Generate domain name suggestions for one or more keywords across a chosen set of TLDs. Returns suggestions grouped by originating keyword.\n\nUSAGE PATTERN:\n  This is typically called AFTER listCategorizedTlds. The standard flow is:\n    1. listCategorizedTlds → pick 3-6 TLDs based on the user's project\n    2. bulkDomainSuggestions → find specific available names on those TLDs\n\nREQUIRED:\n  keywords: 1-10 keywords describing the project.\n  tlds: 1-6 TLDs (hard cap). Pass the TLDs chosen from listCategorizedTlds.\n        Do not include the leading dot (use \"tech\" not \".tech\").\n\nOPTIONAL:\n  lang: language code, default \"eng\".\n  maxResults: max suggestions per keyword, default 20.\n\nReturns:\n  groups: [\n    { keyword: \"voice\", suggestions: [...] },\n    { keyword: \"biomarker\", suggestions: [...] }\n  ]\n  requestedTlds: echo of the TLDs passed in.\n  returnedTlds: TLDs that actually had suggestions (may be a subset).\n\nNote: availability per suggestion may be \"available\", \"taken\", or \"unknown\". For \"unknown\" results, follow up with checkDomainAvailability on specific names the user is interested in. Suggestions on premium-tier TLDs may have premium pricing - confirm with checkDomainAvailability before recommending to the user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tlds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lang": {
+            "type": "string"
+          },
+          "maxResults": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "keywords",
+          "tlds"
+        ]
+      }
+    },
+    {
+      "name": "cancelTransfer",
+      "description": "Stage cancellation of a pending domain transfer. DESTRUCTIVE - irreversible. Requires authentication. Required: domain (e.g., 'example.com'). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "changeVpsPaymentTerm",
+      "description": "Change the payment term (billing cycle) for a VPS instance. Requires authentication. Required: instanceId (string), paymentTerm ('MONTHLY', 'SEMI_ANNUAL', 'ANNUAL', 'BIENNIAL', 'TRIENNIAL')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "paymentTerm": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "instanceId",
+          "paymentTerm"
+        ]
+      }
+    },
+    {
+      "name": "checkDeviceLoginStatus",
+      "description": "Poll for device login completion. Call this after loginWithDevice() once you have opened the verification URL and signed in. Required: deviceCode (the device_code returned by loginWithDevice). On success returns a sessionKey - pass it as the sessionKey argument on every subsequent authenticated tool call.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "deviceCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "deviceCode"
+        ]
+      }
+    },
+    {
+      "name": "checkDomainAvailability",
+      "description": "Check if a domain name is available for registration, with price. No authentication required - anonymous callers get list pricing; authenticated callers get their account pricing. Required: domain (e.g., 'example.com')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "checkHostAvailability",
+      "description": "Check if a host/glue record name is available for creation. Requires authentication. Required: hostname (e.g., 'ns1.example.com')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "hostname"
+        ]
+      }
+    },
+    {
+      "name": "checkKeywordAvailability",
+      "description": "Check keyword availability across all supported TLDs and registries with detailed results. Required: keyword (e.g., 'example'). Optional: registries ('verisign,pir,id,centralnic'), tlds ('com,net,org')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string"
+          },
+          "registries": {
+            "type": "string"
+          },
+          "tlds": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "keyword"
+        ]
+      }
+    },
+    {
+      "name": "checkKeywordAvailabilitySummary",
+      "description": "Check keyword availability summary statistics without detailed domain results (faster). Required: keyword (e.g., 'example'). Optional: registries ('verisign,pir'), tlds ('com,net')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string"
+          },
+          "registries": {
+            "type": "string"
+          },
+          "tlds": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "keyword"
+        ]
+      }
+    },
+    {
+      "name": "countMyVpsInstances",
+      "description": "Get the total count of VPS instances owned by the authenticated user. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "createAccount",
+      "description": "Create a new OSIR customer account. No authentication required - this is step 1 of onboarding. The contact must be the PRINCIPAL's real ICANN registrant contact (the human or business the account is for), never the AI agent itself. Sends a verification email to the account email; the principal relays the emailed code to complete verification via verifyAccount. acceptedTerms must be true and requires the principal's actual consent to the OSIR terms (state the termsVersion you accepted). While PENDING_VERIFICATION the account can search, quote and fund; billable actions (registerDomain execution) need ACTIVE. Calling again for a PENDING account re-sends the verification email. Required: email, accountType (INDIVIDUAL|ORGANIZATION), contact {firstName, lastName, email, phone (+CC.number), street1, city, country (2-letter)}, acceptedTerms, termsVersion. Optional: password, agentName, agentVendor, principalReference (audit trail of which agent acted for whom). Next step: verifyAccount with the emailed code.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "accountType": {
+            "type": "string"
+          },
+          "contact": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "organization": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "postalCode": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "street1": {
+                "type": "string"
+              },
+              "street2": {
+                "type": "string"
+              }
+            }
+          },
+          "acceptedTerms": {
+            "type": "boolean"
+          },
+          "termsVersion": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "agentName": {
+            "type": "string"
+          },
+          "agentVendor": {
+            "type": "string"
+          },
+          "principalReference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "accountType",
+          "contact",
+          "acceptedTerms",
+          "termsVersion"
+        ]
+      }
+    },
+    {
+      "name": "createContact",
+      "description": "Create a new contact for use with domain registrations. Requires authentication. Required: firstName, lastName, email, phone (E.164 format), street1, city, postalCode, country (ISO 3166-1 alpha-2). Optional: organization, street2, state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "organization": {
+            "type": "string"
+          },
+          "street1": {
+            "type": "string"
+          },
+          "street2": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "postalCode": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "email",
+          "phone",
+          "street1",
+          "city",
+          "postalCode",
+          "country"
+        ]
+      }
+    },
+    {
+      "name": "createDnsRecord",
+      "description": "Create a new DNS record for a domain. Requires authentication. For newly registered domains, the zone is initialized automatically if missing. Required: domain (e.g., 'example.com'), name (e.g., 'www', '@', 'mail'), type ('A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV'), content (record value). Optional: ttl (seconds, default 3600), priority (for MX/SRV, default 0)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "ttl": {
+            "type": "integer"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "name",
+          "type",
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "createHost",
+      "description": "Create a new host/glue record (e.g., for custom nameservers). Requires authentication. Required: hostname (e.g., 'ns1.example.com'), ipAddresses (e.g., ['192.0.2.1', '198.51.100.1'])",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "ipAddresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "hostname",
+          "ipAddresses"
+        ]
+      }
+    },
+    {
+      "name": "createMailbox",
+      "description": "Stage creation of a paid mailbox on a mail-enabled domain. BILLABLE - deducts from account balance; get a quote with getMailboxQuote and confirm the price with the user first. Requires authentication. Required: domain (an ACTIVE mail domain), localPart (the part before the @), packageId (from listMailPlans - there is no default). Optional: term ('MONTHLY' or 'ANNUAL', default ANNUAL). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve. The result of the confirmed action contains the generated password EXACTLY ONCE - it can never be retrieved again, so show it to the user immediately; the user can change it later with setMailboxPassword. Also share the client settings from the result (IMAP/SMTP/webmail).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "localPart": {
+            "type": "string"
+          },
+          "packageId": {
+            "type": "string"
+          },
+          "term": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "localPart",
+          "packageId"
+        ]
+      }
+    },
+    {
+      "name": "createPaymentSession",
+      "description": "Stage creation of a Stripe payment checkout session to add funds to account balance. Requires authentication. Required: amount (double, in USD). Optional: currency (string, default 'USD'). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve. The executed result includes checkoutUrl (hand it to the human to pay), expiresAt, and pollTool - after the human opens the URL, poll with that tool (getPaymentTransactions) until the balance credit appears.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      }
+    },
+    {
+      "name": "deleteContact",
+      "description": "Stage deletion of a contact. DESTRUCTIVE - cannot delete if assigned to active domains. Requires authentication. Required: contactId (string). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "contactId"
+        ]
+      }
+    },
+    {
+      "name": "deleteDnsRecord",
+      "description": "Stage deletion of a DNS record. DESTRUCTIVE - irreversible. Requires authentication. Required: domain (e.g., 'example.com'), recordId (string). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "recordId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "recordId"
+        ]
+      }
+    },
+    {
+      "name": "deleteHost",
+      "description": "Stage deletion of a host/glue record. DESTRUCTIVE - irreversible. Requires authentication. Required: hostname (e.g., 'ns1.example.com'). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "hostname"
+        ]
+      }
+    },
+    {
+      "name": "deleteMailbox",
+      "description": "Stage deletion of a mailbox. The mailbox stops working immediately and its data is destroyed after a 14-day grace period. Requires authentication. Required: mailboxId (from listMailboxes). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mailboxId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "mailboxId"
+        ]
+      }
+    },
+    {
+      "name": "deleteSshKey",
+      "description": "Remove an SSH key from your account. This does not affect servers already built with it, and the key can simply be added again. Requires authentication. Required: keyId (integer key id from listMySshKeys).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyId": {
+            "type": "integer"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "keyId"
+        ]
+      }
+    },
+    {
+      "name": "deleteVpsInstance",
+      "description": "Stage deletion/cancellation of a VPS instance. DESTRUCTIVE - irreversible. Requires authentication. Required: instanceId (string). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "instanceId"
+        ]
+      }
+    },
+    {
+      "name": "enableMailDomain",
+      "description": "Enable email hosting on a domain you own. Free - mailboxes are what cost money. Requires authentication. Required: domain. Optional: dnsMode ('PDNS_AUTO', the default, publishes all mail DNS records automatically - the domain must use our nameservers; 'EXTERNAL_MANUAL' returns the DNS records for you to publish at your DNS provider, and the domain stays PENDING_DNS until verifyMailDns succeeds). If the call fails with a DNS conflict (an existing SPF or MX record), ask the user for explicit consent, then re-call with spfMergeConfirmed=true (replace a foreign SPF record) and/or takeoverConfirmed=true (repoint a foreign MX - this moves their live email).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "dnsMode": {
+            "type": "string"
+          },
+          "spfMergeConfirmed": {
+            "type": "boolean"
+          },
+          "takeoverConfirmed": {
+            "type": "boolean"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "executeConfirmedAction",
+      "description": "Execute a previously staged destructive or financial action after user approval. Required: actionId (the UUID returned by the staging tool). The action expires after 5 minutes and can only be executed once.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "actionId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "actionId"
+        ]
+      }
+    },
+    {
+      "name": "generateDomainSuggestions",
+      "description": "Generate domain name suggestions based on keywords. Required: name (e.g., 'mycompany'). Optional: tlds (e.g., 'com,net,org'), lang ('eng'), useNumbers (true/false), maxResults (20)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "tlds": {
+            "type": "string"
+          },
+          "lang": {
+            "type": "string"
+          },
+          "useNumbers": {
+            "type": "boolean"
+          },
+          "maxResults": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "getAccountBalance",
+      "description": "Get the current account balance for the authenticated user. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "getAccountSummary",
+      "description": "Get a comprehensive summary of the user's account: profile, balance, domain count, VPS count, and pending transfers. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "getAuthStatus",
+      "description": "Check whether the current session is authenticated. Returns authenticated status and token expiry. Optional: sessionKey (from checkDeviceLoginStatus).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "getContact",
+      "description": "Get detailed information about a specific contact. Requires authentication. Required: contactId (string)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "contactId"
+        ]
+      }
+    },
+    {
+      "name": "getContactsForDomain",
+      "description": "Get all contacts (registrant, admin, tech, billing) assigned to a domain. Requires authentication. Required: domain (e.g., 'example.com')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "getDedicatedServerCatalog",
+      "description": "Get all available dedicated server configurations with pricing and specifications. No authentication required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "getDnsRecord",
+      "description": "Get details of a specific DNS record. Requires authentication. Required: domain (e.g., 'example.com'), recordId (string)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "recordId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "recordId"
+        ]
+      }
+    },
+    {
+      "name": "getDomainAuditTrail",
+      "description": "Get the audit trail (history of all changes) for a specific domain. Requires authentication. Required: domain (string)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "getDomainExtensions",
+      "description": "Get all available domain extensions (TLDs) with pricing information. No authentication required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "getDomainInfo",
+      "description": "Get detailed information about a domain including expiration date, nameservers, and status. Required: domain (e.g., 'example.com')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "getDomainPricing",
+      "description": "Get pricing for domain extensions from the product catalog. Requires authentication. Optional: extension (e.g., 'com', 'net', 'org') to filter results",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "extension": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "getHostingBundle",
+      "description": "Get the hosting options and exact prices for a specific domain: recommended VPS packages (cheapest first), email plans, web forwarding, and app/site deployment (builds are free; going live runs on a VPS). No authentication required. Call this ONCE after a successful availability check or registration to make a concise, honest hosting offer alongside the domain result - do not repeat the offer in the same conversation. Required: domain (e.g., 'example.com'). Prices are display prices; the authoritative amount is computed at purchase.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "getHostsForDomain",
+      "description": "List all host/glue records associated with a domain. Requires authentication. Required: domain (e.g., 'example.com')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "getInvoiceDetails",
+      "description": "Get detailed information about a specific invoice including line items. Requires authentication. Required: invoiceId (string)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "invoiceId"
+        ]
+      }
+    },
+    {
+      "name": "getInvoiceStatistics",
+      "description": "Get summary statistics of invoices: total paid, pending, overdue amounts. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "getMailDnsRecords",
+      "description": "Get the DNS records a mail domain needs (MX, SPF, DKIM, ...) - for customers managing DNS externally. Requires authentication. Required: domain.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "getMailboxQuote",
+      "description": "Get a display-only price quote for a mailbox plan. Requires authentication. Required: packageId (from listMailPlans). Optional: term ('MONTHLY' or 'ANNUAL', default ANNUAL). The backend re-derives the authoritative price at purchase.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "packageId": {
+            "type": "string"
+          },
+          "term": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "packageId"
+        ]
+      }
+    },
+    {
+      "name": "getMailboxUsage",
+      "description": "Get disk usage per mailbox in bytes, for quota display alongside the plan's quotaBytes. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "getMyAuditLogs",
+      "description": "Get recent audit logs for the authenticated user across all services. Requires authentication. Optional: page (Integer), size (Integer)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "getMyProfile",
+      "description": "Get the authenticated user's profile and account information including name, email, organization, balance, and domain/VPS counts. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "getPaymentTransactions",
+      "description": "Get payment transaction history for the authenticated user. Requires authentication. Optional: page (integer), size (integer)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "getProductCatalog",
+      "description": "Get the complete product catalog including domain extensions, VPS packages, and dedicated servers. No authentication required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "getRecentActivity",
+      "description": "Get the most recent activity across all domains and services for the user. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "getTransferQuote",
+      "description": "Get a transfer price quote for a domain. Requires authentication. Required: domain (e.g., 'example.com'). Returns transfer price, currency, extension years, and new expiration date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "getTransferStatus",
+      "description": "Check the current status of a domain transfer. Requires authentication. Required: domain (e.g., 'example.com'). Returns status, request date, current registrar, and expected completion.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "getVpsInstanceDetails",
+      "description": "Get detailed information about a specific VPS instance including resource usage. Requires authentication. Required: instanceId (string)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "instanceId"
+        ]
+      }
+    },
+    {
+      "name": "getVpsPackageDetails",
+      "description": "Get detailed information about a specific VPS package including all pricing tiers. Requires authentication. Required: packageId (string). For anonymous browsing use listVpsPackages, which already includes per-term pricing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "packageId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "packageId"
+        ]
+      }
+    },
+    {
+      "name": "initializeDnsZone",
+      "description": "Initialize (create) the DNS zone for a domain. NOT needed after registerDomain - registration initialises the zone automatically. Use this only for pre-existing domains without a zone (e.g. after a transfer, or if registration opted out with initializeDnsZone:false). Safe to call on existing zones - it will not overwrite records. Required: domain (e.g., 'example.com')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "initiateTransfer",
+      "description": "Stage initiation of a domain transfer from another registrar. Deducts from account balance. Requires authentication. Required: domain (e.g., 'example.com'), authCode (EPP authorization code from current registrar). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "authCode": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "authCode"
+        ]
+      }
+    },
+    {
+      "name": "listCategorizedTlds",
+      "description": "List TLDs from the OSIR catalog that have category and audience metadata populated. Returns structured candidates only - no ranking, no scoring.\n\nUSAGE PATTERN:\n  1. Call this tool with optional structured filters (price cap, exclude      ccTLDs, exclude restricted, etc.) based on what the user said.\n  2. Examine the returned `candidates`. Each has `categories` and `audience`      arrays you can match against the user's keywords and intent.\n  3. Pick 3-6 TLDs based on relevance to the user's project. Show your      reasoning to the user.\n  4. Pass the chosen TLDs to bulkDomainSuggestions to find specific names.\n\nThe categories vocabulary is controlled. Common values include:   generic, business, commerce, tech, dev, ai, software, web, mobile,   api, cloud, data, health, medical, pharma, clinical, wellness, fitness,   dental, finance, fintech, banking, education, academic, media, news,   design, art, creator, agency, community, social, blog, nonprofit,   personal, brand, marketplace, retail, music, audio, video, photo,   startup, infrastructure, journal.\n\nThe audience vocabulary includes:   b2c, b2b, professional, developer, creator, enterprise, smb, consumer, startup.\n\nNote: registrationPrice and renewalPrice in each candidate are decimal   strings (e.g. \"10.39\"), not numbers.\n\nWhen the user's request is budget-conscious, set maxRegisterPrice. When they explicitly say \"no country domains\", set excludeCcTLDs=true. When they mention regulated industries casually (without intent to register a restricted TLD), set excludeRestricted=true.\n\nDo NOT set excludePremium as a budget filter. hasPremium=true means the TLD has registry-level premium pricing for a small subset of names - the standard registrationPrice shown in the catalog applies to most names. .app, .dev, and .tech are all hasPremium=true but register most names at their standard price. Only set excludePremium=true when the user explicitly asks for \"no premium domains\" or \"no surprise pricing.\"\n\nAuth: not required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "excludeRestricted": {
+            "type": "boolean"
+          },
+          "excludeCcTLDs": {
+            "type": "boolean"
+          },
+          "maxRegisterPrice": {
+            "type": "number"
+          },
+          "excludePremium": {
+            "type": "boolean"
+          },
+          "registry": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listContacts",
+      "description": "List all contacts for the authenticated user with optional search. Requires authentication. Optional: search (search by name/email/org)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listDnsRecords",
+      "description": "List all DNS records for a domain. Requires authentication. Required: domain (e.g., 'example.com')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "listInvoices",
+      "description": "List invoices for the authenticated user with optional status filtering and pagination. Requires authentication. Optional: status ('DRAFT', 'PENDING', 'PAID', 'CANCELLED', 'OVERDUE'), page (default 0), size (default 20)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listMailDomains",
+      "description": "List your domains that are enabled for email hosting, with status (PENDING_DNS or ACTIVE) and DNS mode. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listMailPlans",
+      "description": "List available email mailbox plans with quotas and prices (monthly and annual, in cents). Requires authentication. Always quote prices from here - never from memory.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listMailboxes",
+      "description": "List your mailboxes with plan, payment term, status, and next renewal date. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listMySshKeys",
+      "description": "List the SSH keys stored on your account, with their ids and SHA256 fingerprints. Use this to check whether a key is already stored and to get the ids to pass to orderVps or buildVpsInstance. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listMyVpsInstances",
+      "description": "List all VPS instances owned by the authenticated user. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listPendingTransfers",
+      "description": "List all pending incoming (gaining) domain transfers. Requires authentication. Returns a list of transfers with their status, request date, current registrar, and expected completion.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listUserDomains",
+      "description": "List all domains owned by the authenticated user. No parameters required. Must be authenticated first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listVpsLocations",
+      "description": "List available VPS hosting locations (cities/countries) with available packages. No authentication required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "listVpsOsTemplates",
+      "description": "List operating system templates available to install. Requires authentication. Pass EXACTLY ONE of: packageId (a VPS package id from listVpsPackages) to see what a package can install BEFORE ordering - use this to pick an operatingSystemId for orderVps, so the server arrives with an OS already on it; or instanceId (from listMyVpsInstances) to see what an existing server can be reinstalled with, for buildVpsInstance. The two are not interchangeable: the available set depends on the package, so ask with the key that matches what you are about to do. Optional: includeEol (boolean, default false - include end-of-life templates). Template ids are per-install and change over time, so always resolve an id here rather than reusing a remembered or hardcoded one.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "packageId": {
+            "type": "string"
+          },
+          "instanceId": {
+            "type": "string"
+          },
+          "includeEol": {
+            "type": "boolean"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "listVpsPackages",
+      "description": "List available VPS hosting packages with pricing, specs, and locations. No authentication required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "lockDomain",
+      "description": "Enable registrar lock on a domain to prevent unauthorized transfers. Required: domain (e.g., 'example.com')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "loginToVpsPanel",
+      "description": "Generate a one-time login URL to the VPS control panel (VirtFusion) for managing the server. Requires authentication. Required: instanceId (string)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "instanceId"
+        ]
+      }
+    },
+    {
+      "name": "loginWithDevice",
+      "description": "Start a device authorization login (RFC 8628). Returns a verificationUri and userCode. Open the URI in your browser, enter the code, and sign in with your OSIR credentials. Then call checkDeviceLoginStatus with the returned deviceCode to complete login. No parameters required.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "logout",
+      "description": "Log out: revokes the session's tokens at the identity provider immediately. Optional: sessionKey (from checkDeviceLoginStatus) - pass it to end that conversation session.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "orderVps",
+      "description": "Stage an order for a new VPS instance. Deducts from account balance. Requires authentication. Required: packageId (VPS package ID), hostname (e.g., 'myserver.example.com'), paymentTerm ('MONTHLY', 'SEMI_ANNUAL', 'ANNUAL', 'BIENNIAL', 'TRIENNIAL'). Optional: operatingSystemId (integer OS template id - resolve one with listVpsOsTemplates using this same packageId; omit to get a server with NO operating system installed), sshKeyIds (integer key ids from listMySshKeys or addSshKey, injected during install - without one you cannot log in). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "packageId": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "paymentTerm": {
+            "type": "string"
+          },
+          "operatingSystemId": {
+            "type": "integer"
+          },
+          "sshKeyIds": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "packageId",
+          "hostname",
+          "paymentTerm"
+        ]
+      }
+    },
+    {
+      "name": "osirAppCreateUpload",
+      "description": "Create an upload ticket for deploying app source code to Osir. Returns an uploadTicket, a putUrl, and instructions to zip the project and upload it. After uploading, call osirAppDeploy with the uploadTicket. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "osirAppDelete",
+      "description": "Stage deletion of an Osir app. DESTRUCTIVE and irreversible - removes its microVM, image, route, and data. Required: appId (string). Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "appId"
+        ]
+      }
+    },
+    {
+      "name": "osirAppDeploy",
+      "description": "Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a microVM. Deploying an existing app name redeploys it (new version) and applies any secrets set via osirAppSetSecret. Required: name (lowercase letters/digits/hyphens, e.g. 'habit-tracker'), language ('node'|'python'|'php-laravel'|'go'), uploadTicket (from osirAppCreateUpload, after you upload the zipped source). A plain static website (HTML/CSS/JS with no framework or build step) is also supported - it's auto-detected and served directly; pass language 'node' for it. Optional: region ('us'|'al'; 'al' = Albania/Tirana). Defaults to the platform's home region. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "uploadTicket": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "name",
+          "language",
+          "uploadTicket"
+        ]
+      }
+    },
+    {
+      "name": "osirAppGetSource",
+      "description": "Get a short-lived signed download URL for an Osir app's current source zip - use this to make edits to a deployed app without the user re-attaching the project: download, patch the files, then osirAppCreateUpload (PUT the new zip) and osirAppDeploy under the SAME name; the platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box. Required: appName. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "appName"
+        ]
+      }
+    },
+    {
+      "name": "osirAppList",
+      "description": "List the authenticated user's deployed Osir apps with their live URLs and status. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "osirAppLogs",
+      "description": "Get recent logs from an Osir app's microVM ('why is my app broken?'). Required: appId (string). Optional: tail (number of recent lines, default 100). Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "tail": {
+            "type": "integer"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "appId"
+        ]
+      }
+    },
+    {
+      "name": "osirAppMoveToOwned",
+      "description": "Move a deployed Osir app from the shared free tier onto a paid VPS owned by the user. First call stages a VPS order (COSTS MONEY - returns an actionId; present the price/summary to the user and call executeConfirmedAction only if they approve). After confirmation the platform installs Ubuntu, ships the app onto the box server-side, and binds the domain's DNS if it is hosted on osir.app nameservers (otherwise returns the IP and manual DNS instructions). If the result status is BUILDING or BUILD_FAILED, follow its nextStep - calling this tool again with the same arguments RESUMES the move and never orders a second server. Required: appName, packageId (from listVpsPackages). Optional: domain (custom domain to serve the app on). Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "packageId": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "appName",
+          "packageId"
+        ]
+      }
+    },
+    {
+      "name": "osirAppProvisionDatabase",
+      "description": "Provision a managed Postgres database for an Osir app. The connection string is stored as the app's DATABASE_URL secret (encrypted, injected on the next osirAppDeploy) and is NEVER returned. Required: appId (string). Optional: engine ('postgres', default). Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "engine": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "appId"
+        ]
+      }
+    },
+    {
+      "name": "osirAppSetSecret",
+      "description": "Set an environment secret for an Osir app (e.g. DATABASE_URL, API_KEY). The value is stored encrypted and injected as an env var on the next osirAppDeploy of the app; it is NEVER returned or logged. Required: appId (string), key (env var name), value (string). Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "appId",
+          "key",
+          "value"
+        ]
+      }
+    },
+    {
+      "name": "osirAppStatus",
+      "description": "Get an Osir app's current status, live URL, and health ('is my app working?'). If the status is BUILD_FAILED, 'recentErrors' explains why (e.g. a missing start command) so you can fix the source and redeploy. 'qa' is an independent black-box check of the LIVE app after deploy: qa.status PASSED means it loaded and worked; FAILED means it deployed but didn't actually work (qa.findings lists the problems - e.g. a server error or blank page - so you can fix and redeploy). Required: appId (string). Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "appId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "appId"
+        ]
+      }
+    },
+    {
+      "name": "osirSiteDesignBrief",
+      "description": "Step 1 of designing a website with OSIR. BEFORE calling: ask the user for any required field you would otherwise have to guess, and offer the optional extras in ONE batch - logo, brand colours, own photos, real content (tagline, services with prices, contact details), reference sites plus what they like about each, language, tone. Don't invent what the user could simply tell you; skipped extras are fine. Validates the client's brief and returns 'systemPrompt' - the design instructions YOU must then follow to write one complete self-contained HTML page - plus 'editRules' for later revisions. Required: businessName, whatItIs (what the business concretely does/sells), audience (who visits and why), pageJob (get_contact|sell_product|book_appointment|collect_signups|inform_portfolio|other), primaryAction (the one CTA, e.g. 'Book a table'). Optional briefJson: a JSON object with site_type, sections[], language (ISO, default en), tone (warm|premium|playful|technical|minimal|bold), mood_words[] (max 5), brand{logo_url, primary_color '#RRGGBB', secondary_color, fonts[], existing_site_url, references[{url, what_you_like}] (max 3; direction only, never copied), dislikes}, content{tagline, services_or_products[{name,description,price}], about_text, contact{phone,email,address,hours,social[]}, image_urls[], testimonials[{quote,name}] (real only)}, constraints{dark_mode, animations (none|subtle|expressive), form_endpoint, legal_footer}. No authentication needed. Afterwards publish with osirSitePublish.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "businessName": {
+            "type": "string"
+          },
+          "whatItIs": {
+            "type": "string"
+          },
+          "audience": {
+            "type": "string"
+          },
+          "pageJob": {
+            "type": "string"
+          },
+          "primaryAction": {
+            "type": "string"
+          },
+          "briefJson": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "businessName",
+          "whatItIs",
+          "audience",
+          "pageJob",
+          "primaryAction"
+        ]
+      }
+    },
+    {
+      "name": "osirSitePublish",
+      "description": "Publish a single-page website to a live HTTPS URL on Osir (free tier) - ANY complete HTML document works: the user's own site, a page designed in this chat, or one from the osirSiteDesignBrief flow. Required: name (lowercase letters/digits/hyphens, e.g. 'bar-mediterran'), html (complete <html> document, max 1 MiB). Calling again with the same name redeploys the new version. Optional: region ('us'|'al'); designContract (true ONLY for pages generated via the osirSiteDesignBrief flow - additionally enforces its output contract: exactly one <h1>, self-contained, no external scripts/CSS except Google Fonts, no iframes; never set it for a user's own site). For MULTI-FILE sites (separate CSS/JS/images) use osirAppCreateUpload + osirAppDeploy with a zip instead. Then poll osirAppStatus until READY. Requires authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "html": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "designContract": {
+            "type": "boolean"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "name",
+          "html"
+        ]
+      }
+    },
+    {
+      "name": "payInvoice",
+      "description": "Stage payment of an outstanding invoice from account balance. Requires authentication. Required: invoiceId (string). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "invoiceId"
+        ]
+      }
+    },
+    {
+      "name": "previewPaymentFees",
+      "description": "Preview the fees that would be charged for a given payment amount. Requires authentication. Required: amount (double). Optional: currency (string)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      }
+    },
+    {
+      "name": "registerDomain",
+      "description": "Stage registration of a new domain name. Deducts from account balance. The DNS zone is initialised automatically after registration (asynchronously - if a createDnsRecord call right after registration reports a missing zone, retry after a few seconds); no separate initializeDnsZone call needed (pass initializeDnsZone:false to opt out). Required: domain (e.g., 'example.com'), years (1-10), registrantInfo (contact details), nameservers (e.g., ['ns1.example.com', 'ns2.example.com']). Optional: privacyProtection (true/false), autoRenew (true/false), initializeDnsZone (default true). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "years": {
+            "type": "integer"
+          },
+          "registrantInfo": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "postalCode": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "street1": {
+                    "type": "string"
+                  },
+                  "street2": {
+                    "type": "string"
+                  }
+                }
+              },
+              "email": {
+                "type": "string"
+              },
+              "fax": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "organization": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              }
+            }
+          },
+          "nameservers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "privacyProtection": {
+            "type": "boolean"
+          },
+          "autoRenew": {
+            "type": "boolean"
+          },
+          "initializeDnsZone": {
+            "type": "boolean"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "years",
+          "registrantInfo",
+          "nameservers"
+        ]
+      }
+    },
+    {
+      "name": "renewDomain",
+      "description": "Stage renewal of a domain for a specified number of years. Deducts from account balance. Required: domain (e.g., 'example.com'), years (1-10). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "years": {
+            "type": "integer"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "years"
+        ]
+      }
+    },
+    {
+      "name": "setMailboxPassword",
+      "description": "Set a new password on a mailbox. Requires authentication. Required: mailboxId (from listMailboxes), password. Never log or store the password.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mailboxId": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "mailboxId",
+          "password"
+        ]
+      }
+    },
+    {
+      "name": "spinDomainWords",
+      "description": "Generate domain suggestions by spinning/replacing words. Required: name (e.g., 'pizza,restaurant'). Optional: position (0-based index), similarity (0.0-1.0), tlds ('com,net'), lang ('eng'), maxResults (20)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer"
+          },
+          "similarity": {
+            "type": "number"
+          },
+          "tlds": {
+            "type": "string"
+          },
+          "lang": {
+            "type": "string"
+          },
+          "maxResults": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    },
+    {
+      "name": "suggestAlternatives",
+      "description": "Suggest alternative domain names if the requested one is unavailable (legacy method). Required: domain (e.g., 'example.com'). Optional: limit (default 10)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "transferDomain",
+      "description": "Stage transfer of a domain from another registrar to OSIR. Deducts from account balance. Required: domain (e.g., 'example.com'), authCode (EPP code from current registrar), registrantInfo (contact details). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "authCode": {
+            "type": "string"
+          },
+          "registrantInfo": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "type": "object",
+                "properties": {
+                  "city": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "postalCode": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "street1": {
+                    "type": "string"
+                  },
+                  "street2": {
+                    "type": "string"
+                  }
+                }
+              },
+              "email": {
+                "type": "string"
+              },
+              "fax": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "organization": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              }
+            }
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "authCode",
+          "registrantInfo"
+        ]
+      }
+    },
+    {
+      "name": "unlockDomain",
+      "description": "Stage removal of registrar lock from a domain to allow transfers. DESTRUCTIVE - reduces domain security. Required: domain (e.g., 'example.com'). Returns an actionId - present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "updateContact",
+      "description": "Update an existing contact's information. Requires authentication. Required: contactId (string). Optional: firstName, lastName, email, phone, organization, street1, street2, city, state, postalCode, country",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "contactId": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "organization": {
+            "type": "string"
+          },
+          "street1": {
+            "type": "string"
+          },
+          "street2": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "postalCode": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "contactId"
+        ]
+      }
+    },
+    {
+      "name": "updateDnsRecord",
+      "description": "Update an existing DNS record. Requires authentication. Required: domain (e.g., 'example.com'), recordId (string). Optional: name, type, content, ttl, priority",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "recordId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "ttl": {
+            "type": "integer"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "recordId"
+        ]
+      }
+    },
+    {
+      "name": "updateDomainAutoRenew",
+      "description": "Enable or disable auto-renewal for a domain. Required: domain (e.g., 'example.com'), enabled (true/false)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "enabled"
+        ]
+      }
+    },
+    {
+      "name": "updateDomainPrivacy",
+      "description": "Enable or disable WHOIS privacy protection for a domain. Required: domain (e.g., 'example.com'), enabled (true/false)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "enabled"
+        ]
+      }
+    },
+    {
+      "name": "updateNameservers",
+      "description": "Update nameservers for a domain. Required: domain (e.g., 'example.com'), nameservers (e.g., ['ns1.example.com', 'ns2.example.com'])",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "nameservers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain",
+          "nameservers"
+        ]
+      }
+    },
+    {
+      "name": "validateDomainName",
+      "description": "Validate if a domain name format is correct. Required: domain (e.g., 'example.com')",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "name": "verifyAccount",
+      "description": "Verify a newly created OSIR account with the code from the verification email - step 2 of onboarding, no authentication required. The code is the same token as the email link, so the principal can relay it to their agent. On success the account becomes ACTIVE and billable actions are unlocked. If the code expired, call createAccount again with the same email to get a fresh one. Required: accountId (from createAccount), code.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountId",
+          "code"
+        ]
+      }
+    },
+    {
+      "name": "verifyMailDns",
+      "description": "Check that a mail domain's DNS records resolve; activates the domain for email when all records are found. Returns any still-missing records. Requires authentication. Required: domain.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string",
+            "description": "Session key (osk_...) returned by checkDeviceLoginStatus. Pass it on every call when logged in via the in-chat device flow; omit when connected via OAuth."
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      }
+    }
+  ],
+  "prompts": [
+    {
+      "name": "billing_overview",
+      "description": "Billing overview",
+      "arguments": []
+    },
+    {
+      "name": "dns_setup_guide",
+      "description": "Dns setup guide",
+      "arguments": []
+    },
+    {
+      "name": "domain_management_guide",
+      "description": "Domain management guide",
+      "arguments": []
+    },
+    {
+      "name": "domain_registration_guide",
+      "description": "Domain registration guide",
+      "arguments": [
+        {
+          "name": "domain_type",
+          "description": "",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "domain_transfer_checklist",
+      "description": "Domain transfer checklist",
+      "arguments": []
+    },
+    {
+      "name": "getting_started",
+      "description": "Getting started",
+      "arguments": []
+    },
+    {
+      "name": "hosting_comparison",
+      "description": "Hosting comparison",
+      "arguments": []
+    },
+    {
+      "name": "security_best_practices",
+      "description": "Security best practices",
+      "arguments": []
+    },
+    {
+      "name": "troubleshooting",
+      "description": "Troubleshooting",
+      "arguments": []
+    },
+    {
+      "name": "vps_setup_guide",
+      "description": "Vps setup guide",
+      "arguments": []
+    },
+    {
+      "name": "website_designer",
+      "description": "Design and publish a website for the user with OSIR: interview, design, revise, publish.",
+      "arguments": []
+    }
+  ]
+}
