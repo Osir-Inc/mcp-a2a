@@ -141,6 +141,117 @@ privacy, nameservers, AI-powered name suggestions.
 
 Full tool/skill catalog, example conversations, and end-to-end walkthroughs are in **[GUIDE.md](docs/GUIDE.md)**.
 
+## Tools
+
+105 tools, verified against the live server (tools/list on https://be.osir.com/mcp/http).
+
+- **addPrefixToDomain** - Generate domain suggestions by adding prefixes.
+- **addSshKey** - Store an SSH public key on your account so it can be injected into VPS installs.
+- **addSuffixToDomain** - Generate domain suggestions by adding suffixes.
+- **buildVpsInstance** - Stage an operating system install on a VPS instance.
+- **bulkDomainSuggestions** - Generate domain name suggestions for one or more keywords across a chosen set of TLDs.
+- **cancelTransfer** - Stage cancellation of a pending domain transfer.
+- **changeVpsPaymentTerm** - Change the payment term (billing cycle) for a VPS instance.
+- **checkDeviceLoginStatus** - Poll for device login completion.
+- **checkDomainAvailability** - Check if a domain name is available for registration, with price.
+- **checkHostAvailability** - Check if a host/glue record name is available for creation.
+- **checkKeywordAvailability** - Check keyword availability across all supported TLDs and registries with detailed results.
+- **checkKeywordAvailabilitySummary** - Check keyword availability summary statistics without detailed domain results (faster).
+- **countMyVpsInstances** - Get the total count of VPS instances owned by the authenticated user.
+- **createAccount** - Create a new OSIR customer account.
+- **createContact** - Create a new contact for use with domain registrations.
+- **createDnsRecord** - Create a new DNS record for a domain.
+- **createHost** - Create a new host/glue record (e.g., for custom nameservers).
+- **createMailbox** - Stage creation of a paid mailbox on a mail-enabled domain.
+- **createPaymentSession** - Stage creation of a Stripe payment checkout session to add funds to account balance.
+- **deleteContact** - Stage deletion of a contact.
+- **deleteDnsRecord** - Stage deletion of a DNS record.
+- **deleteHost** - Stage deletion of a host/glue record.
+- **deleteMailbox** - Stage deletion of a mailbox.
+- **deleteSshKey** - Remove an SSH key from your account.
+- **deleteVpsInstance** - Stage deletion/cancellation of a VPS instance.
+- **enableMailDomain** - Enable email hosting on a domain you own.
+- **executeConfirmedAction** - Execute a previously staged destructive or financial action after user approval.
+- **generateDomainSuggestions** - Generate domain name suggestions based on keywords.
+- **getAccountBalance** - Get the current account balance for the authenticated user.
+- **getAccountSummary** - Get a comprehensive summary of the user's account: profile, balance, domain count, VPS count, and pending transfers.
+- **getAuthStatus** - Check whether the current session is authenticated.
+- **getContact** - Get detailed information about a specific contact.
+- **getContactsForDomain** - Get all contacts (registrant, admin, tech, billing) assigned to a domain.
+- **getDedicatedServerCatalog** - Get all available dedicated server configurations with pricing and specifications.
+- **getDnsRecord** - Get details of a specific DNS record.
+- **getDomainAuditTrail** - Get the audit trail (history of all changes) for a specific domain.
+- **getDomainExtensions** - Get all available domain extensions (TLDs) with pricing information.
+- **getDomainInfo** - Get detailed information about a domain including expiration date, nameservers, and status.
+- **getDomainPricing** - Get pricing for domain extensions from the product catalog.
+- **getHostingBundle** - Get the hosting options and exact prices for a specific domain: recommended VPS packages (cheapest first), email plans, web forwarding, and app/site deployment (builds are free; going live runs on a VPS).
+- **getHostsForDomain** - List all host/glue records associated with a domain.
+- **getInvoiceDetails** - Get detailed information about a specific invoice including line items.
+- **getInvoiceStatistics** - Get summary statistics of invoices: total paid, pending, overdue amounts.
+- **getMailboxQuote** - Get a display-only price quote for a mailbox plan.
+- **getMailboxUsage** - Get disk usage per mailbox in bytes, for quota display alongside the plan's quotaBytes.
+- **getMailDnsRecords** - Get the DNS records a mail domain needs (MX, SPF, DKIM, ...) - for customers managing DNS externally.
+- **getMyAuditLogs** - Get recent audit logs for the authenticated user across all services.
+- **getMyProfile** - Get the authenticated user's profile and account information including name, email, organization, balance, and domain/VPS counts.
+- **getPaymentTransactions** - Get payment transaction history for the authenticated user.
+- **getProductCatalog** - Get the complete product catalog including domain extensions, VPS packages, and dedicated servers.
+- **getRecentActivity** - Get the most recent activity across all domains and services for the user.
+- **getTransferQuote** - Get a transfer price quote for a domain.
+- **getTransferStatus** - Check the current status of a domain transfer.
+- **getVpsInstanceDetails** - Get detailed information about a specific VPS instance including resource usage.
+- **getVpsPackageDetails** - Get detailed information about a specific VPS package including all pricing tiers.
+- **initializeDnsZone** - Initialize (create) the DNS zone for a domain.
+- **initiateTransfer** - Stage initiation of a domain transfer from another registrar.
+- **listCategorizedTlds** - List TLDs from the OSIR catalog that have category and audience metadata populated.
+- **listContacts** - List all contacts for the authenticated user with optional search.
+- **listDnsRecords** - List all DNS records for a domain.
+- **listInvoices** - List invoices for the authenticated user with optional status filtering and pagination.
+- **listMailboxes** - List your mailboxes with plan, payment term, status, and next renewal date.
+- **listMailDomains** - List your domains that are enabled for email hosting, with status (PENDING_DNS or ACTIVE) and DNS mode.
+- **listMailPlans** - List available email mailbox plans with quotas and prices (monthly and annual, in cents).
+- **listMySshKeys** - List the SSH keys stored on your account, with their ids and SHA256 fingerprints.
+- **listMyVpsInstances** - List all VPS instances owned by the authenticated user.
+- **listPendingTransfers** - List all pending incoming (gaining) domain transfers.
+- **listUserDomains** - List all domains owned by the authenticated user.
+- **listVpsLocations** - List available VPS hosting locations (cities/countries) with available packages.
+- **listVpsOsTemplates** - List operating system templates available to install.
+- **listVpsPackages** - List available VPS hosting packages with pricing, specs, and locations.
+- **lockDomain** - Enable registrar lock on a domain to prevent unauthorized transfers.
+- **loginToVpsPanel** - Generate a one-time login URL to the VPS control panel (VirtFusion) for managing the server.
+- **loginWithDevice** - Start a device authorization login (RFC 8628).
+- **logout** - Log out: revokes the session's tokens at the identity provider immediately.
+- **orderVps** - Stage an order for a new VPS instance.
+- **osirAppCreateUpload** - Create an upload ticket for deploying app source code to Osir.
+- **osirAppDelete** - Stage deletion of an Osir app.
+- **osirAppDeploy** - Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a microVM.
+- **osirAppGetSource** - Get a short-lived signed download URL for an Osir app's current source zip - use this to make edits to a deployed app without the user re-attaching the project: download, patch the files, then osirAppCreateUpload (PUT the new zip) and osirAppDeploy under the SAME name; the platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box.
+- **osirAppList** - List the authenticated user's deployed Osir apps with their live URLs and status.
+- **osirAppLogs** - Get recent logs from an Osir app's microVM ('why is my app broken?').
+- **osirAppMoveToOwned** - Move a deployed Osir app from the shared free tier onto a paid VPS owned by the user.
+- **osirAppProvisionDatabase** - Provision a managed Postgres database for an Osir app.
+- **osirAppSetSecret** - Set an environment secret for an Osir app (e.g.
+- **osirAppStatus** - Get an Osir app's current status, live URL, and health ('is my app working?').
+- **osirSiteDesignBrief** - Step 1 of designing a website with OSIR.
+- **osirSitePublish** - Publish a single-page website to a live HTTPS URL on Osir (free tier) - ANY complete HTML document works: the user's own site, a page designed in this chat, or one from the osirSiteDesignBrief flow.
+- **payInvoice** - Stage payment of an outstanding invoice from account balance.
+- **previewPaymentFees** - Preview the fees that would be charged for a given payment amount.
+- **registerDomain** - Stage registration of a new domain name.
+- **renewDomain** - Stage renewal of a domain for a specified number of years.
+- **setMailboxPassword** - Set a new password on a mailbox.
+- **spinDomainWords** - Generate domain suggestions by spinning/replacing words.
+- **suggestAlternatives** - Suggest alternative domain names if the requested one is unavailable (legacy method).
+- **transferDomain** - Stage transfer of a domain from another registrar to OSIR.
+- **unlockDomain** - Stage removal of registrar lock from a domain to allow transfers.
+- **updateContact** - Update an existing contact's information.
+- **updateDnsRecord** - Update an existing DNS record.
+- **updateDomainAutoRenew** - Enable or disable auto-renewal for a domain.
+- **updateDomainPrivacy** - Enable or disable WHOIS privacy protection for a domain.
+- **updateNameservers** - Update nameservers for a domain.
+- **validateDomainName** - Validate if a domain name format is correct.
+- **verifyAccount** - Verify a newly created OSIR account with the code from the verification email - step 2 of onboarding, no authentication required.
+- **verifyMailDns** - Check that a mail domain's DNS records resolve; activates the domain for email when all records are found.
+
+
 ---
 
 ## Build, test, deploy
