@@ -66,7 +66,7 @@ public class WebsiteDesignMCPServer {
     }
 
     @Tool(name = "osirSiteDesignBrief",
-            description = "Step 1 of designing a NEW website with OSIR. Validates the brief and returns "
+            description = "osirSiteDesignBrief: Step 1 of designing a NEW website with OSIR. Validates the brief and returns "
                     + "'systemPrompt', the structured design brief and constraints YOU must then follow to write "
                     + "one complete self-contained HTML page, plus 'editRules' for later revisions. Call it before "
                     + "osirSitePublish for a new site, then publish the finished page with osirSitePublish. "
@@ -94,7 +94,7 @@ public class WebsiteDesignMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirSitePublish",
-            description = "Publish a single-page website to a live HTTPS URL on Osir (free tier). ANY complete "
+            description = "osirSitePublish: Publish a single-page website to a live HTTPS URL on Osir (free tier). ANY complete "
                     + "HTML document works: the user's own site, a page designed in this chat, or one from the "
                     + "osirSiteDesignBrief flow. Calling again with the same name redeploys the new version. For "
                     + "MULTI-FILE sites (separate CSS/JS/images) use osirAppCreateUpload + osirAppDeploy with a "

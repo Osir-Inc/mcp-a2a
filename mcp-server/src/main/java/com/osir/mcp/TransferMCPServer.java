@@ -25,7 +25,7 @@ public class TransferMCPServer {
     @Inject
     PendingActionStore pendingActionStore;
 
-    @Tool(description = "Get a transfer price quote for a domain. Requires authentication. Returns transfer price, currency, extension years, and new expiration date. Call before initiateTransfer to show the user the cost.",
+    @Tool(description = "getTransferQuote: Get a transfer price quote for a domain. Requires authentication. Returns transfer price, currency, extension years, and new expiration date. Call before initiateTransfer to show the user the cost.",
             structuredContent = true,
             annotations = @Tool.Annotations(
                     title = "Get transfer quote",
@@ -44,7 +44,7 @@ public class TransferMCPServer {
         }
     }
 
-    @Tool(description = "Starts a transfer for a domain already prepared at the losing registrar (unlocked, auth code in hand). transferDomain (domain tools) stages transfer + registrant assignment in one step; use that when the user gives you contact details. Deducts from account balance. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "initiateTransfer: Starts a transfer for a domain already prepared at the losing registrar (unlocked, auth code in hand). transferDomain (domain tools) stages transfer + registrant assignment in one step; use that when the user gives you contact details. Deducts from account balance. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Initiate domain transfer",
                     readOnlyHint = false,
@@ -64,7 +64,7 @@ public class TransferMCPServer {
         );
     }
 
-    @Tool(description = "Check the current status of a domain transfer. Requires authentication. Returns status, request date, current registrar, and expected completion.",
+    @Tool(description = "getTransferStatus: Check the current status of a domain transfer. Requires authentication. Returns status, request date, current registrar, and expected completion.",
             annotations = @Tool.Annotations(
                     title = "Get transfer status",
                     readOnlyHint = true,
@@ -82,7 +82,7 @@ public class TransferMCPServer {
         }
     }
 
-    @Tool(description = "Stage cancellation of a pending domain transfer. DESTRUCTIVE and irreversible once executed. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "cancelTransfer: Stage cancellation of a pending domain transfer. DESTRUCTIVE and irreversible once executed. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Cancel domain transfer",
                     readOnlyHint = false,
@@ -101,7 +101,7 @@ public class TransferMCPServer {
         );
     }
 
-    @Tool(description = "List all pending incoming (gaining) domain transfers. Requires authentication. Returns each transfer with its status, request date, current registrar, and expected completion.",
+    @Tool(description = "listPendingTransfers: List all pending incoming (gaining) domain transfers. Requires authentication. Returns each transfer with its status, request date, current registrar, and expected completion.",
             annotations = @Tool.Annotations(
                     title = "List pending transfers",
                     readOnlyHint = true,

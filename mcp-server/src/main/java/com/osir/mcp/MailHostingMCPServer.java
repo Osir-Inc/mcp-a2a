@@ -30,7 +30,7 @@ public class MailHostingMCPServer {
     // Catalog / quote
 
     @RequiresAuth
-    @Tool(description = "List available email mailbox plans with quotas and prices (monthly and annual, in cents). Requires authentication. Always quote prices from here, never from memory.",
+    @Tool(description = "listMailPlans: List available email mailbox plans with quotas and prices (monthly and annual, in cents). Requires authentication. Always quote prices from here, never from memory.",
             annotations = @Tool.Annotations(
                     title = "List mail plans",
                     readOnlyHint = true,
@@ -42,7 +42,7 @@ public class MailHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Get a display-only price quote for a mailbox plan. The backend re-derives the authoritative price at purchase. Requires authentication.",
+    @Tool(description = "getMailboxQuote: Get a display-only price quote for a mailbox plan. The backend re-derives the authoritative price at purchase. Requires authentication.",
             structuredContent = true,
             annotations = @Tool.Annotations(
                     title = "Get mailbox quote",
@@ -61,7 +61,7 @@ public class MailHostingMCPServer {
     // Domains
 
     @RequiresAuth
-    @Tool(description = "Enable email hosting on a domain you own. Free; mailboxes are what cost money. If the call fails with a DNS conflict (an existing SPF or MX record), ask the user for explicit consent, then re-call with spfMergeConfirmed=true and/or takeoverConfirmed=true. Requires authentication.",
+    @Tool(description = "enableMailDomain: Enable email hosting on a domain you own. Free; mailboxes are what cost money. If the call fails with a DNS conflict (an existing SPF or MX record), ask the user for explicit consent, then re-call with spfMergeConfirmed=true and/or takeoverConfirmed=true. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Enable mail domain",
                     readOnlyHint = false,
@@ -79,7 +79,7 @@ public class MailHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "List your domains that are enabled for email hosting, with status (PENDING_DNS or ACTIVE) and DNS mode. Requires authentication.",
+    @Tool(description = "listMailDomains: List your domains that are enabled for email hosting, with status (PENDING_DNS or ACTIVE) and DNS mode. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "List mail domains",
                     readOnlyHint = true,
@@ -91,7 +91,7 @@ public class MailHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Get the DNS records a mail domain needs (MX, SPF, DKIM, ...), for customers managing DNS externally. Requires authentication.",
+    @Tool(description = "getMailDnsRecords: Get the DNS records a mail domain needs (MX, SPF, DKIM, ...), for customers managing DNS externally. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get mail DNS records",
                     readOnlyHint = true,
@@ -105,7 +105,7 @@ public class MailHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Check that a mail domain's DNS records resolve; activates the domain for email when all records are found. Returns any still-missing records. Requires authentication.",
+    @Tool(description = "verifyMailDns: Check that a mail domain's DNS records resolve; activates the domain for email when all records are found. Returns any still-missing records. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Verify mail DNS",
                     readOnlyHint = true,
@@ -121,7 +121,7 @@ public class MailHostingMCPServer {
     // Mailboxes
 
     @RequiresAuth
-    @Tool(description = "Stage creation of a paid mailbox on a mail-enabled domain. BILLABLE: deducts from account balance; get a quote with getMailboxQuote and confirm the price with the user first. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve. The result of the confirmed action contains the generated password EXACTLY ONCE; it can never be retrieved again, so show it to the user immediately (they can change it later with setMailboxPassword). Also share the client settings from the result (IMAP/SMTP/webmail).",
+    @Tool(description = "createMailbox: Stage creation of a paid mailbox on a mail-enabled domain. BILLABLE: deducts from account balance; get a quote with getMailboxQuote and confirm the price with the user first. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve. The result of the confirmed action contains the generated password EXACTLY ONCE; it can never be retrieved again, so show it to the user immediately (they can change it later with setMailboxPassword). Also share the client settings from the result (IMAP/SMTP/webmail).",
             annotations = @Tool.Annotations(
                     title = "Create mailbox",
                     readOnlyHint = false,
@@ -147,7 +147,7 @@ public class MailHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "List your mailboxes with plan, payment term, status, and next renewal date. Requires authentication.",
+    @Tool(description = "listMailboxes: List your mailboxes with plan, payment term, status, and next renewal date. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "List mailboxes",
                     readOnlyHint = true,
@@ -159,7 +159,7 @@ public class MailHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Set a new password on a mailbox. Never log or store the password. Requires authentication.",
+    @Tool(description = "setMailboxPassword: Set a new password on a mailbox. Never log or store the password. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Set mailbox password",
                     readOnlyHint = false,
@@ -174,7 +174,7 @@ public class MailHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Stage deletion of a mailbox. The mailbox stops working immediately and its data is destroyed after a 14-day grace period. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "deleteMailbox: Stage deletion of a mailbox. The mailbox stops working immediately and its data is destroyed after a 14-day grace period. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Delete mailbox",
                     readOnlyHint = false,
@@ -194,7 +194,7 @@ public class MailHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Get disk usage per mailbox in bytes, for quota display alongside the plan's quotaBytes. Requires authentication.",
+    @Tool(description = "getMailboxUsage: Get disk usage per mailbox in bytes, for quota display alongside the plan's quotaBytes. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get mailbox usage",
                     readOnlyHint = true,

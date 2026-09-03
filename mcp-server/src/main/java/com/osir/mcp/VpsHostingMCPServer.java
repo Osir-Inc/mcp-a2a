@@ -28,7 +28,7 @@ public class VpsHostingMCPServer {
 
     // Public catalog tools (no auth required)
 
-    @Tool(description = "List available VPS hosting packages with pricing, specs, and locations. No authentication required.",
+    @Tool(description = "listVpsPackages: List available VPS hosting packages with pricing, specs, and locations. No authentication required.",
             annotations = @Tool.Annotations(
                     title = "List VPS packages",
                     readOnlyHint = true,
@@ -44,7 +44,7 @@ public class VpsHostingMCPServer {
         }
     }
 
-    @Tool(description = "List available VPS hosting locations (cities/countries) with available packages. No authentication required.",
+    @Tool(description = "listVpsLocations: List available VPS hosting locations (cities/countries) with available packages. No authentication required.",
             annotations = @Tool.Annotations(
                     title = "List VPS locations",
                     readOnlyHint = true,
@@ -61,7 +61,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Get detailed information about a specific VPS package including all pricing tiers. Requires authentication. For anonymous browsing use listVpsPackages, which already includes per-term pricing.",
+    @Tool(description = "getVpsPackageDetails: Get detailed information about a specific VPS package including all pricing tiers. Requires authentication. For anonymous browsing use listVpsPackages, which already includes per-term pricing.",
             annotations = @Tool.Annotations(
                     title = "Get VPS package details",
                     readOnlyHint = true,
@@ -82,7 +82,7 @@ public class VpsHostingMCPServer {
     // Authenticated VPS tools
 
     @RequiresAuth
-    @Tool(description = "Stage an order for a new VPS instance; deducts from account balance. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "orderVps: Stage an order for a new VPS instance; deducts from account balance. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Order a VPS",
                     readOnlyHint = false,
@@ -113,7 +113,7 @@ public class VpsHostingMCPServer {
     // OS install
 
     @RequiresAuth
-    @Tool(description = "List operating system templates available to install. Requires authentication. "
+    @Tool(description = "listVpsOsTemplates: List operating system templates available to install. Requires authentication. "
             + "Pass EXACTLY ONE of packageId (to pick an operatingSystemId for orderVps, so the server arrives "
             + "with an OS on it) or instanceId (to pick a template for reinstalling via buildVpsInstance). The two "
             + "are not interchangeable: the available set depends on the package. Template ids change over time, "
@@ -138,7 +138,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Stage an operating system install (or reinstall) on a VPS instance. DESTRUCTIVE: ERASES ALL DATA on the server, including any deployed application, and cannot be undone. The install is asynchronous; afterwards poll getVpsInstanceDetails until buildState is COMPLETE. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "buildVpsInstance: Stage an operating system install (or reinstall) on a VPS instance. DESTRUCTIVE: ERASES ALL DATA on the server, including any deployed application, and cannot be undone. The install is asynchronous; afterwards poll getVpsInstanceDetails until buildState is COMPLETE. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Install OS on VPS",
                     readOnlyHint = false,
@@ -166,7 +166,7 @@ public class VpsHostingMCPServer {
     // SSH keys
 
     @RequiresAuth
-    @Tool(description = "Store an SSH public key on your account so it can be injected into VPS installs. Idempotent: storing a key you already have returns the existing one instead of creating a duplicate, so it is safe to call before every order. Returns the key id to pass to orderVps or buildVpsInstance. Requires authentication.",
+    @Tool(description = "addSshKey: Store an SSH public key on your account so it can be injected into VPS installs. Idempotent: storing a key you already have returns the existing one instead of creating a duplicate, so it is safe to call before every order. Returns the key id to pass to orderVps or buildVpsInstance. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Add SSH key",
                     readOnlyHint = false,
@@ -186,7 +186,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "List the SSH keys stored on your account, with their ids and SHA256 fingerprints. Use this to check whether a key is already stored and to get the ids to pass to orderVps or buildVpsInstance. Requires authentication.",
+    @Tool(description = "listMySshKeys: List the SSH keys stored on your account, with their ids and SHA256 fingerprints. Use this to check whether a key is already stored and to get the ids to pass to orderVps or buildVpsInstance. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "List SSH keys",
                     readOnlyHint = true,
@@ -203,7 +203,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Remove an SSH key from your account. This does not affect servers already built with it, and the key can simply be added again. Requires authentication.",
+    @Tool(description = "deleteSshKey: Remove an SSH key from your account. This does not affect servers already built with it, and the key can simply be added again. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Delete SSH key",
                     readOnlyHint = false,
@@ -222,7 +222,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "List all VPS instances owned by the authenticated user. Requires authentication.",
+    @Tool(description = "listMyVpsInstances: List all VPS instances owned by the authenticated user. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "List my VPS instances",
                     readOnlyHint = true,
@@ -239,7 +239,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Get detailed information about a specific VPS instance including resource usage. Requires authentication.",
+    @Tool(description = "getVpsInstanceDetails: Get detailed information about a specific VPS instance including resource usage. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get VPS instance details",
                     readOnlyHint = true,
@@ -258,7 +258,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Stage deletion/cancellation of a VPS instance. DESTRUCTIVE and irreversible. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "deleteVpsInstance: Stage deletion/cancellation of a VPS instance. DESTRUCTIVE and irreversible. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Delete VPS instance",
                     readOnlyHint = false,
@@ -278,7 +278,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Change the payment term (billing cycle) for a VPS instance. Requires authentication.",
+    @Tool(description = "changeVpsPaymentTerm: Change the payment term (billing cycle) for a VPS instance. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Change VPS payment term",
                     readOnlyHint = false,
@@ -298,7 +298,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Generate a one-time login URL to the VPS control panel (VirtFusion) for managing the server. Requires authentication.",
+    @Tool(description = "loginToVpsPanel: Generate a one-time login URL to the VPS control panel (VirtFusion) for managing the server. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Log in to VPS panel",
                     readOnlyHint = false,
@@ -317,7 +317,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Get the total count of VPS instances owned by the authenticated user. Requires authentication.",
+    @Tool(description = "countMyVpsInstances: Get the total count of VPS instances owned by the authenticated user. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Count my VPS instances",
                     readOnlyHint = true,

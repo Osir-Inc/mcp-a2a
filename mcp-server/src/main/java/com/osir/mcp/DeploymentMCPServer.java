@@ -44,7 +44,7 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppCreateUpload",
-            description = "Create an upload ticket for deploying app source code to Osir. Returns an uploadTicket, "
+            description = "osirAppCreateUpload: Create an upload ticket for deploying app source code to Osir. Returns an uploadTicket, "
                     + "a putUrl, and instructions to zip the project and upload it. After uploading, call osirAppDeploy "
                     + "with the uploadTicket. Requires authentication.",
             annotations = @Tool.Annotations(
@@ -64,7 +64,7 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppDeploy",
-            description = "Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a "
+            description = "osirAppDeploy: Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a "
                     + "microVM. Deploying an existing app name redeploys it (new version) and applies any secrets set "
                     + "via osirAppSetSecret. A plain static website (HTML/CSS/JS with no framework or build step) is "
                     + "also supported: it is auto-detected and served directly; pass language 'node' for it. "
@@ -91,7 +91,7 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppList",
-            description = "List the authenticated user's deployed Osir apps with their live URLs and status. Requires authentication.",
+            description = "osirAppList: List the authenticated user's deployed Osir apps with their live URLs and status. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "List deployed apps",
                     readOnlyHint = true,
@@ -109,7 +109,7 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppStatus",
-            description = "Get an Osir app's current status, live URL, and health ('is my app working?'). "
+            description = "osirAppStatus: Get an Osir app's current status, live URL, and health ('is my app working?'). "
                     + "If the status is BUILD_FAILED, 'recentErrors' explains why so you can fix the source "
                     + "and redeploy. 'qa' is an independent black-box check of the LIVE app after deploy: "
                     + "qa.status PASSED means it loaded and worked; FAILED means it deployed but didn't "
@@ -134,7 +134,7 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppSetSecret",
-            description = "Set an environment secret for an Osir app (e.g. DATABASE_URL, API_KEY). The value is stored "
+            description = "osirAppSetSecret: Set an environment secret for an Osir app (e.g. DATABASE_URL, API_KEY). The value is stored "
                     + "encrypted and injected as an env var on the next osirAppDeploy of the app; it is NEVER returned "
                     + "or logged. Requires authentication.",
             annotations = @Tool.Annotations(
@@ -158,7 +158,7 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppLogs",
-            description = "Get recent logs from an Osir app's microVM ('why is my app broken?'). Requires authentication.",
+            description = "osirAppLogs: Get recent logs from an Osir app's microVM ('why is my app broken?'). Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get app logs",
                     readOnlyHint = true,
@@ -179,7 +179,7 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppProvisionDatabase",
-            description = "Provision a managed Postgres database for an Osir app. The connection string is stored "
+            description = "osirAppProvisionDatabase: Provision a managed Postgres database for an Osir app. The connection string is stored "
                     + "as the app's DATABASE_URL secret (encrypted, injected on the next osirAppDeploy) and is NEVER "
                     + "returned. Requires authentication.",
             annotations = @Tool.Annotations(
@@ -203,7 +203,7 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppGetSource",
-            description = "Get a short-lived signed download URL for an Osir app's current source zip. Use this to "
+            description = "osirAppGetSource: Get a short-lived signed download URL for an Osir app's current source zip. Use this to "
                     + "make edits to a deployed app without the user re-attaching the project: download, patch the "
                     + "files, then osirAppCreateUpload (PUT the new zip) and osirAppDeploy under the SAME name; the "
                     + "platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box. "
@@ -228,7 +228,7 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppMoveToOwned",
-            description = "Move a deployed Osir app from the shared free tier onto a paid VPS owned by the user. "
+            description = "osirAppMoveToOwned: Move a deployed Osir app from the shared free tier onto a paid VPS owned by the user. "
                     + "First call stages a VPS order (COSTS MONEY): returns an actionId; present the price/summary "
                     + "to the user and call executeConfirmedAction only if they approve. After confirmation the "
                     + "platform installs Ubuntu and ships the app onto the box server-side. If the result status is "
@@ -270,7 +270,7 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppDelete",
-            description = "Stage deletion of an Osir app. DESTRUCTIVE and irreversible: removes its microVM, image, "
+            description = "osirAppDelete: Stage deletion of an Osir app. DESTRUCTIVE and irreversible: removes its microVM, image, "
                     + "route, and data. Returns an actionId; present the summary to the user, "
                     + "then call executeConfirmedAction with the actionId if they approve. Requires authentication.",
             annotations = @Tool.Annotations(

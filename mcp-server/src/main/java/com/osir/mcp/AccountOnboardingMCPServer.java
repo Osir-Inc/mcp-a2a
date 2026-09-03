@@ -41,7 +41,7 @@ public class AccountOnboardingMCPServer {
     }
 
     @Tool(description = """
-            Create a new OSIR customer account; step 1 of onboarding, no authentication \
+            createAccount: Create a new OSIR customer account; step 1 of onboarding, no authentication \
             required. The contact must be the PRINCIPAL's real ICANN registrant contact (the \
             human or business the account is for), never the AI agent itself. Sends a \
             verification email; complete via verifyAccount with the emailed code. While \
@@ -90,7 +90,7 @@ public class AccountOnboardingMCPServer {
     }
 
     @Tool(description = """
-            Verify a newly created OSIR account with the code from the verification email; \
+            verifyAccount: Verify a newly created OSIR account with the code from the verification email; \
             step 2 of onboarding, no authentication required. The code is the same token as the \
             email link, so the principal can relay it to their agent. On success the account \
             becomes ACTIVE and billable actions are unlocked. If the code expired, call \

@@ -25,7 +25,7 @@ public class BillingMCPServer {
     @Inject
     PendingActionStore pendingActionStore;
 
-    @Tool(description = "Get the current account balance for the authenticated user. Requires authentication.",
+    @Tool(description = "getAccountBalance: Get the current account balance for the authenticated user. Requires authentication.",
             structuredContent = true,
             annotations = @Tool.Annotations(
                     title = "Get account balance",
@@ -42,7 +42,7 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "List invoices for the authenticated user with optional status filtering and pagination. Requires authentication.",
+    @Tool(description = "listInvoices: List invoices for the authenticated user with optional status filtering and pagination. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "List invoices",
                     readOnlyHint = true,
@@ -58,7 +58,7 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Get detailed information about a specific invoice including line items. Requires authentication.",
+    @Tool(description = "getInvoiceDetails: Get detailed information about a specific invoice including line items. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get invoice details",
                     readOnlyHint = true,
@@ -74,7 +74,7 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Stage payment of an outstanding invoice from account balance. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "payInvoice: Stage payment of an outstanding invoice from account balance. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Pay invoice",
                     readOnlyHint = false,
@@ -91,7 +91,7 @@ public class BillingMCPServer {
         );
     }
 
-    @Tool(description = "Get summary statistics of invoices: total paid, pending, overdue amounts. Requires authentication.",
+    @Tool(description = "getInvoiceStatistics: Get summary statistics of invoices: total paid, pending, overdue amounts. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get invoice statistics",
                     readOnlyHint = true,
@@ -107,7 +107,7 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Stage a Stripe checkout session to add funds to the account balance. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve. The executed result includes checkoutUrl (hand it to the human to pay) and expiresAt; then poll getPaymentTransactions until the balance credit appears.",
+    @Tool(description = "createPaymentSession: Stage a Stripe checkout session to add funds to the account balance. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve. The executed result includes checkoutUrl (hand it to the human to pay) and expiresAt; then poll getPaymentTransactions until the balance credit appears.",
             annotations = @Tool.Annotations(
                     title = "Create payment session",
                     readOnlyHint = false,
@@ -125,7 +125,7 @@ public class BillingMCPServer {
         );
     }
 
-    @Tool(description = "Get payment transaction history for the authenticated user. Requires authentication.",
+    @Tool(description = "getPaymentTransactions: Get payment transaction history for the authenticated user. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get payment transactions",
                     readOnlyHint = true,
@@ -141,7 +141,7 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Preview the fees that would be charged for a given payment amount. Requires authentication.",
+    @Tool(description = "previewPaymentFees: Preview the fees that would be charged for a given payment amount. Requires authentication.",
             structuredContent = true,
             annotations = @Tool.Annotations(
                     title = "Preview payment fees",
@@ -158,7 +158,7 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Get pricing for domain extensions from the product catalog. Requires authentication.",
+    @Tool(description = "getDomainPricing: Get pricing for domain extensions from the product catalog. Requires authentication.",
             structuredContent = true,
             annotations = @Tool.Annotations(
                     title = "Get domain pricing",

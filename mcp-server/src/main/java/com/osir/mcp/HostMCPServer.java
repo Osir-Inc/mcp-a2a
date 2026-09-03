@@ -27,7 +27,7 @@ public class HostMCPServer {
     @Inject
     PendingActionStore pendingActionStore;
 
-    @Tool(description = "Check if a host/glue record name is available for creation. Requires authentication. Returns whether the hostname is free; call before createHost.",
+    @Tool(description = "checkHostAvailability: Check if a host/glue record name is available for creation. Requires authentication. Returns whether the hostname is free; call before createHost.",
             annotations = @Tool.Annotations(
                     title = "Check host availability",
                     readOnlyHint = true,
@@ -45,7 +45,7 @@ public class HostMCPServer {
         }
     }
 
-    @Tool(description = "Create a new host/glue record, e.g. for custom nameservers like 'ns1.example.com'. Requires authentication. Check the name first with checkHostAvailability. Returns the created host record.",
+    @Tool(description = "createHost: Create a new host/glue record, e.g. for custom nameservers like 'ns1.example.com'. Requires authentication. Check the name first with checkHostAvailability. Returns the created host record.",
             annotations = @Tool.Annotations(
                     title = "Create host record",
                     readOnlyHint = false,
@@ -64,7 +64,7 @@ public class HostMCPServer {
         }
     }
 
-    @Tool(description = "List all host/glue records associated with a domain. Requires authentication. Returns each host name and its IP addresses.",
+    @Tool(description = "getHostsForDomain: List all host/glue records associated with a domain. Requires authentication. Returns each host name and its IP addresses.",
             annotations = @Tool.Annotations(
                     title = "List host records",
                     readOnlyHint = true,
@@ -82,7 +82,7 @@ public class HostMCPServer {
         }
     }
 
-    @Tool(description = "Stage deletion of a host/glue record. DESTRUCTIVE and irreversible once executed. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "deleteHost: Stage deletion of a host/glue record. DESTRUCTIVE and irreversible once executed. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Delete host record",
                     readOnlyHint = false,

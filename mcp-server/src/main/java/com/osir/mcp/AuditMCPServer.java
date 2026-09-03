@@ -21,7 +21,7 @@ public class AuditMCPServer {
     @Inject
     AuditService auditService;
 
-    @Tool(description = "Get the audit trail (history of all changes) for a specific domain. Requires authentication.",
+    @Tool(description = "getDomainAuditTrail: Get the audit trail (history of all changes) for a specific domain. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get domain audit trail",
                     readOnlyHint = true,
@@ -37,7 +37,7 @@ public class AuditMCPServer {
         }
     }
 
-    @Tool(description = "Get recent audit logs for the authenticated user across all services. Requires authentication.",
+    @Tool(description = "getMyAuditLogs: Get recent audit logs for the authenticated user across all services. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get my audit logs",
                     readOnlyHint = true,
@@ -53,7 +53,7 @@ public class AuditMCPServer {
         }
     }
 
-    @Tool(description = "Get the most recent activity across all domains and services for the user. Requires authentication.",
+    @Tool(description = "getRecentActivity: Get the most recent activity across all domains and services for the user. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get recent activity",
                     readOnlyHint = true,

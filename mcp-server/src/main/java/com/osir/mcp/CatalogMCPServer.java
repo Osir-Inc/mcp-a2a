@@ -30,7 +30,7 @@ public class CatalogMCPServer {
     com.osir.mcp.clients.CatalogBackendClient catalogBackendClient;
 
     @Tool(description = """
-            Get the hosting options and exact prices for a specific domain: recommended VPS \
+            getHostingBundle: Get the hosting options and exact prices for a specific domain: recommended VPS \
             packages (cheapest first), email plans, web forwarding, and app/site deployment. \
             No authentication required. Call this ONCE after a successful availability check or \
             registration to make a concise hosting offer; do not repeat the offer in the same \
@@ -51,7 +51,7 @@ public class CatalogMCPServer {
         }
     }
 
-    @Tool(description = "Get the complete product catalog including domain extensions, VPS packages, and dedicated servers. No authentication required.",
+    @Tool(description = "getProductCatalog: Get the complete product catalog including domain extensions, VPS packages, and dedicated servers. No authentication required.",
             annotations = @Tool.Annotations(
                     title = "Get product catalog",
                     readOnlyHint = true,
@@ -67,7 +67,7 @@ public class CatalogMCPServer {
         }
     }
 
-    @Tool(description = "Get all available domain extensions (TLDs) with pricing information. No authentication required.",
+    @Tool(description = "getDomainExtensions: Get all available domain extensions (TLDs) with pricing information. No authentication required.",
             annotations = @Tool.Annotations(
                     title = "Get domain extensions",
                     readOnlyHint = true,
@@ -83,7 +83,7 @@ public class CatalogMCPServer {
         }
     }
 
-    @Tool(description = "Get all available dedicated server configurations with pricing and specifications. No authentication required.",
+    @Tool(description = "getDedicatedServerCatalog: Get all available dedicated server configurations with pricing and specifications. No authentication required.",
             annotations = @Tool.Annotations(
                     title = "Get dedicated server catalog",
                     readOnlyHint = true,
@@ -100,7 +100,7 @@ public class CatalogMCPServer {
     }
 
     @Tool(description = """
-            List TLDs from the OSIR catalog that have category and audience metadata, with \
+            listCategorizedTlds: List TLDs from the OSIR catalog that have category and audience metadata, with \
             registration and renewal prices as decimal strings (e.g. '10.39'). Use it to pick \
             3-6 relevant TLDs before calling bulkDomainSuggestions. Filters: price cap, exclude \
             ccTLDs/restricted/premium, registry. Returns unranked candidates with categories, \

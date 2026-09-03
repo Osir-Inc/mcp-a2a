@@ -25,7 +25,7 @@ public class DnsMCPServer {
     @Inject
     PendingActionStore pendingActionStore;
 
-    @Tool(description = "Initialize (create) the DNS zone for a domain. NOT needed after registerDomain, which initializes the zone automatically. Use only for pre-existing domains without a zone (e.g. after a transfer, or if registration opted out with initializeDnsZone:false). Safe on existing zones, it will not overwrite records. Requires authentication.",
+    @Tool(description = "initializeDnsZone: Initialize (create) the DNS zone for a domain. NOT needed after registerDomain, which initializes the zone automatically. Use only for pre-existing domains without a zone (e.g. after a transfer, or if registration opted out with initializeDnsZone:false). Safe on existing zones, it will not overwrite records. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Initialize DNS zone",
                     readOnlyHint = false,
@@ -41,7 +41,7 @@ public class DnsMCPServer {
         }
     }
 
-    @Tool(description = "List all DNS records for a domain. Requires authentication. Returns each record with its id, name, type, content, TTL, and priority; use the record id with getDnsRecord, updateDnsRecord, or deleteDnsRecord.",
+    @Tool(description = "listDnsRecords: List all DNS records for a domain. Requires authentication. Returns each record with its id, name, type, content, TTL, and priority; use the record id with getDnsRecord, updateDnsRecord, or deleteDnsRecord.",
             annotations = @Tool.Annotations(
                     title = "List DNS records",
                     readOnlyHint = true,
@@ -57,7 +57,7 @@ public class DnsMCPServer {
         }
     }
 
-    @Tool(description = "Create a new DNS record for a domain. Requires authentication. For newly registered domains the zone is initialized automatically if missing. Returns the created record including its id for later updates or deletion.",
+    @Tool(description = "createDnsRecord: Create a new DNS record for a domain. Requires authentication. For newly registered domains the zone is initialized automatically if missing. Returns the created record including its id for later updates or deletion.",
             annotations = @Tool.Annotations(
                     title = "Create DNS record",
                     readOnlyHint = false,
@@ -80,7 +80,7 @@ public class DnsMCPServer {
         }
     }
 
-    @Tool(description = "Update an existing DNS record. Requires authentication. Only the fields you provide are changed; omitted fields keep their current values. Get the recordId from listDnsRecords. Returns the updated record.",
+    @Tool(description = "updateDnsRecord: Update an existing DNS record. Requires authentication. Only the fields you provide are changed; omitted fields keep their current values. Get the recordId from listDnsRecords. Returns the updated record.",
             annotations = @Tool.Annotations(
                     title = "Update DNS record",
                     readOnlyHint = false,
@@ -104,7 +104,7 @@ public class DnsMCPServer {
         }
     }
 
-    @Tool(description = "Stage deletion of a DNS record. DESTRUCTIVE and irreversible once executed. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "deleteDnsRecord: Stage deletion of a DNS record. DESTRUCTIVE and irreversible once executed. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Delete DNS record",
                     readOnlyHint = false,
@@ -124,7 +124,7 @@ public class DnsMCPServer {
         );
     }
 
-    @Tool(description = "Get details of a specific DNS record by id. Requires authentication. Get the recordId from listDnsRecords. Returns the record's name, type, content, TTL, and priority.",
+    @Tool(description = "getDnsRecord: Get details of a specific DNS record by id. Requires authentication. Get the recordId from listDnsRecords. Returns the record's name, type, content, TTL, and priority.",
             annotations = @Tool.Annotations(
                     title = "Get DNS record",
                     readOnlyHint = true,

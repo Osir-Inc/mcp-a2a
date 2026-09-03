@@ -54,7 +54,7 @@ public class DomainRegistrarMCPServer {
 
     // ── Authentication ────────────────────────────────────────────────────────
 
-    @Tool(name = "loginWithDevice", description = "Start a device authorization login (RFC 8628). Returns a verificationUri and userCode. Open the URI in your browser, enter the code, and sign in with your OSIR credentials. Then call checkDeviceLoginStatus with the returned deviceCode to complete login. No parameters required.",
+    @Tool(name = "loginWithDevice", description = "loginWithDevice: Start a device authorization login (RFC 8628). Returns a verificationUri and userCode. Open the URI in your browser, enter the code, and sign in with your OSIR credentials. Then call checkDeviceLoginStatus with the returned deviceCode to complete login. No parameters required.",
             annotations = @Tool.Annotations(
                     title = "Start device login",
                     readOnlyHint = false,
@@ -70,7 +70,7 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Poll for device login completion. Call this after loginWithDevice() once you have opened the verification URL and signed in. Required: deviceCode (the device_code returned by loginWithDevice). On success returns a sessionKey; pass it as the sessionKey argument on every subsequent authenticated tool call.",
+    @Tool(description = "checkDeviceLoginStatus: Poll for device login completion. Call this after loginWithDevice() once you have opened the verification URL and signed in. Required: deviceCode (the device_code returned by loginWithDevice). On success returns a sessionKey; pass it as the sessionKey argument on every subsequent authenticated tool call.",
             structuredContent = true,
             annotations = @Tool.Annotations(
                     title = "Check device login status",
@@ -89,7 +89,7 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Check whether the current session is authenticated. Returns authenticated status and token expiry. Optional: sessionKey (from checkDeviceLoginStatus).",
+    @Tool(description = "getAuthStatus: Check whether the current session is authenticated. Returns authenticated status and token expiry. Optional: sessionKey (from checkDeviceLoginStatus).",
             structuredContent = true,
             annotations = @Tool.Annotations(
                     title = "Get authentication status",
@@ -118,7 +118,7 @@ public class DomainRegistrarMCPServer {
         return connStatus;
     }
 
-    @Tool(description = "Log out: revokes the session's tokens at the identity provider immediately. Optional: sessionKey (from checkDeviceLoginStatus); pass it to end that conversation session.",
+    @Tool(description = "logout: Log out: revokes the session's tokens at the identity provider immediately. Optional: sessionKey (from checkDeviceLoginStatus); pass it to end that conversation session.",
             annotations = @Tool.Annotations(
                     title = "Log out",
                     readOnlyHint = false,
@@ -141,7 +141,7 @@ public class DomainRegistrarMCPServer {
     // ── Domain Availability ───────────────────────────────────────────────────
 
     // Domain Availability Tools
-    @Tool(description = "Check if a domain name is available for registration, with price. No authentication required; anonymous callers get list pricing, authenticated callers get their account pricing. Required: domain (e.g., 'example.com')",
+    @Tool(description = "checkDomainAvailability: Check if a domain name is available for registration, with price. No authentication required; anonymous callers get list pricing, authenticated callers get their account pricing. Required: domain (e.g., 'example.com')",
             structuredContent = true,
             annotations = @Tool.Annotations(
                     title = "Check domain availability",
@@ -172,7 +172,7 @@ public class DomainRegistrarMCPServer {
 
     // Domain Registration Tools
     @RequiresAuth
-    @Tool(description = "Stage registration of a new domain name. Deducts from account balance. The DNS zone is initialised automatically after registration (asynchronously; if createDnsRecord right after registration reports a missing zone, retry after a few seconds). Pass initializeDnsZone:false to opt out. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "registerDomain: Stage registration of a new domain name. Deducts from account balance. The DNS zone is initialised automatically after registration (asynchronously; if createDnsRecord right after registration reports a missing zone, retry after a few seconds). Pass initializeDnsZone:false to opt out. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Register a domain",
                     readOnlyHint = false,
@@ -203,7 +203,7 @@ public class DomainRegistrarMCPServer {
 
     // Domain Transfer Tools
     @RequiresAuth
-    @Tool(description = "Stage transfer of a domain from another registrar to OSIR. Deducts from account balance. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "transferDomain: Stage transfer of a domain from another registrar to OSIR. Deducts from account balance. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Transfer a domain",
                     readOnlyHint = false,
@@ -226,7 +226,7 @@ public class DomainRegistrarMCPServer {
 
     // Domain Management Tools
     @RequiresAuth
-    @Tool(description = "Update nameservers for a domain. Replaces the current nameserver set with the given list.",
+    @Tool(description = "updateNameservers: Update nameservers for a domain. Replaces the current nameserver set with the given list.",
             annotations = @Tool.Annotations(
                     title = "Update nameservers",
                     readOnlyHint = false,
@@ -245,7 +245,7 @@ public class DomainRegistrarMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Get detailed information about a domain including expiration date, nameservers, and status.",
+    @Tool(description = "getDomainInfo: Get detailed information about a domain including expiration date, nameservers, and status.",
             annotations = @Tool.Annotations(
                     title = "Get domain details",
                     readOnlyHint = true,
@@ -263,7 +263,7 @@ public class DomainRegistrarMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "List all domains owned by the authenticated user. No parameters required. Must be authenticated first.",
+    @Tool(description = "listUserDomains: List all domains owned by the authenticated user. No parameters required. Must be authenticated first.",
             annotations = @Tool.Annotations(
                     title = "List my domains",
                     readOnlyHint = true,
@@ -280,7 +280,7 @@ public class DomainRegistrarMCPServer {
 
     // Domain Renewal
     @RequiresAuth
-    @Tool(description = "Stage renewal of a domain for a specified number of years. Deducts from account balance. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "renewDomain: Stage renewal of a domain for a specified number of years. Deducts from account balance. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Renew a domain",
                     readOnlyHint = false,
@@ -302,7 +302,7 @@ public class DomainRegistrarMCPServer {
 
     // Domain Lock/Unlock
     @RequiresAuth
-    @Tool(description = "Enable registrar lock on a domain to prevent unauthorized transfers.",
+    @Tool(description = "lockDomain: Enable registrar lock on a domain to prevent unauthorized transfers.",
             annotations = @Tool.Annotations(
                     title = "Lock a domain",
                     readOnlyHint = false,
@@ -320,7 +320,7 @@ public class DomainRegistrarMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Stage removal of registrar lock from a domain to allow transfers. DESTRUCTIVE: reduces domain security. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "unlockDomain: Stage removal of registrar lock from a domain to allow transfers. DESTRUCTIVE: reduces domain security. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Unlock a domain",
                     readOnlyHint = false,
@@ -341,7 +341,7 @@ public class DomainRegistrarMCPServer {
 
     // Domain Settings
     @RequiresAuth
-    @Tool(description = "Enable or disable auto-renewal for a domain.",
+    @Tool(description = "updateDomainAutoRenew: Enable or disable auto-renewal for a domain.",
             annotations = @Tool.Annotations(
                     title = "Set domain auto-renew",
                     readOnlyHint = false,
@@ -360,7 +360,7 @@ public class DomainRegistrarMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Enable or disable WHOIS privacy protection for a domain.",
+    @Tool(description = "updateDomainPrivacy: Enable or disable WHOIS privacy protection for a domain.",
             annotations = @Tool.Annotations(
                     title = "Set WHOIS privacy",
                     readOnlyHint = false,
@@ -379,7 +379,7 @@ public class DomainRegistrarMCPServer {
     }
 
     // Utility Tools
-    @Tool(description = "Validate if a domain name format is correct. No authentication required.",
+    @Tool(description = "validateDomainName: Validate if a domain name format is correct. No authentication required.",
             annotations = @Tool.Annotations(
                     title = "Validate domain name",
                     readOnlyHint = true,
@@ -393,7 +393,7 @@ public class DomainRegistrarMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Suggest alternative domain names if the requested one is unavailable. Legacy; prefer generateDomainSuggestions.",
+    @Tool(description = "suggestAlternatives: Suggest alternative domain names if the requested one is unavailable. Legacy; prefer generateDomainSuggestions.",
             annotations = @Tool.Annotations(
                     title = "Suggest alternative domains",
                     readOnlyHint = true,
@@ -412,7 +412,7 @@ public class DomainRegistrarMCPServer {
     }
 
     // Domain Suggestion Tools
-    @Tool(description = "Generate domain name suggestions based on keywords. This is the preferred suggestion tool for a single keyword; use it over suggestAlternatives. Returns suggested names with availability.",
+    @Tool(description = "generateDomainSuggestions: Generate domain name suggestions based on keywords. This is the preferred suggestion tool for a single keyword; use it over suggestAlternatives. Returns suggested names with availability.",
             annotations = @Tool.Annotations(
                     title = "Generate domain suggestions",
                     readOnlyHint = true,
@@ -433,7 +433,7 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Generate domain suggestions by spinning/replacing words with similar alternatives.",
+    @Tool(description = "spinDomainWords: Generate domain suggestions by spinning/replacing words with similar alternatives.",
             annotations = @Tool.Annotations(
                     title = "Spin domain words",
                     readOnlyHint = true,
@@ -455,7 +455,7 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Generate domain suggestions by adding prefixes to a base name.",
+    @Tool(description = "addPrefixToDomain: Generate domain suggestions by adding prefixes to a base name.",
             annotations = @Tool.Annotations(
                     title = "Add domain prefixes",
                     readOnlyHint = true,
@@ -476,7 +476,7 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Generate domain suggestions by adding suffixes to a base name.",
+    @Tool(description = "addSuffixToDomain: Generate domain suggestions by adding suffixes to a base name.",
             annotations = @Tool.Annotations(
                     title = "Add domain suffixes",
                     readOnlyHint = true,
@@ -497,7 +497,7 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Generate domain suggestions for 1-10 keywords across 1-6 TLDs (hard cap), grouped by originating keyword. Typical flow: call listCategorizedTlds first to pick 3-6 TLDs, then this tool. Per-suggestion availability may be \"available\", \"taken\", or \"unknown\"; confirm \"unknown\" or premium-TLD names with checkDomainAvailability before recommending.",
+    @Tool(description = "bulkDomainSuggestions: Generate domain suggestions for 1-10 keywords across 1-6 TLDs (hard cap), grouped by originating keyword. Typical flow: call listCategorizedTlds first to pick 3-6 TLDs, then this tool. Per-suggestion availability may be \"available\", \"taken\", or \"unknown\"; confirm \"unknown\" or premium-TLD names with checkDomainAvailability before recommending.",
             annotations = @Tool.Annotations(
                     title = "Bulk domain suggestions",
                     readOnlyHint = true,
@@ -526,7 +526,7 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Check keyword availability across all supported TLDs and registries with detailed per-domain results. Use checkKeywordAvailabilitySummary instead when you only need counts; it is faster.",
+    @Tool(description = "checkKeywordAvailability: Check keyword availability across all supported TLDs and registries with detailed per-domain results. Use checkKeywordAvailabilitySummary instead when you only need counts; it is faster.",
             annotations = @Tool.Annotations(
                     title = "Check keyword availability",
                     readOnlyHint = true,
@@ -546,7 +546,7 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Check keyword availability across TLDs and registries. Summary statistics only (no per-domain results), faster than checkKeywordAvailability.",
+    @Tool(description = "checkKeywordAvailabilitySummary: Check keyword availability across TLDs and registries. Summary statistics only (no per-domain results), faster than checkKeywordAvailability.",
             annotations = @Tool.Annotations(
                     title = "Keyword availability summary",
                     readOnlyHint = true,

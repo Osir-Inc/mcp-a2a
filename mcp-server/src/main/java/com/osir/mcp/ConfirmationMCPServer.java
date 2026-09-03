@@ -31,7 +31,7 @@ public class ConfirmationMCPServer {
     @Inject
     McpAuthHelper authHelper;
 
-    @Tool(description = "Execute a previously staged destructive or financial action after user approval. The action expires after 5 minutes and can only be executed once.",
+    @Tool(description = "executeConfirmedAction: Execute a previously staged destructive or financial action after user approval. The action expires after 5 minutes and can only be executed once.",
             annotations = @Tool.Annotations(
                     title = "Execute confirmed action",
                     readOnlyHint = false,

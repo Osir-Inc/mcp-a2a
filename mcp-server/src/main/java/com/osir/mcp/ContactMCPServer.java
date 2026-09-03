@@ -25,7 +25,7 @@ public class ContactMCPServer {
     @Inject
     PendingActionStore pendingActionStore;
 
-    @Tool(description = "List all contacts for the authenticated user, optionally filtered by a search term. Requires authentication. Returns each contact with its id for use in getContact, updateContact, deleteContact, or domain registration.",
+    @Tool(description = "listContacts: List all contacts for the authenticated user, optionally filtered by a search term. Requires authentication. Returns each contact with its id for use in getContact, updateContact, deleteContact, or domain registration.",
             annotations = @Tool.Annotations(
                     title = "List contacts",
                     readOnlyHint = true,
@@ -43,7 +43,7 @@ public class ContactMCPServer {
         }
     }
 
-    @Tool(description = "Get detailed information about a specific contact. Requires authentication. Get the contactId from listContacts. Returns name, email, phone, organization, and address.",
+    @Tool(description = "getContact: Get detailed information about a specific contact. Requires authentication. Get the contactId from listContacts. Returns name, email, phone, organization, and address.",
             annotations = @Tool.Annotations(
                     title = "Get contact",
                     readOnlyHint = true,
@@ -61,7 +61,7 @@ public class ContactMCPServer {
         }
     }
 
-    @Tool(description = "Create a new contact for use with domain registrations. Requires authentication. Returns the created contact including its id for assignment to domains.",
+    @Tool(description = "createContact: Create a new contact for use with domain registrations. Requires authentication. Returns the created contact including its id for assignment to domains.",
             annotations = @Tool.Annotations(
                     title = "Create contact",
                     readOnlyHint = false,
@@ -90,7 +90,7 @@ public class ContactMCPServer {
         }
     }
 
-    @Tool(description = "Update an existing contact's information. Requires authentication. Only the fields you provide are changed; omitted fields keep their current values. Get the contactId from listContacts. Returns the updated contact.",
+    @Tool(description = "updateContact: Update an existing contact's information. Requires authentication. Only the fields you provide are changed; omitted fields keep their current values. Get the contactId from listContacts. Returns the updated contact.",
             annotations = @Tool.Annotations(
                     title = "Update contact",
                     readOnlyHint = false,
@@ -120,7 +120,7 @@ public class ContactMCPServer {
         }
     }
 
-    @Tool(description = "Stage deletion of a contact. DESTRUCTIVE; fails if the contact is assigned to active domains. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "deleteContact: Stage deletion of a contact. DESTRUCTIVE; fails if the contact is assigned to active domains. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Delete contact",
                     readOnlyHint = false,
@@ -139,7 +139,7 @@ public class ContactMCPServer {
         );
     }
 
-    @Tool(description = "Get all contacts (registrant, admin, tech, billing) assigned to a domain. Requires authentication. Returns the contact assigned to each role.",
+    @Tool(description = "getContactsForDomain: Get all contacts (registrant, admin, tech, billing) assigned to a domain. Requires authentication. Returns the contact assigned to each role.",
             annotations = @Tool.Annotations(
                     title = "Get domain contacts",
                     readOnlyHint = true,
