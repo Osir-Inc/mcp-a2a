@@ -154,11 +154,23 @@ public class DnsSpecialistAgent extends BaseSpecialistAgent {
         card.setCapabilities(new AgentCard.AgentCapabilities(false, false));
         card.setAuthentication(new AgentCard.AgentAuthentication(List.of("bearer")));
         card.setSkills(List.of(
-                new Skill("list_dns_records", "List DNS Records", "List all DNS records for a domain"),
-                new Skill("create_dns_record", "Create DNS Record", "Create A, AAAA, CNAME, MX, TXT, or SRV records"),
-                new Skill("update_dns_record", "Update DNS Record", "Update an existing DNS record"),
-                new Skill("delete_dns_record", "Delete DNS Record", "Delete a DNS record"),
-                new Skill("get_dns_record", "Get DNS Record", "Get details of a specific DNS record")
+                new Skill("list_dns_records", "List DNS Records", "List all DNS records for a domain",
+                        List.of("dns", "records", "list"),
+                        List.of("List the DNS records for cedarloop.com", "Show me the zone for brahaj.al")),
+                new Skill("create_dns_record", "Create DNS Record", "Create A, AAAA, CNAME, MX, TXT, or SRV records",
+                        List.of("dns", "records", "create"),
+                        List.of("Add an A record for www.cedarloop.com pointing to 203.0.113.42",
+                                "Create an MX record for brahaj.al with priority 10")),
+                new Skill("update_dns_record", "Update DNS Record", "Update an existing DNS record",
+                        List.of("dns", "records", "update"),
+                        List.of("Change the A record on cedarloop.com to 203.0.113.99",
+                                "Update the TTL on record 5512 to 300")),
+                new Skill("delete_dns_record", "Delete DNS Record", "Delete a DNS record",
+                        List.of("dns", "records", "delete"),
+                        List.of("Delete record 5512 from cedarloop.com", "Remove the old TXT record on brahaj.al")),
+                new Skill("get_dns_record", "Get DNS Record", "Get details of a specific DNS record",
+                        List.of("dns", "records", "details"),
+                        List.of("Show me record 5512 on cedarloop.com"))
         ));
         return card;
     }

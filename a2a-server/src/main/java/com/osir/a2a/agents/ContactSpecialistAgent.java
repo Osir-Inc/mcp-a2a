@@ -121,12 +121,27 @@ public class ContactSpecialistAgent extends BaseSpecialistAgent {
         card.setCapabilities(new AgentCard.AgentCapabilities(false, false));
         card.setAuthentication(new AgentCard.AgentAuthentication(List.of("bearer")));
         card.setSkills(List.of(
-                new Skill("list_contacts", "List Contacts", "List all contacts"),
-                new Skill("get_contact", "Get Contact", "Get details of a specific contact"),
-                new Skill("create_contact", "Create Contact", "Create a new contact record"),
-                new Skill("update_contact", "Update Contact", "Update an existing contact"),
-                new Skill("delete_contact", "Delete Contact", "Delete a contact"),
-                new Skill("get_domain_contacts", "Get Domain Contacts", "Get contacts assigned to a domain — provide domain name e.g. example.com")
+                new Skill("list_contacts", "List Contacts", "List all contacts",
+                        List.of("contacts", "list"),
+                        List.of("List my contacts", "Show all the contacts on my account")),
+                new Skill("get_contact", "Get Contact", "Get details of a specific contact",
+                        List.of("contacts", "details"),
+                        List.of("Show me contact C-1042", "Get the details for my admin contact")),
+                new Skill("create_contact", "Create Contact", "Create a new contact record",
+                        List.of("contacts", "create", "registrant"),
+                        List.of("Create a new registrant contact for Ana Hoxha, ana@cedarloop.com",
+                                "Add a contact for my new client")),
+                new Skill("update_contact", "Update Contact", "Update an existing contact",
+                        List.of("contacts", "update", "edit"),
+                        List.of("Update the email on contact C-1042 to billing@cedarloop.com",
+                                "Change the phone number on my registrant contact")),
+                new Skill("delete_contact", "Delete Contact", "Delete a contact",
+                        List.of("contacts", "delete", "remove"),
+                        List.of("Delete contact C-1042", "Remove my old billing contact")),
+                new Skill("get_domain_contacts", "Get Domain Contacts",
+                        "Get contacts assigned to a domain, provide domain name e.g. example.com",
+                        List.of("contacts", "domains", "whois"),
+                        List.of("Who are the contacts on cedarloop.com?", "Show the registrant for brahaj.al"))
         ));
         return card;
     }

@@ -52,6 +52,14 @@ public class AgentCardResource {
         // streaming (/a2a/stream) and push notifications (webhookUrl) are both implemented
         card.setCapabilities(new AgentCard.AgentCapabilities(true, true));
         card.setAuthentication(new AgentCard.AgentAuthentication(List.of("bearer")));
+        // How to actually obtain the bearer (audit F7: "bearer" alone gave agents no path in).
+        card.setSecuritySchemes(java.util.Map.of(
+                "oauth", java.util.Map.of(
+                        "type", "openIdConnect",
+                        "openIdConnectUrl", "https://auth.osir.com/realms/osir/.well-known/openid-configuration",
+                        "description", "OAuth 2.0 via Keycloak. Anonymous dynamic client registration is enabled; "
+                                + "authorization_code+PKCE, device_code, and client_credentials grants are supported. "
+                                + "Send the access token as 'Authorization: Bearer <token>'.")));
 
         // Aggregate skills from all registered specialist agents
         List<Skill> allSkills = agentRegistry.getAllAgentCards().stream()

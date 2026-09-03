@@ -17,6 +17,9 @@ public class AgentCard {
     private AgentProvider provider;
     private AgentCapabilities capabilities;
     private AgentAuthentication authentication;
+    // A2A securitySchemes: named OpenAPI-style security scheme objects (e.g. how to obtain
+    // a bearer token). Serialized as a map so schemes stay spec-shaped without a class per type.
+    private Map<String, Object> securitySchemes;
     private List<Skill> skills;
 
     public AgentCard() {}
@@ -38,6 +41,8 @@ public class AgentCard {
     public void setCapabilities(AgentCapabilities capabilities) { this.capabilities = capabilities; }
     public AgentAuthentication getAuthentication() { return authentication; }
     public void setAuthentication(AgentAuthentication authentication) { this.authentication = authentication; }
+    public Map<String, Object> getSecuritySchemes() { return securitySchemes; }
+    public void setSecuritySchemes(Map<String, Object> securitySchemes) { this.securitySchemes = securitySchemes; }
     public List<Skill> getSkills() { return skills; }
     public void setSkills(List<Skill> skills) { this.skills = skills; }
 

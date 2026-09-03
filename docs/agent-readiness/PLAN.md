@@ -86,6 +86,14 @@ Directory scorecard feedback (score 41) worked in full:
 
 **MCP 2.x upgrade**: quarkus-mcp-server 1.11.0 → 2.0.0 (see docs/TODO.md "MCP transport" for the endpoint-layout compat notes). Stateless auto-init verified; all 218 mcp-server tests green; wire-level smoke confirmed annotations/schemas/resources/icons/instructions.
 
+## A.4 completion + discovery harness (2026-09-03)
+
+- **F7 closed (code side)**: all 64 A2A skills across 9 agents carry tags + examples; two NEW specialist agents shipped - Email Agent (7 read/enable/quote skills; billable mailbox ops deliberately excluded, see below) and Deploy Agent (list/status/logs/deploy - deploys are free, nothing billable). Top-level card now advertises `securitySchemes` (openIdConnect at auth.osir.com, notes DCR + the three grants). Verified on a local boot: 0 null tags/examples, 9 agents. Goes live with the next deploy.
+- **`server.json`** (repo root) + **`SUBMISSION-CHECKLIST.md`** (this dir): MCP Registry / Claude directory / ChatGPT connectors, with the version-bump republish rule and a pre-submission gate.
+- **`scripts/agent-e2e/04-discovery.sh`**: asserts OAuth metadata, agent card shape, public availability/bundle/openapi, MCP initialize instructions, and (warn-only) the apex files. First prod run: 8 pass / 2 fail - both fails are the not-yet-deployed 2.x serverInfo+instructions and card securitySchemes. **Apex discovery files are LIVE** (osir.com agent.json, llms.txt, robots.txt) - marketing shipped C.2; audit F8/F9 resolved.
+
+**OPEN RISK (brief non-negotiable violated on the A2A side)**: `docs/A2A-CONFIRMATION-GATE-SPEC.md` is proposed-but-NOT-implemented - A2A `register_domain` (Domain Agent) and the VPS order path call billable services directly with no staged confirmation, unlike every MCP tool. The new Email/Deploy agents deliberately expose nothing billable, but the existing gap remains. Decide: implement the gate spec, or strip billable skills from the A2A cards until it exists.
+
 ## Sequencing (matches the brief's cross-project steps)
 
 1. **Now:** F1 fix (MCP-side, self-contained) · A.0 inventory · A.1 phase-1 harness + baseline · MCP 2.x upgrade spike · A.8 `04-discovery.sh`

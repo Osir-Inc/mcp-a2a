@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.json",
+  "name": "com.osir/registrar",
+  "description": "AI-native domain registrar: search and register domains, manage DNS, order VPS, host email, and deploy sites/apps. Anonymous lookups work without login; staged confirmations gate every financial or destructive action.",
+  "status": "active",
+  "websiteUrl": "https://osir.com",
+  "repository": {
+    "url": "https://github.com/Osir-Inc/mcp-a2a",
+    "source": "github"
+  },
+  "version": "2.2.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://be.osir.com/mcp/http"
+    }
+  ]
+}

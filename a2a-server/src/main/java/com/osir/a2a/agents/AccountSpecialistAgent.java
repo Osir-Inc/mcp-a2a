@@ -99,12 +99,24 @@ public class AccountSpecialistAgent extends BaseSpecialistAgent {
         card.setCapabilities(new AgentCard.AgentCapabilities(false, false));
         card.setAuthentication(new AgentCard.AgentAuthentication(List.of("bearer")));
         card.setSkills(List.of(
-                new Skill("get_profile", "Get Profile", "Get user profile information"),
-                new Skill("get_account_summary", "Get Account Summary", "Get comprehensive account overview"),
-                new Skill("get_auth_status", "Get Auth Status", "Check authentication status"),
-                new Skill("get_audit_logs", "Get Audit Logs", "View audit logs"),
-                new Skill("get_domain_audit", "Get Domain Audit", "View audit trail for a specific domain"),
-                new Skill("get_recent_activity", "Get Recent Activity", "View recent activity across services")
+                new Skill("get_profile", "Get Profile", "Get user profile information",
+                        List.of("account", "profile", "user"),
+                        List.of("Show my profile", "Who am I logged in as?")),
+                new Skill("get_account_summary", "Get Account Summary", "Get comprehensive account overview",
+                        List.of("account", "summary", "overview"),
+                        List.of("Give me an overview of my account", "Show my account summary")),
+                new Skill("get_auth_status", "Get Auth Status", "Check authentication status",
+                        List.of("account", "auth", "status"),
+                        List.of("Am I logged in?", "Check my authentication status")),
+                new Skill("get_audit_logs", "Get Audit Logs", "View audit logs",
+                        List.of("account", "audit", "logs"),
+                        List.of("Show my audit logs", "What changes were made on my account?")),
+                new Skill("get_domain_audit", "Get Domain Audit", "View audit trail for a specific domain",
+                        List.of("account", "audit", "domains"),
+                        List.of("Show the audit trail for brahaj.al", "Who changed the nameservers on cedarloop.com?")),
+                new Skill("get_recent_activity", "Get Recent Activity", "View recent activity across services",
+                        List.of("account", "activity", "recent"),
+                        List.of("What happened on my account recently?", "Show my recent activity"))
         ));
         return card;
     }

@@ -119,15 +119,33 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
         card.setCapabilities(new AgentCard.AgentCapabilities(false, false));
         card.setAuthentication(new AgentCard.AgentAuthentication(List.of("bearer")));
         card.setSkills(List.of(
-                new Skill("get_balance", "Get Account Balance", "Check current account balance"),
-                new Skill("list_invoices", "List Invoices", "List all invoices"),
-                new Skill("get_invoice", "Get Invoice Details", "Get details of a specific invoice"),
-                new Skill("pay_invoice", "Pay Invoice", "Pay an outstanding invoice from balance"),
-                new Skill("invoice_statistics", "Invoice Statistics", "Get invoice summary stats"),
-                new Skill("create_payment", "Create Payment Session", "Add funds via Stripe checkout"),
-                new Skill("get_transactions", "Get Transactions", "View payment transaction history"),
-                new Skill("preview_fees", "Preview Fees", "Preview fees for a payment amount"),
-                new Skill("get_domain_pricing", "Get Domain Pricing", "Get pricing for domain extensions")
+                new Skill("get_balance", "Get Account Balance", "Check current account balance",
+                        List.of("billing", "balance", "funds"),
+                        List.of("What is my account balance?", "How much credit do I have left?")),
+                new Skill("list_invoices", "List Invoices", "List all invoices",
+                        List.of("billing", "invoices", "list"),
+                        List.of("Show me all my invoices", "Do I have any unpaid invoices?")),
+                new Skill("get_invoice", "Get Invoice Details", "Get details of a specific invoice",
+                        List.of("billing", "invoice", "details"),
+                        List.of("Show me invoice INV-2024-0417", "What is on my latest invoice?")),
+                new Skill("pay_invoice", "Pay Invoice", "Pay an outstanding invoice from balance",
+                        List.of("billing", "payment", "invoice"),
+                        List.of("Pay invoice INV-2024-0417 from my balance", "Settle my open invoice")),
+                new Skill("invoice_statistics", "Invoice Statistics", "Get invoice summary stats",
+                        List.of("billing", "invoices", "statistics"),
+                        List.of("How much have I spent on invoices this year?", "Give me a summary of my billing")),
+                new Skill("create_payment", "Create Payment Session", "Add funds via Stripe checkout",
+                        List.of("billing", "payment", "topup"),
+                        List.of("Add 50 EUR to my account", "I want to top up my balance with 100 dollars")),
+                new Skill("get_transactions", "Get Transactions", "View payment transaction history",
+                        List.of("billing", "transactions", "history"),
+                        List.of("Show my payment history", "List my recent transactions")),
+                new Skill("preview_fees", "Preview Fees", "Preview fees for a payment amount",
+                        List.of("billing", "fees", "preview"),
+                        List.of("What fees would I pay on a 75 EUR payment?")),
+                new Skill("get_domain_pricing", "Get Domain Pricing", "Get pricing for domain extensions",
+                        List.of("billing", "pricing", "domains"),
+                        List.of("How much does a .io domain cost?", "What is the price for .com registrations?"))
         ));
         return card;
     }

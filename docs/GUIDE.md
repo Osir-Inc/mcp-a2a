@@ -298,7 +298,7 @@ curl -X POST http://localhost:8082/a2a \
   -d '{"jsonrpc":"2.0","id":"5","method":"tasks/cancel","params":{"id":"task-001"}}'
 ```
 
-### Available Agents & Skills (50+ skills across 7 agents)
+### Available Agents & Skills (64 skills across 9 agents)
 
 **Domain Agent** (`agent: "domain-agent"`)
 `check_availability`, `register_domain`, `get_domain_info`, `list_domains`, `renew_domain`, `lock_domain`, `unlock_domain`, `suggest_domains`, `transfer_domain`, `enable_privacy`, `disable_privacy`, `enable_autorenew`, `disable_autorenew`
@@ -501,7 +501,7 @@ docker-compose logs -f
      └────────────────┘
 ```
 
-Both servers share the `common` module — same services, same REST clients, same models. The MCP server exposes them as 105 individual tools. The A2A server wraps them in 7 specialist agents with 50+ skills, coordinated by an orchestrator that handles multi-step workflows.
+Both servers share the `common` module — same services, same REST clients, same models. The MCP server exposes them as 105 individual tools. The A2A server wraps them in 9 specialist agents with 64 skills, coordinated by an orchestrator that handles multi-step workflows.
 
 ### Security & Operations
 - **CORS:** restricted to configured origins (permissive in dev mode)

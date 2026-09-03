@@ -269,9 +269,14 @@ public class OrchestratorAgent implements SpecialistAgent {
         card.setAuthentication(new AgentCard.AgentAuthentication(List.of("bearer")));
         card.setSkills(List.of(
                 new Skill("orchestrate", "Orchestrate Workflow",
-                        "Break down complex tasks into steps and execute across multiple agents"),
+                        "Break down complex tasks into steps and execute across multiple agents",
+                        List.of("orchestration", "workflow", "multi-step"),
+                        List.of("Set up cedarloop.com with DNS pointing to 203.0.113.42 and order a VPS",
+                                "Onboard a new client with a domain, DNS, and hosting")),
                 new Skill("plan_workflow", "Plan Workflow",
-                        "Create an execution plan for a multi-step task without executing it")
+                        "Create an execution plan for a multi-step task without executing it",
+                        List.of("orchestration", "planning", "workflow"),
+                        List.of("Plan the steps to migrate brahaj.al and its DNS to OSIR without doing anything yet"))
         ));
         return card;
     }
