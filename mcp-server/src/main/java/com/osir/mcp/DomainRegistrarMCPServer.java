@@ -245,7 +245,7 @@ public class DomainRegistrarMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "getDomainInfo: Get detailed information about a domain including expiration date, nameservers, and status.",
+    @Tool(description = "getDomainInfo: Get registry (EPP) state plus account settings for one domain: status, nameservers, lock state, auto-renew, privacy, creation/expiry dates, premium/expired/redemption info. Dates are null while a registration is still pending at the registry; autoRenew is omitted for transferredOut domains.",
             annotations = @Tool.Annotations(
                     title = "Get domain details",
                     readOnlyHint = true,

@@ -84,13 +84,66 @@ class DomainServiceNewToolsTest {
         assertNull(result.getStatus());
     }
 
+    /** Backend v2 envelope: payload nested under data (BACKEND-CONTRACT-lock-and-info.md). */
+    private static DomainLockResponse lockEnvelope(String domain, boolean locked, String message) {
+        DomainLockResponse response = new DomainLockResponse();
+        response.setSuccess(true);
+        DomainLockResponse.Data data = new DomainLockResponse.Data();
+        data.setDomain(domain);
+        data.setLocked(locked);
+        data.setMessage(message);
+        response.setData(data);
+        return response;
+    }
+
+    // ===== getDomainInfo contract mapping (BACKEND-CONTRACT-lock-and-info.md) =====
+
+    private static DomainInfoBackendResponse infoEnvelope(String status) {
+        DomainInfoBackendResponse response = new DomainInfoBackendResponse();
+        response.setDomain(TEST_DOMAIN);
+        response.setSuccess(true);
+        DomainInfoBackendResponse.DomainData data = new DomainInfoBackendResponse.DomainData();
+        data.setStatus(status);
+        data.setAutoRenew(true);
+        data.setPrivacy(true);          // backend field name is "privacy"
+        data.setLocked(true);
+        data.setCreationDate("2024-01-01T00:00:00Z");
+        data.setExpiryDate("2027-01-01T00:00:00Z");
+        response.setData(data);
+        return response;
+    }
+
+    @Test
+    void getDomainInfo_mapsContractFields() {
+        mockAuthenticated();
+        when(backendClient.getDomainInfo(TEST_DOMAIN, BEARER_TOKEN)).thenReturn(infoEnvelope("active"));
+
+        DomainInfoResult result = domainService.getDomainInfo(TEST_DOMAIN);
+
+        assertEquals(Boolean.TRUE, result.getAutoRenew());
+        assertEquals(Boolean.TRUE, result.getPrivacyProtection());
+        assertEquals(Boolean.TRUE, result.getLocked());
+        assertEquals("2024-01-01T00:00:00Z", result.getRegistrationDate());
+        assertEquals("2027-01-01T00:00:00Z", result.getExpirationDate());
+    }
+
+    @Test
+    void getDomainInfo_transferredOut_suppressesMeaninglessAutoRenew() {
+        mockAuthenticated();
+        when(backendClient.getDomainInfo(TEST_DOMAIN, BEARER_TOKEN)).thenReturn(infoEnvelope("transferredOut"));
+
+        DomainInfoResult result = domainService.getDomainInfo(TEST_DOMAIN);
+
+        assertNull(result.getAutoRenew());                       // backend hardcodes false here
+        assertEquals(Boolean.TRUE, result.getPrivacyProtection()); // privacy stays real
+    }
+
     // ===== lockDomain tests =====
 
     @Test
     void lockDomain_success() {
         mockAuthenticated();
-        DomainLockResponse response = new DomainLockResponse(TEST_DOMAIN, true, "locked");
-        response.setMessage("Domain locked successfully");
+        DomainLockResponse response = lockEnvelope(TEST_DOMAIN, true, "Domain locked successfully");
         when(backendClient.lockDomain(TEST_DOMAIN, BEARER_TOKEN)).thenReturn(response);
 
         DomainActionResult result = domainService.lockDomain(TEST_DOMAIN);
@@ -99,6 +152,33 @@ class DomainServiceNewToolsTest {
         assertEquals("Domain locked successfully", result.getMessage());
         assertEquals(TEST_DOMAIN, result.getDomain());
         assertEquals("locked", result.getStatus());
+    }
+
+    @Test
+    void lockDomain_nullBodyFields_fallsBackToDeterministicResult() {
+        // Regression: backend 200 with unmapped/empty body must never yield success:true + all-null.
+        mockAuthenticated();
+        when(backendClient.lockDomain(TEST_DOMAIN, BEARER_TOKEN)).thenReturn(new DomainLockResponse());
+
+        DomainActionResult result = domainService.lockDomain(TEST_DOMAIN);
+
+        assertTrue(result.isSuccess());
+        assertEquals(TEST_DOMAIN, result.getDomain());
+        assertEquals("locked", result.getStatus());
+        assertNotNull(result.getMessage());
+        assertTrue(result.getMessage().contains(TEST_DOMAIN));
+    }
+
+    @Test
+    void unlockDomain_nullBodyFields_fallsBackToDeterministicResult() {
+        mockAuthenticated();
+        when(backendClient.unlockDomain(TEST_DOMAIN, BEARER_TOKEN)).thenReturn(new DomainLockResponse());
+
+        DomainActionResult result = domainService.unlockDomain(TEST_DOMAIN);
+
+        assertTrue(result.isSuccess());
+        assertEquals("unlocked", result.getStatus());
+        assertTrue(result.getMessage().contains(TEST_DOMAIN));
     }
 
     @Test
@@ -130,8 +210,7 @@ class DomainServiceNewToolsTest {
     @Test
     void unlockDomain_success() {
         mockAuthenticated();
-        DomainLockResponse response = new DomainLockResponse(TEST_DOMAIN, false, "unlocked");
-        response.setMessage("Domain unlocked successfully");
+        DomainLockResponse response = lockEnvelope(TEST_DOMAIN, false, "Domain unlocked successfully");
         when(backendClient.unlockDomain(TEST_DOMAIN, BEARER_TOKEN)).thenReturn(response);
 
         DomainActionResult result = domainService.unlockDomain(TEST_DOMAIN);

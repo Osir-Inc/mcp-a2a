@@ -16,23 +16,28 @@ public class DomainInfoBackendResponse {
     private String message;
     private DomainData data;
 
+    /**
+     * DomainInfoResponseDTO (backend v2.11.5) - field names verified against backend source,
+     * see docs/agent-readiness/BACKEND-CONTRACT-lock-and-info.md. Notably: the privacy flag is
+     * named "privacy" (not privacyProtection) and the dates are "creationDate"/"expiryDate"
+     * (not crDate/exDate) - both were mismapped before, yielding false/null in getDomainInfo.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DomainData {
-        private String name;
-        private String roid;
-        // "status" is a single string (e.g. "active"); "statuses" is the EPP array
+        // "status" is a single string (e.g. "active", "transferredOut"); "statuses" is the EPP array
         private String status;
         private List<String> statuses;
-        private String crDate;
-        private String upDate;
-        private String exDate;
+        private String creationDate;
+        private String expiryDate;
         private List<String> nameservers;
-
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-
-        public String getRoid() { return roid; }
-        public void setRoid(String roid) { this.roid = roid; }
+        private Boolean autoRenew;
+        private Boolean privacy;
+        private Boolean locked;
+        private Boolean premium;
+        private Boolean expired;
+        private Boolean inRedemptionPeriod;
+        private String rgpStatus;
+        private String registrar;
 
         public String getStatus() { return status; }
         public void setStatus(String status) { this.status = status; }
@@ -40,17 +45,38 @@ public class DomainInfoBackendResponse {
         public List<String> getStatuses() { return statuses; }
         public void setStatuses(List<String> statuses) { this.statuses = statuses; }
 
-        public String getCrDate() { return crDate; }
-        public void setCrDate(String crDate) { this.crDate = crDate; }
+        public String getCreationDate() { return creationDate; }
+        public void setCreationDate(String creationDate) { this.creationDate = creationDate; }
 
-        public String getUpDate() { return upDate; }
-        public void setUpDate(String upDate) { this.upDate = upDate; }
-
-        public String getExDate() { return exDate; }
-        public void setExDate(String exDate) { this.exDate = exDate; }
+        public String getExpiryDate() { return expiryDate; }
+        public void setExpiryDate(String expiryDate) { this.expiryDate = expiryDate; }
 
         public List<String> getNameservers() { return nameservers; }
         public void setNameservers(List<String> nameservers) { this.nameservers = nameservers; }
+
+        public Boolean getAutoRenew() { return autoRenew; }
+        public void setAutoRenew(Boolean autoRenew) { this.autoRenew = autoRenew; }
+
+        public Boolean getPrivacy() { return privacy; }
+        public void setPrivacy(Boolean privacy) { this.privacy = privacy; }
+
+        public Boolean getLocked() { return locked; }
+        public void setLocked(Boolean locked) { this.locked = locked; }
+
+        public Boolean getPremium() { return premium; }
+        public void setPremium(Boolean premium) { this.premium = premium; }
+
+        public Boolean getExpired() { return expired; }
+        public void setExpired(Boolean expired) { this.expired = expired; }
+
+        public Boolean getInRedemptionPeriod() { return inRedemptionPeriod; }
+        public void setInRedemptionPeriod(Boolean inRedemptionPeriod) { this.inRedemptionPeriod = inRedemptionPeriod; }
+
+        public String getRgpStatus() { return rgpStatus; }
+        public void setRgpStatus(String rgpStatus) { this.rgpStatus = rgpStatus; }
+
+        public String getRegistrar() { return registrar; }
+        public void setRegistrar(String registrar) { this.registrar = registrar; }
     }
 
     // Getters and setters

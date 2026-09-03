@@ -1,33 +1,45 @@
 package com.osir.mcp.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+/**
+ * POST /v2/domains/{domain}/lock|unlock - standard v2 envelope, payload nested under data
+ * (verified against backend v2.11.5, docs/agent-readiness/BACKEND-CONTRACT-lock-and-info.md).
+ * Failures are HTTP 400 with {success:false, error, errorCode} and surface as exceptions.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class DomainLockResponse {
-    private String domain;
-    private boolean locked;
-    private String status;
-    private String message;
+
+    private boolean success;
+    private Data data;
+    private String timestamp;
+    private String error;
     private String errorCode;
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Data {
+        private String domain;
+        private Boolean locked;
+        private String message;
+
+        public String getDomain() { return domain; }
+        public void setDomain(String domain) { this.domain = domain; }
+        public Boolean getLocked() { return locked; }
+        public void setLocked(Boolean locked) { this.locked = locked; }
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
+    }
 
     public DomainLockResponse() {}
 
-    public DomainLockResponse(String domain, boolean locked, String status) {
-        this.domain = domain;
-        this.locked = locked;
-        this.status = status;
-    }
-
-    // Getters and Setters
-    public String getDomain() { return domain; }
-    public void setDomain(String domain) { this.domain = domain; }
-
-    public boolean isLocked() { return locked; }
-    public void setLocked(boolean locked) { this.locked = locked; }
-
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
-
+    public boolean isSuccess() { return success; }
+    public void setSuccess(boolean success) { this.success = success; }
+    public Data getData() { return data; }
+    public void setData(Data data) { this.data = data; }
+    public String getTimestamp() { return timestamp; }
+    public void setTimestamp(String timestamp) { this.timestamp = timestamp; }
+    public String getError() { return error; }
+    public void setError(String error) { this.error = error; }
     public String getErrorCode() { return errorCode; }
     public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
 }

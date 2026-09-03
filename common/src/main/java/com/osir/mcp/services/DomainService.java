@@ -258,13 +258,7 @@ public class DomainService {
         try {
             String token = authService.getCurrentToken();
             DomainLockResponse response = backendClient.lockDomain(domain, token);
-
-            return new DomainActionResult(
-                    true,
-                    response.getMessage(),
-                    response.getDomain(),
-                    response.getStatus()
-            );
+            return lockResult(domain, response, true);
         } catch (Exception e) {
             return new DomainActionResult(false, "Domain lock failed: " + e.getMessage(), domain, null);
         }
@@ -278,16 +272,27 @@ public class DomainService {
         try {
             String token = authService.getCurrentToken();
             DomainLockResponse response = backendClient.unlockDomain(domain, token);
-
-            return new DomainActionResult(
-                    true,
-                    response.getMessage(),
-                    response.getDomain(),
-                    response.getStatus()
-            );
+            return lockResult(domain, response, false);
         } catch (Exception e) {
             return new DomainActionResult(false, "Domain unlock failed: " + e.getMessage(), domain, null);
         }
+    }
+
+    /**
+     * Contract (backend v2.11.5): HTTP 200 = the registrar command succeeded (failures are 400
+     * and surface as exceptions); the payload is nested under data {domain, locked, message}.
+     * Never surface success:true with every other field null - prefer the backend's values,
+     * fall back to deterministic text.
+     */
+    private DomainActionResult lockResult(String domain, DomainLockResponse response, boolean locking) {
+        DomainLockResponse.Data data = response.getData();
+        String d = data != null && data.getDomain() != null ? data.getDomain() : domain;
+        boolean locked = data != null && data.getLocked() != null ? data.getLocked() : locking;
+        String message = data != null && data.getMessage() != null ? data.getMessage()
+                : (locked
+                    ? "Registrar lock enabled for " + d + " (transfers blocked until unlocked)."
+                    : "Registrar lock removed from " + d + " (transfers are now possible - re-lock when done).");
+        return new DomainActionResult(true, message, d, locked ? "locked" : "unlocked");
     }
 
     public DomainActionResult updateAutoRenew(String domain, boolean enabled) {

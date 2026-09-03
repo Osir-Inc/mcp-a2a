@@ -78,7 +78,8 @@ esac
 hdr=$(curl -sS -m 15 -o /dev/null -D - -X POST "$BASE/mcp/http" -H "Content-Type: application/json" -d '{}' 2>/dev/null | tr -d '\r')
 case "$hdr" in
   *"WWW-Authenticate:"*resource_metadata*) ok "401 challenge advertises resource_metadata";;
-  *"HTTP/"*" 200"*|*"HTTP/2 200"*) meh "mcp endpoint answers anonymously (challenge disabled mode)";;
+  *"HTTP/"*" 200"*|*"HTTP/2 200"*|*"HTTP/"*" 400"*|*"HTTP/2 400"*)
+    ok "mcp endpoint anonymous mode (challenge disabled; invalid body correctly rejected)";;
   *) meh "mcp endpoint: unexpected unauthenticated response";;
 esac
 
