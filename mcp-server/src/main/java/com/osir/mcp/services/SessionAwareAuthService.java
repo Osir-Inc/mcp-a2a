@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Per-connection authentication state for MCP sessions.
  * Tokens are scoped to a connection ID and automatically refreshed before expiry.
- * Note: connection IDs change on reconnect — users must re-authenticate after a
+ * Note: connection IDs change on reconnect, users must re-authenticate after a
  * network disconnection.
  */
 @ApplicationScoped
@@ -40,7 +40,7 @@ public class SessionAwareAuthService {
     @ConfigProperty(name = "auth.token.refresh-buffer-seconds", defaultValue = "60")
     long refreshBufferSeconds;
 
-    /** Conversation session keys go stale after this much inactivity — bounds standing access. */
+    /** Conversation session keys go stale after this much inactivity, bounds standing access. */
     @ConfigProperty(name = "mcp.session.idle-timeout-minutes", defaultValue = "30")
     long idleTimeoutMinutes;
 
@@ -51,7 +51,7 @@ public class SessionAwareAuthService {
     /** Prefix distinguishing conversation session keys from MCP connection ids in the store. */
     public static final String SESSION_KEY_PREFIX = "osk_";
 
-    /** Scopes requested at device login — shared with the common AuthService. */
+    /** Scopes requested at device login, shared with the common AuthService. */
     private static final String DEVICE_SCOPES = AuthService.DEVICE_SCOPES;
 
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -60,7 +60,7 @@ public class SessionAwareAuthService {
     private final Map<String, SessionAuth> sessionAuths = new ConcurrentHashMap<>();
 
     // PKCE code_verifier per pending device code (Keycloak enforces S256 on public clients,
-    // including the device grant). Keyed by DEVICE CODE, not connection — Claude.ai opens a new
+    // including the device grant). Keyed by DEVICE CODE, not connection, Claude.ai opens a new
     // MCP session between loginWithDevice and the poll, so connection-scoped state would be lost.
     // If the MCP server restarts mid-login the verifier is gone and the user restarts the login.
     private record PendingPkce(String verifier, long expiresAtMillis) {}
@@ -81,7 +81,7 @@ public class SessionAwareAuthService {
             return new AuthStatusResult(false, null, null);
         }
 
-        // Refresh if needed (mirrors getCurrentToken) rather than discarding the session — a status
+        // Refresh if needed (mirrors getCurrentToken) rather than discarding the session, a status
         // check during a long operation (e.g. a multi-minute build) must NOT throw away a still-valid
         // refresh token, or the user gets logged out mid-deploy.
         if (getCurrentToken(connectionId) == null) {
@@ -135,7 +135,7 @@ public class SessionAwareAuthService {
         }
         return new AuthResult(true,
                 "Signed out on the server and revoked the token at Keycloak. If your client caches the "
-                        + "access token it stays valid until it expires — remove it there to fully sign out.");
+                        + "access token it stays valid until it expires, remove it there to fully sign out.");
     }
 
     public String getCurrentToken(String connectionId) {
@@ -159,7 +159,7 @@ public class SessionAwareAuthService {
         long now = System.currentTimeMillis();
         long expiresAt = sessionAuth.getExpiresAt();
 
-        // Token expired — attempt refresh before giving up
+        // Token expired, attempt refresh before giving up
         if (now > expiresAt) {
             if (sessionAuth.getRefreshToken() != null) {
                 LOG.debugf("Token expired for connection %s, attempting refresh", connectionId);
@@ -176,7 +176,7 @@ public class SessionAwareAuthService {
                     connectionId, secondsUntilExpiry, refreshBufferSeconds);
             String refreshed = refreshSession(connectionId, sessionAuth);
             if (refreshed != null) return refreshed;
-            // Refresh failed but token still valid — fall through and return it
+            // Refresh failed but token still valid, fall through and return it
         }
 
         return sessionAuth.getTokenType() + " " + sessionAuth.getAccessToken();
@@ -245,12 +245,12 @@ public class SessionAwareAuthService {
             sessionAuths.put(connectionId, sessionAuth);
 
             // Conversation session key: the stable handle for clients (Claude.ai) that open a
-            // new MCP session per tool call — the key lives in the conversation, not the session.
+            // new MCP session per tool call, the key lives in the conversation, not the session.
             String sessionKey = newSessionKey();
             sessionAuths.put(sessionKey, sessionAuth);
 
             // Keycloak's SSO-session idle window (refresh_expires_in) caps how long the refresh
-            // token works regardless of our clock — advertise whichever limit bites first so the
+            // token works regardless of our clock, advertise whichever limit bites first so the
             // login message never over-promises.
             long effectiveIdleMinutes = idleTimeoutMinutes;
             if (tokenResponse.getRefreshExpiresIn() != null && tokenResponse.getRefreshExpiresIn() > 0) {
@@ -261,7 +261,7 @@ public class SessionAwareAuthService {
             DeviceLoginStatusResult result = new DeviceLoginStatusResult(
                     true,
                     "Authentication successful. Your sessionKey is " + sessionKey
-                            + " — pass it as the sessionKey argument on every subsequent tool call. "
+                            + ", pass it as the sessionKey argument on every subsequent tool call. "
                             + "The session ends after " + effectiveIdleMinutes + " minutes of inactivity ("
                             + maxLifetimeHours + "h maximum); call logout with the sessionKey to end it immediately.",
                     "complete",
@@ -323,7 +323,7 @@ public class SessionAwareAuthService {
                 );
                 // Update EVERY alias (osk_ key + connection id share one SessionAuth). Keycloak
                 // rotates refresh tokens (maxReuse=2): a twin left holding the rotated-out token
-                // would die on its next refresh. Deliberately no put/putIfAbsent — if a concurrent
+                // would die on its next refresh. Deliberately no put/putIfAbsent, if a concurrent
                 // logout just removed the entries, re-inserting a revoked session would be wrong.
                 sessionAuths.replaceAll((k, v) -> v == current ? refreshed : v);
                 LOG.infof("Token refreshed for user %s on connection %s", current.getUsername(), connectionId);
@@ -344,7 +344,7 @@ public class SessionAwareAuthService {
 
         // Two passes. Stale osk_ sessions are revoked and removed together with every alias
         // (the same SessionAuth is also stored under a connection id). Expired connection-keyed
-        // entries are removed individually — their osk_ alias may have refreshed and still be
+        // entries are removed individually, their osk_ alias may have refreshed and still be
         // live, so no alias cascade there.
         Map<SessionAuth, Boolean> staleConversations = new java.util.IdentityHashMap<>();
         java.util.List<String> expiredConnKeys = new java.util.ArrayList<>();
@@ -355,7 +355,7 @@ public class SessionAwareAuthService {
                 expiredConnKeys.add(key);
             }
         });
-        // ponytail: serial blocking revocations on the scheduler thread — batch/async if the
+        // ponytail: serial blocking revocations on the scheduler thread, batch/async if the
         // stale set ever grows into the hundreds per sweep.
         staleConversations.keySet().forEach(this::revokeQuietly);
         sessionAuths.entrySet().removeIf(entry -> staleConversations.containsKey(entry.getValue()));

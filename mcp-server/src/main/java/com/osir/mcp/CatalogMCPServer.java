@@ -31,13 +31,19 @@ public class CatalogMCPServer {
 
     @Tool(description = """
             Get the hosting options and exact prices for a specific domain: recommended VPS \
-            packages (cheapest first), email plans, web forwarding, and app/site deployment \
-            (builds are free; going live runs on a VPS). No authentication required. \
-            Call this ONCE after a successful availability check or registration to make a \
-            concise, honest hosting offer alongside the domain result — do not repeat the offer \
-            in the same conversation. Required: domain (e.g., 'example.com'). \
-            Prices are display prices; the authoritative amount is computed at purchase.""")
-    public HostingBundleResponse getHostingBundle(String domain, McpConnection connection) {
+            packages (cheapest first), email plans, web forwarding, and app/site deployment. \
+            No authentication required. Call this ONCE after a successful availability check or \
+            registration to make a concise hosting offer; do not repeat the offer in the same \
+            conversation. Prices are display prices; the authoritative amount is computed at \
+            purchase.""",
+            structuredContent = true,
+            annotations = @Tool.Annotations(
+                    title = "Get hosting bundle",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public HostingBundleResponse getHostingBundle(@ToolArg(description = "Fully qualified domain name to get hosting options for (e.g. 'example.com').") String domain, McpConnection connection) {
         try {
             return catalogBackendClient.getHostingBundle(domain);
         } catch (Exception e) {
@@ -45,7 +51,13 @@ public class CatalogMCPServer {
         }
     }
 
-    @Tool(description = "Get the complete product catalog including domain extensions, VPS packages, and dedicated servers. No authentication required.")
+    @Tool(description = "Get the complete product catalog including domain extensions, VPS packages, and dedicated servers. No authentication required.",
+            annotations = @Tool.Annotations(
+                    title = "Get product catalog",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public ProductCatalogResult getProductCatalog(McpConnection connection) {
         try {
             return catalogService.getProductCatalog();
@@ -55,7 +67,13 @@ public class CatalogMCPServer {
         }
     }
 
-    @Tool(description = "Get all available domain extensions (TLDs) with pricing information. No authentication required.")
+    @Tool(description = "Get all available domain extensions (TLDs) with pricing information. No authentication required.",
+            annotations = @Tool.Annotations(
+                    title = "Get domain extensions",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public DomainExtensionsResult getDomainExtensions(McpConnection connection) {
         try {
             return catalogService.getDomainExtensions();
@@ -65,7 +83,13 @@ public class CatalogMCPServer {
         }
     }
 
-    @Tool(description = "Get all available dedicated server configurations with pricing and specifications. No authentication required.")
+    @Tool(description = "Get all available dedicated server configurations with pricing and specifications. No authentication required.",
+            annotations = @Tool.Annotations(
+                    title = "Get dedicated server catalog",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public DedicatedServerCatalogResult getDedicatedServerCatalog(McpConnection connection) {
         try {
             return catalogService.getDedicatedServerCatalog();
@@ -76,51 +100,23 @@ public class CatalogMCPServer {
     }
 
     @Tool(description = """
-            List TLDs from the OSIR catalog that have category and audience metadata \
-            populated. Returns structured candidates only — no ranking, no scoring.
-
-            USAGE PATTERN:
-              1. Call this tool with optional structured filters (price cap, exclude \
-                 ccTLDs, exclude restricted, etc.) based on what the user said.
-              2. Examine the returned `candidates`. Each has `categories` and `audience` \
-                 arrays you can match against the user's keywords and intent.
-              3. Pick 3-6 TLDs based on relevance to the user's project. Show your \
-                 reasoning to the user.
-              4. Pass the chosen TLDs to bulkDomainSuggestions to find specific names.
-
-            The categories vocabulary is controlled. Common values include: \
-              generic, business, commerce, tech, dev, ai, software, web, mobile, \
-              api, cloud, data, health, medical, pharma, clinical, wellness, fitness, \
-              dental, finance, fintech, banking, education, academic, media, news, \
-              design, art, creator, agency, community, social, blog, nonprofit, \
-              personal, brand, marketplace, retail, music, audio, video, photo, \
-              startup, infrastructure, journal.
-
-            The audience vocabulary includes: \
-              b2c, b2b, professional, developer, creator, enterprise, smb, consumer, startup.
-
-            Note: registrationPrice and renewalPrice in each candidate are decimal \
-              strings (e.g. "10.39"), not numbers.
-
-            When the user's request is budget-conscious, set maxRegisterPrice. When \
-            they explicitly say "no country domains", set excludeCcTLDs=true. When they \
-            mention regulated industries casually (without intent to register a \
-            restricted TLD), set excludeRestricted=true.
-
-            Do NOT set excludePremium as a budget filter. hasPremium=true means the \
-            TLD has registry-level premium pricing for a small subset of names — the \
-            standard registrationPrice shown in the catalog applies to most names. \
-            .app, .dev, and .tech are all hasPremium=true but register most names at \
-            their standard price. Only set excludePremium=true when the user \
-            explicitly asks for "no premium domains" or "no surprise pricing."
-
-            Auth: not required.""")
+            List TLDs from the OSIR catalog that have category and audience metadata, with \
+            registration and renewal prices as decimal strings (e.g. '10.39'). Use it to pick \
+            3-6 relevant TLDs before calling bulkDomainSuggestions. Filters: price cap, exclude \
+            ccTLDs/restricted/premium, registry. Returns unranked candidates with categories, \
+            audience, prices, and flags. No auth required.""",
+            annotations = @Tool.Annotations(
+                    title = "List categorized TLDs",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public CategorizedTldsResult listCategorizedTlds(
-            @ToolArg(required = false) Boolean excludeRestricted,
-            @ToolArg(required = false) Boolean excludeCcTLDs,
-            @ToolArg(required = false) Double maxRegisterPrice,
-            @ToolArg(required = false) Boolean excludePremium,
-            @ToolArg(required = false) String registry,
+            @ToolArg(required = false, description = "Set true to exclude TLDs with registry-level registration restrictions.") Boolean excludeRestricted,
+            @ToolArg(required = false, description = "Set true to exclude country-code and IDN TLDs.") Boolean excludeCcTLDs,
+            @ToolArg(required = false, description = "Maximum registration price as a decimal; TLDs priced above it are excluded.") Double maxRegisterPrice,
+            @ToolArg(required = false, description = "Set true only when the user explicitly asks for no premium or surprise pricing; premium-flagged TLDs still register most names at the standard price, so do not use this as a budget filter.") Boolean excludePremium,
+            @ToolArg(required = false, description = "Filter to TLDs operated by this registry name (case-insensitive exact match).") String registry,
             McpConnection connection) {
 
         boolean excRestricted = Boolean.TRUE.equals(excludeRestricted);
@@ -164,7 +160,7 @@ public class CatalogMCPServer {
                     try {
                         return Double.parseDouble(e.getRegistrationPrice()) <= maxRegisterPrice;
                     } catch (NumberFormatException ex) {
-                        Log.warnf("Malformed registration price for TLD '%s': '%s' — including in results",
+                        Log.warnf("Malformed registration price for TLD '%s': '%s', including in results",
                                 e.getTld(), e.getRegistrationPrice());
                         return true;
                     }

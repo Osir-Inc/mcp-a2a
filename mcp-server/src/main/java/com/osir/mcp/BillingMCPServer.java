@@ -25,7 +25,14 @@ public class BillingMCPServer {
     @Inject
     PendingActionStore pendingActionStore;
 
-    @Tool(description = "Get the current account balance for the authenticated user. Requires authentication.")
+    @Tool(description = "Get the current account balance for the authenticated user. Requires authentication.",
+            structuredContent = true,
+            annotations = @Tool.Annotations(
+                    title = "Get account balance",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public AccountBalanceResult getAccountBalance(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return billingService.getAccountBalance();
@@ -35,8 +42,14 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "List invoices for the authenticated user with optional status filtering and pagination. Requires authentication. Optional: status ('DRAFT', 'PENDING', 'PAID', 'CANCELLED', 'OVERDUE'), page (default 0), size (default 20)")
-    public InvoiceListResult listInvoices(@ToolArg(required = false) String status, @ToolArg(required = false) Integer page, @ToolArg(required = false) Integer size, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "List invoices for the authenticated user with optional status filtering and pagination. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "List invoices",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public InvoiceListResult listInvoices(@ToolArg(required = false, description = "Filter by invoice status: DRAFT, PENDING, PAID, CANCELLED, or OVERDUE.") String status, @ToolArg(required = false, description = "Zero-based page number for pagination, default 0.") Integer page, @ToolArg(required = false, description = "Number of invoices per page, default 20.") Integer size, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return billingService.listInvoices(status, page, size);
         } catch (Exception e) {
@@ -45,8 +58,14 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Get detailed information about a specific invoice including line items. Requires authentication. Required: invoiceId (string)")
-    public InvoiceDetailResult getInvoiceDetails(String invoiceId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Get detailed information about a specific invoice including line items. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get invoice details",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public InvoiceDetailResult getInvoiceDetails(@ToolArg(description = "The identifier of the invoice to fetch, as returned by listInvoices.") String invoiceId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return billingService.getInvoiceDetails(invoiceId);
         } catch (Exception e) {
@@ -55,8 +74,14 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Stage payment of an outstanding invoice from account balance. Requires authentication. Required: invoiceId (string). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult payInvoice(String invoiceId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Stage payment of an outstanding invoice from account balance. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+            annotations = @Tool.Annotations(
+                    title = "Pay invoice",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public ConfirmationRequiredResult payInvoice(@ToolArg(description = "The identifier of the outstanding invoice to pay, as returned by listInvoices.") String invoiceId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "payInvoice",
                 "Pay invoice '" + invoiceId + "' from account balance",
@@ -66,7 +91,13 @@ public class BillingMCPServer {
         );
     }
 
-    @Tool(description = "Get summary statistics of invoices: total paid, pending, overdue amounts. Requires authentication.")
+    @Tool(description = "Get summary statistics of invoices: total paid, pending, overdue amounts. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get invoice statistics",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public InvoiceStatisticsResult getInvoiceStatistics(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return billingService.getInvoiceStatistics();
@@ -76,8 +107,14 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Stage creation of a Stripe payment checkout session to add funds to account balance. Requires authentication. Required: amount (double, in USD). Optional: currency (string, default 'USD'). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve. The executed result includes checkoutUrl (hand it to the human to pay), expiresAt, and pollTool — after the human opens the URL, poll with that tool (getPaymentTransactions) until the balance credit appears.")
-    public ConfirmationRequiredResult createPaymentSession(double amount, @ToolArg(required = false) String currency, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Stage a Stripe checkout session to add funds to the account balance. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve. The executed result includes checkoutUrl (hand it to the human to pay) and expiresAt; then poll getPaymentTransactions until the balance credit appears.",
+            annotations = @Tool.Annotations(
+                    title = "Create payment session",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public ConfirmationRequiredResult createPaymentSession(@ToolArg(description = "Amount to add to the balance, in the account currency as a decimal (e.g. 25.00).") double amount, @ToolArg(required = false, description = "3-letter ISO 4217 currency code, default USD.") String currency, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         String currencyLabel = currency != null ? currency : "USD";
         return pendingActionStore.stage(
                 "createPaymentSession",
@@ -88,8 +125,14 @@ public class BillingMCPServer {
         );
     }
 
-    @Tool(description = "Get payment transaction history for the authenticated user. Requires authentication. Optional: page (integer), size (integer)")
-    public TransactionListResult getPaymentTransactions(@ToolArg(required = false) Integer page, @ToolArg(required = false) Integer size, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Get payment transaction history for the authenticated user. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get payment transactions",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public TransactionListResult getPaymentTransactions(@ToolArg(required = false, description = "Zero-based page number for pagination.") Integer page, @ToolArg(required = false, description = "Number of transactions per page.") Integer size, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return billingService.getPaymentTransactions(page, size);
         } catch (Exception e) {
@@ -98,8 +141,15 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Preview the fees that would be charged for a given payment amount. Requires authentication. Required: amount (double). Optional: currency (string)")
-    public FeePreviewResult previewPaymentFees(double amount, @ToolArg(required = false) String currency, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Preview the fees that would be charged for a given payment amount. Requires authentication.",
+            structuredContent = true,
+            annotations = @Tool.Annotations(
+                    title = "Preview payment fees",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public FeePreviewResult previewPaymentFees(@ToolArg(description = "Payment amount to preview, in the account currency as a decimal (e.g. 25.00).") double amount, @ToolArg(required = false, description = "3-letter ISO 4217 currency code, default USD.") String currency, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return billingService.previewPaymentFees(amount, currency);
         } catch (Exception e) {
@@ -108,8 +158,15 @@ public class BillingMCPServer {
         }
     }
 
-    @Tool(description = "Get pricing for domain extensions from the product catalog. Requires authentication. Optional: extension (e.g., 'com', 'net', 'org') to filter results")
-    public DomainPricingResult getDomainPricing(@ToolArg(required = false) String extension, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Get pricing for domain extensions from the product catalog. Requires authentication.",
+            structuredContent = true,
+            annotations = @Tool.Annotations(
+                    title = "Get domain pricing",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DomainPricingResult getDomainPricing(@ToolArg(required = false, description = "Domain extension to filter by, without the leading dot (e.g. 'com', 'net', 'org').") String extension, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return billingService.getDomainPricing(extension);
         } catch (Exception e) {

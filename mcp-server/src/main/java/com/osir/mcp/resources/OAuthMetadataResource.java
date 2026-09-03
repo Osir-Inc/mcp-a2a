@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * RFC 8414 — OAuth 2.0 Authorization Server Metadata.
+ * RFC 8414, OAuth 2.0 Authorization Server Metadata.
  *
  * Served at the same origin as the MCP server (be.osir.com) as required by
  * the MCP authorization spec. All OAuth operations delegate to KeyCloak;

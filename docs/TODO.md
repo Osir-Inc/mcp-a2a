@@ -18,10 +18,10 @@
 - [ ] **Custom domains for `*.osir.app` static sites** — customers will ask ("I want it on my own domain"). Needs C2 route support for a customer domain → app mapping; the MCP side already has registerDomain + DNS tools to complete the story.
 - [ ] Version history / revert beyond the last deploy — only if clients ask (`osirAppGetSource` covers the last version).
 
-## MCP transport (found during e2e testing, 2026-08-31)
+## MCP transport
 
-- [ ] **Frontend (osir.com chat) MCP client must re-initialize on session loss.** A server restart invalidates every Streamable HTTP session; the server answers `Mcp session not found`. Required client behavior (per the Streamable HTTP spec): on a POST rejected for a missing session, run a new `initialize` handshake and retry the call once — auth is unaffected (Bearer/sessionKey are stateless). Observed 2026-08-31: the DeepSeek loop retried a dead session for 6+ minutes and reported it as a "platform outage"; Claude.ai recovered after 2 attempts by re-initializing. Also cap MCP retries (2–3, then surface to the user).
-- [ ] **Upgrade quarkus-mcp-server to 2.x** — adds the stateless `2026-07-28` protocol revision: restarts become invisible to clients, and the recurring `Invalid MCP protocol header: 2026-07-28` noise from Claude.ai disappears. Needs a compat spike (1.11.0 → 2.x API changes).
+- [x] **Upgrade quarkus-mcp-server to 2.0.0** (done 2026-09-02) — source-compatible; one merged `-http` artifact serves Streamable at `/mcp` and legacy SSE at `/mcp/sse`; the published `/mcp/http` URL is preserved by `McpHttpPathCompatFilter`. `streamable.auto-init=true` makes stale sessions auto-initialize (verified: bogus `Mcp-Session-Id` gets a valid response, no more "Mcp session not found") - server restarts no longer strand clients.
+- [ ] **Frontend (osir.com chat) MCP client should still cap retries and re-initialize on errors** (2-3 attempts, then surface to the user) - good hygiene even though the server-side auto-init has removed the "session not found" failure class observed 2026-08-31/2026-09-02.
 
 ## Docs
 

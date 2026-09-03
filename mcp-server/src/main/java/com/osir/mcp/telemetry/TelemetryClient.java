@@ -14,8 +14,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * POST /v1/agent/telemetry (backend B.6) — batch ingest, ≤200 events per call.
- * API keys go in X-API-Key, NOT Authorization: Bearer — Bearer is routed to OIDC and 401s
+ * POST /v1/agent/telemetry (backend B.6), batch ingest, ≤200 events per call.
+ * API keys go in X-API-Key, NOT Authorization: Bearer, Bearer is routed to OIDC and 401s
  * (handoff §5).
  */
 @RegisterRestClient(configKey = "domain-backend")

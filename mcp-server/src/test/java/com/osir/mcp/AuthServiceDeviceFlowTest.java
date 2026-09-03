@@ -50,7 +50,7 @@ class AuthServiceDeviceFlowTest {
         response.setExpiresIn(600);
         response.setInterval(5);
 
-        when(keycloakClient.requestDeviceCode(eq("osir-mcp-agent"), eq("openid"), anyString(), eq("S256"))).thenReturn(response);
+        when(keycloakClient.requestDeviceCode(eq("osir-mcp-agent"), eq(AuthService.DEVICE_SCOPES), anyString(), eq("S256"))).thenReturn(response);
 
         DeviceLoginResult result = authService.startDeviceLogin();
 
@@ -68,7 +68,7 @@ class AuthServiceDeviceFlowTest {
 
     @Test
     void startDeviceLogin_nullResponse() {
-        when(keycloakClient.requestDeviceCode(eq("osir-mcp-agent"), eq("openid"), anyString(), eq("S256"))).thenReturn(null);
+        when(keycloakClient.requestDeviceCode(eq("osir-mcp-agent"), eq(AuthService.DEVICE_SCOPES), anyString(), eq("S256"))).thenReturn(null);
 
         DeviceLoginResult result = authService.startDeviceLogin();
 
@@ -78,7 +78,7 @@ class AuthServiceDeviceFlowTest {
 
     @Test
     void startDeviceLogin_exception() {
-        when(keycloakClient.requestDeviceCode(eq("osir-mcp-agent"), eq("openid"), anyString(), eq("S256")))
+        when(keycloakClient.requestDeviceCode(eq("osir-mcp-agent"), eq(AuthService.DEVICE_SCOPES), anyString(), eq("S256")))
                 .thenThrow(new RuntimeException("Connection refused"));
 
         DeviceLoginResult result = authService.startDeviceLogin();

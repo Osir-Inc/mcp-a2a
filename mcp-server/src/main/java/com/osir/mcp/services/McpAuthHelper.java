@@ -18,11 +18,11 @@ import java.util.Map;
  * "Bearer header wins over session" precedence lives in exactly one place.
  *
  * Three token sources, in priority order:
- * 1. An {@code Authorization: Bearer} header on the MCP HTTP request — sent by
+ * 1. An {@code Authorization: Bearer} header on the MCP HTTP request, sent by
  *    OAuth connectors on every call. Survives MCP session churn: such clients
  *    may open a new session (new connection id) per call.
  * 2. A conversation session key ({@code osk_*}) passed as the {@code sessionKey}
- *    tool argument — minted by checkDeviceLoginStatus and carried in the LLM
+ *    tool argument, minted by checkDeviceLoginStatus and carried in the LLM
  *    conversation, so it also survives session churn without any OAuth setup.
  * 3. The per-connection session established via the device-login tools.
  *
@@ -64,7 +64,7 @@ public class McpAuthHelper {
             return true;
         }
         if (connection != null) {
-            LOG.debugf("No usable token for connection %s — call will fail auth check in service layer", connection.id());
+            LOG.debugf("No usable token for connection %s, call will fail auth check in service layer", connection.id());
         }
         return false;
     }
@@ -142,7 +142,7 @@ public class McpAuthHelper {
 
     private boolean isLocallyExpired(String rawToken) {
         Map<String, Object> claims = authService.parseJwtClaims(rawToken);
-        if (claims == null) return false; // opaque token — can't prove expiry, let the backend decide
+        if (claims == null) return false; // opaque token, can't prove expiry, let the backend decide
         return claims.get("exp") instanceof Number exp && System.currentTimeMillis() / 1000 > exp.longValue();
     }
 

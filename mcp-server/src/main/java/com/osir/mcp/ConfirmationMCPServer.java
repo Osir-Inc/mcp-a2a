@@ -31,8 +31,14 @@ public class ConfirmationMCPServer {
     @Inject
     McpAuthHelper authHelper;
 
-    @Tool(description = "Execute a previously staged destructive or financial action after user approval. Required: actionId (the UUID returned by the staging tool). The action expires after 5 minutes and can only be executed once.")
-    public ActionExecutionResult executeConfirmedAction(String actionId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Execute a previously staged destructive or financial action after user approval. The action expires after 5 minutes and can only be executed once.",
+            annotations = @Tool.Annotations(
+                    title = "Execute confirmed action",
+                    readOnlyHint = false,
+                    destructiveHint = true,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public ActionExecutionResult executeConfirmedAction(@ToolArg(description = "The action UUID from the staging tool's response.") String actionId,@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         var opt = pendingActionStore.claim(actionId);
         if (opt.isEmpty()) {
             return new ActionExecutionResult(false,
@@ -46,7 +52,7 @@ public class ConfirmationMCPServer {
                     "Action '" + pending.toolName() + "' has expired. Please retry the original operation.");
         }
 
-        // Ownership and rate limiting key on the authenticated user, not the MCP connection —
+        // Ownership and rate limiting key on the authenticated user, not the MCP connection -
         // OAuth clients (Claude.ai) stage and execute on different connections for the same user.
         String principal = authHelper.currentPrincipal(connection);
         if (!pending.owner().equals(principal)) {
@@ -76,7 +82,7 @@ public class ConfirmationMCPServer {
 
     private static boolean extractSuccess(Object result) {
         if (result == null) return true;
-        // Beans expose isSuccess(), records expose success() — check both before assuming success.
+        // Beans expose isSuccess(), records expose success(), check both before assuming success.
         for (String accessor : new String[]{"isSuccess", "success"}) {
             try {
                 return (boolean) result.getClass().getMethod(accessor).invoke(result);

@@ -25,8 +25,14 @@ public class DnsMCPServer {
     @Inject
     PendingActionStore pendingActionStore;
 
-    @Tool(description = "Initialize (create) the DNS zone for a domain. NOT needed after registerDomain — registration initialises the zone automatically. Use this only for pre-existing domains without a zone (e.g. after a transfer, or if registration opted out with initializeDnsZone:false). Safe to call on existing zones — it will not overwrite records. Required: domain (e.g., 'example.com')")
-    public DnsActionResult initializeDnsZone(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Initialize (create) the DNS zone for a domain. NOT needed after registerDomain, which initializes the zone automatically. Use only for pre-existing domains without a zone (e.g. after a transfer, or if registration opted out with initializeDnsZone:false). Safe on existing zones, it will not overwrite records. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Initialize DNS zone",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DnsActionResult initializeDnsZone(@ToolArg(description = "Fully qualified domain name to create the zone for, e.g. 'example.com'.") String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.initializeZone(domain);
         } catch (Exception e) {
@@ -35,8 +41,14 @@ public class DnsMCPServer {
         }
     }
 
-    @Tool(description = "List all DNS records for a domain. Requires authentication. Required: domain (e.g., 'example.com')")
-    public DnsRecordListResult listDnsRecords(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "List all DNS records for a domain. Requires authentication. Returns each record with its id, name, type, content, TTL, and priority; use the record id with getDnsRecord, updateDnsRecord, or deleteDnsRecord.",
+            annotations = @Tool.Annotations(
+                    title = "List DNS records",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DnsRecordListResult listDnsRecords(@ToolArg(description = "Fully qualified domain name whose records to list, e.g. 'example.com'.") String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.listRecords(domain);
         } catch (Exception e) {
@@ -45,8 +57,21 @@ public class DnsMCPServer {
         }
     }
 
-    @Tool(description = "Create a new DNS record for a domain. Requires authentication. For newly registered domains, the zone is initialized automatically if missing. Required: domain (e.g., 'example.com'), name (e.g., 'www', '@', 'mail'), type ('A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV'), content (record value). Optional: ttl (seconds, default 3600), priority (for MX/SRV, default 0)")
-    public DnsRecordResult createDnsRecord(String domain, String name, String type, String content, @ToolArg(required = false) Integer ttl, @ToolArg(required = false) Integer priority, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Create a new DNS record for a domain. Requires authentication. For newly registered domains the zone is initialized automatically if missing. Returns the created record including its id for later updates or deletion.",
+            annotations = @Tool.Annotations(
+                    title = "Create DNS record",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public DnsRecordResult createDnsRecord(
+            @ToolArg(description = "Fully qualified domain name the record belongs to, e.g. 'example.com'.") String domain,
+            @ToolArg(description = "Record name relative to the zone, e.g. 'www', 'mail', or '@' for the apex.") String name,
+            @ToolArg(description = "Record type: A, AAAA, CNAME, MX, TXT, NS, SRV, CAA.") String type,
+            @ToolArg(description = "Record value, e.g. an IPv4 dotted-quad or IPv6 address for A/AAAA, a hostname for CNAME/MX/NS, or text for TXT.") String content,
+            @ToolArg(required = false, description = "Time to live in seconds; defaults to 3600 when omitted.") Integer ttl,
+            @ToolArg(required = false, description = "Priority for MX/SRV records only; defaults to 0 when omitted.") Integer priority,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.createRecord(domain, name, type, content, ttl, priority);
         } catch (Exception e) {
@@ -55,8 +80,22 @@ public class DnsMCPServer {
         }
     }
 
-    @Tool(description = "Update an existing DNS record. Requires authentication. Required: domain (e.g., 'example.com'), recordId (string). Optional: name, type, content, ttl, priority")
-    public DnsRecordResult updateDnsRecord(String domain, String recordId, @ToolArg(required = false) String name, @ToolArg(required = false) String type, @ToolArg(required = false) String content, @ToolArg(required = false) Integer ttl, @ToolArg(required = false) Integer priority, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Update an existing DNS record. Requires authentication. Only the fields you provide are changed; omitted fields keep their current values. Get the recordId from listDnsRecords. Returns the updated record.",
+            annotations = @Tool.Annotations(
+                    title = "Update DNS record",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DnsRecordResult updateDnsRecord(
+            @ToolArg(description = "Fully qualified domain name the record belongs to, e.g. 'example.com'.") String domain,
+            @ToolArg(description = "Identifier of the record to update, as returned by listDnsRecords.") String recordId,
+            @ToolArg(required = false, description = "New record name relative to the zone, e.g. 'www' or '@' for the apex.") String name,
+            @ToolArg(required = false, description = "New record type: A, AAAA, CNAME, MX, TXT, NS, SRV, CAA.") String type,
+            @ToolArg(required = false, description = "New record value, e.g. an IPv4 dotted-quad or IPv6 address, hostname, or text.") String content,
+            @ToolArg(required = false, description = "New time to live in seconds.") Integer ttl,
+            @ToolArg(required = false, description = "New priority for MX/SRV records only.") Integer priority,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.updateRecord(domain, recordId, name, type, content, ttl, priority);
         } catch (Exception e) {
@@ -65,8 +104,17 @@ public class DnsMCPServer {
         }
     }
 
-    @Tool(description = "Stage deletion of a DNS record. DESTRUCTIVE — irreversible. Requires authentication. Required: domain (e.g., 'example.com'), recordId (string). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult deleteDnsRecord(String domain, String recordId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Stage deletion of a DNS record. DESTRUCTIVE and irreversible once executed. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+            annotations = @Tool.Annotations(
+                    title = "Delete DNS record",
+                    readOnlyHint = false,
+                    destructiveHint = true,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public ConfirmationRequiredResult deleteDnsRecord(
+            @ToolArg(description = "Fully qualified domain name the record belongs to, e.g. 'example.com'.") String domain,
+            @ToolArg(description = "Identifier of the record to delete, as returned by listDnsRecords.") String recordId,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "deleteDnsRecord",
                 "Permanently delete DNS record '" + recordId + "' from domain '" + domain + "'",
@@ -76,8 +124,17 @@ public class DnsMCPServer {
         );
     }
 
-    @Tool(description = "Get details of a specific DNS record. Requires authentication. Required: domain (e.g., 'example.com'), recordId (string)")
-    public DnsRecordResult getDnsRecord(String domain, String recordId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Get details of a specific DNS record by id. Requires authentication. Get the recordId from listDnsRecords. Returns the record's name, type, content, TTL, and priority.",
+            annotations = @Tool.Annotations(
+                    title = "Get DNS record",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DnsRecordResult getDnsRecord(
+            @ToolArg(description = "Fully qualified domain name the record belongs to, e.g. 'example.com'.") String domain,
+            @ToolArg(description = "Identifier of the record to fetch, as returned by listDnsRecords.") String recordId,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return dnsService.getRecord(domain, recordId);
         } catch (Exception e) {

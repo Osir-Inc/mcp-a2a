@@ -287,7 +287,7 @@ See [`.env.example`](.env.example) for the full list.
 
 ```
 common/      Shared library — 12 services, 9 REST clients, ~174 models
-mcp-server/  Quarkus MCP server — 106 tools, 11 prompts, chat UI
+mcp-server/  Quarkus MCP server — 105 tools, 11 prompts, 2 resources, chat UI
 a2a-server/  Quarkus A2A server — 7 agents, JSON-RPC, JPA task persistence
 ```
 

@@ -32,7 +32,7 @@ public class PendingActionStore {
 
         String actionId = UUID.randomUUID().toString();
         long expiresAt = System.currentTimeMillis() + TTL_MS;
-        // Owner is the authenticated user (stable across MCP sessions), not the connection id —
+        // Owner is the authenticated user (stable across MCP sessions), not the connection id -
         // OAuth clients like Claude.ai stage and execute on different connections.
         String owner = authHelper.currentPrincipal(connectionId);
         store.put(actionId, new PendingAction(actionId, toolName, summary, owner, connectionId, bucket, expiresAt, action));

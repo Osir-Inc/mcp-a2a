@@ -7,8 +7,7 @@ dependencies {
 
     implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
     implementation 'io.quarkus:quarkus-arc'
-    implementation 'io.quarkiverse.mcp:quarkus-mcp-server-sse:1.11.0'
-    implementation 'io.quarkiverse.mcp:quarkus-mcp-server-http:1.11.0'
+    implementation 'io.quarkiverse.mcp:quarkus-mcp-server-http:2.0.0'
 
     // REST client dependencies
     implementation 'io.quarkus:quarkus-rest-client'

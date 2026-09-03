@@ -27,7 +27,7 @@ import jakarta.inject.Inject;
  * LLM-facing tools for the Osir app-deploy platform (chat-native deploy to *.osir.app). All tools
  * are prefixed {@code osirApp*} so they're clearly identifiable as this product, distinct from the
  * domain/VPS/DNS tools. Thin façade over the deploy backend (C2); reuses the existing KeyCloak
- * session. No tool argument may carry a runtime/isolation choice — C2 decides that.
+ * session. No tool argument may carry a runtime/isolation choice, C2 decides that.
  */
 @McpAudited
 @ApplicationScoped
@@ -46,7 +46,13 @@ public class DeploymentMCPServer {
     @Tool(name = "osirAppCreateUpload",
             description = "Create an upload ticket for deploying app source code to Osir. Returns an uploadTicket, "
                     + "a putUrl, and instructions to zip the project and upload it. After uploading, call osirAppDeploy "
-                    + "with the uploadTicket. Requires authentication.")
+                    + "with the uploadTicket. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Create app upload ticket",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
     public UploadTicketResult osirAppCreateUpload(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.createUpload();
@@ -60,14 +66,20 @@ public class DeploymentMCPServer {
     @Tool(name = "osirAppDeploy",
             description = "Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a "
                     + "microVM. Deploying an existing app name redeploys it (new version) and applies any secrets set "
-                    + "via osirAppSetSecret. Required: name (lowercase letters/digits/hyphens, e.g. 'habit-tracker'), "
-                    + "language ('node'|'python'|'php-laravel'|'go'), uploadTicket (from osirAppCreateUpload, after you "
-                    + "upload the zipped source). A plain static website (HTML/CSS/JS with no framework or build step) "
-                    + "is also supported — it's auto-detected and served directly; pass language 'node' for it. "
-                    + "Optional: region ('us'|'al'; 'al' = Albania/Tirana). Defaults to the platform's home region. "
-                    + "Requires authentication.")
-    public DeployResult osirAppDeploy(String name, String language, String uploadTicket,
-                                      @ToolArg(required = false) String region,
+                    + "via osirAppSetSecret. A plain static website (HTML/CSS/JS with no framework or build step) is "
+                    + "also supported: it is auto-detected and served directly; pass language 'node' for it. "
+                    + "Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Deploy an app",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public DeployResult osirAppDeploy(
+                                      @ToolArg(description = "App name: lowercase letters, digits, and hyphens, e.g. 'habit-tracker'.") String name,
+                                      @ToolArg(description = "Runtime language: 'node', 'python', 'php-laravel', or 'go'; use 'node' for a plain static site.") String language,
+                                      @ToolArg(description = "Upload ticket from osirAppCreateUpload, after uploading the zipped source to its putUrl.") String uploadTicket,
+                                      @ToolArg(required = false, description = "Region: 'us' or 'al' ('al' is Albania/Tirana); defaults to the platform's home region.") String region,
                                       @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.deploy(name, language, region, uploadTicket);
@@ -79,7 +91,13 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppList",
-            description = "List the authenticated user's deployed Osir apps with their live URLs and status. Requires authentication.")
+            description = "List the authenticated user's deployed Osir apps with their live URLs and status. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "List deployed apps",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public AppListResult osirAppList(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.listApps();
@@ -92,13 +110,20 @@ public class DeploymentMCPServer {
     @RequiresAuth
     @Tool(name = "osirAppStatus",
             description = "Get an Osir app's current status, live URL, and health ('is my app working?'). "
-                    + "If the status is BUILD_FAILED, 'recentErrors' explains why (e.g. a missing start "
-                    + "command) so you can fix the source and redeploy. 'qa' is an independent black-box "
-                    + "check of the LIVE app after deploy: qa.status PASSED means it loaded and worked; "
-                    + "FAILED means it deployed but didn't actually work (qa.findings lists the problems — "
-                    + "e.g. a server error or blank page — so you can fix and redeploy). Required: appId "
-                    + "(string). Requires authentication.")
-    public AppStatusResult osirAppStatus(String appId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+                    + "If the status is BUILD_FAILED, 'recentErrors' explains why so you can fix the source "
+                    + "and redeploy. 'qa' is an independent black-box check of the LIVE app after deploy: "
+                    + "qa.status PASSED means it loaded and worked; FAILED means it deployed but didn't "
+                    + "actually work, and qa.findings lists the problems so you can fix and redeploy. "
+                    + "Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get app status",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public AppStatusResult osirAppStatus(
+            @ToolArg(description = "App id from osirAppList or a deploy result.") String appId,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.getStatus(appId);
         } catch (Exception e) {
@@ -111,8 +136,18 @@ public class DeploymentMCPServer {
     @Tool(name = "osirAppSetSecret",
             description = "Set an environment secret for an Osir app (e.g. DATABASE_URL, API_KEY). The value is stored "
                     + "encrypted and injected as an env var on the next osirAppDeploy of the app; it is NEVER returned "
-                    + "or logged. Required: appId (string), key (env var name), value (string). Requires authentication.")
-    public SetSecretResult osirAppSetSecret(String appId, String key, String value, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+                    + "or logged. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Set app secret",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public SetSecretResult osirAppSetSecret(
+            @ToolArg(description = "App id from osirAppList.") String appId,
+            @ToolArg(description = "Environment variable name, e.g. 'API_KEY'.") String key,
+            @ToolArg(description = "The secret value; never returned or logged.") String value,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.setSecret(appId, key, value);
         } catch (Exception e) {
@@ -123,10 +158,17 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppLogs",
-            description = "Get recent logs from an Osir app's microVM ('why is my app broken?'). "
-                    + "Required: appId (string). Optional: tail (number of recent lines, default 100). "
-                    + "Requires authentication.")
-    public AppLogsResult osirAppLogs(String appId, @ToolArg(required = false) Integer tail, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+            description = "Get recent logs from an Osir app's microVM ('why is my app broken?'). Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get app logs",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public AppLogsResult osirAppLogs(
+            @ToolArg(description = "App id from osirAppList.") String appId,
+            @ToolArg(required = false, description = "Number of recent log lines to return (default 100).") Integer tail,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return deploymentService.getLogs(appId, tail);
         } catch (Exception e) {
@@ -139,8 +181,16 @@ public class DeploymentMCPServer {
     @Tool(name = "osirAppProvisionDatabase",
             description = "Provision a managed Postgres database for an Osir app. The connection string is stored "
                     + "as the app's DATABASE_URL secret (encrypted, injected on the next osirAppDeploy) and is NEVER "
-                    + "returned. Required: appId (string). Optional: engine ('postgres', default). Requires authentication.")
-    public ProvisionDbResult osirAppProvisionDatabase(String appId, @ToolArg(required = false) String engine,
+                    + "returned. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Provision app database",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public ProvisionDbResult osirAppProvisionDatabase(
+                                                      @ToolArg(description = "App id from osirAppList.") String appId,
+                                                      @ToolArg(required = false, description = "Database engine; only 'postgres' (the default) is supported.") String engine,
                                                       @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
                                                       McpConnection connection) {
         try {
@@ -153,12 +203,19 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppGetSource",
-            description = "Get a short-lived signed download URL for an Osir app's current source zip — use this to "
+            description = "Get a short-lived signed download URL for an Osir app's current source zip. Use this to "
                     + "make edits to a deployed app without the user re-attaching the project: download, patch the "
                     + "files, then osirAppCreateUpload (PUT the new zip) and osirAppDeploy under the SAME name; the "
                     + "platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box. "
-                    + "Required: appName. Requires authentication.")
-    public AppSourceResult osirAppGetSource(String appName,
+                    + "Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get app source",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public AppSourceResult osirAppGetSource(
+            @ToolArg(description = "The deployed app's name, as shown by osirAppList.") String appName,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection) {
         try {
@@ -172,20 +229,25 @@ public class DeploymentMCPServer {
     @RequiresAuth
     @Tool(name = "osirAppMoveToOwned",
             description = "Move a deployed Osir app from the shared free tier onto a paid VPS owned by the user. "
-                    + "First call stages a VPS order (COSTS MONEY — returns an actionId; present the price/summary "
-                    + "to the user and call executeConfirmedAction only if they approve). After confirmation the "
-                    + "platform installs Ubuntu, ships the app onto the box server-side, and binds the domain's DNS "
-                    + "if it is hosted on osir.app nameservers (otherwise returns the IP and manual DNS instructions). "
-                    + "If the result status is BUILDING or BUILD_FAILED, follow its nextStep — calling this tool again "
-                    + "with the same arguments RESUMES the move and never orders a second server. Required: appName, "
-                    + "packageId (from listVpsPackages). Optional: domain (custom domain to serve the app on). "
-                    + "Requires authentication.")
-    public Object osirAppMoveToOwned(String appName, String packageId,
-                                     @ToolArg(required = false) String domain,
+                    + "First call stages a VPS order (COSTS MONEY): returns an actionId; present the price/summary "
+                    + "to the user and call executeConfirmedAction only if they approve. After confirmation the "
+                    + "platform installs Ubuntu and ships the app onto the box server-side. If the result status is "
+                    + "BUILDING or BUILD_FAILED, follow its nextStep; calling this tool again with the same arguments "
+                    + "RESUMES the move and never orders a second server. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Move app to owned VPS",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public Object osirAppMoveToOwned(
+                                     @ToolArg(description = "The deployed app's name, as shown by osirAppList.") String appName,
+                                     @ToolArg(description = "VPS package id from listVpsPackages.") String packageId,
+                                     @ToolArg(required = false, description = "Custom domain to serve the app on; DNS is bound automatically if the domain is hosted on osir.app nameservers, otherwise the result returns the IP and manual DNS instructions.") String domain,
                                      @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
                                      McpConnection connection) {
         try {
-            // A VPS was already ordered for this app — resume (poll/ship/DNS), no new spend, no gate.
+            // A VPS was already ordered for this app, resume (poll/ship/DNS), no new spend, no gate.
             if (moveToOwnedService.hasOrderedInstance(appName)) {
                 return moveToOwnedService.resume(appName, domain);
             }
@@ -193,7 +255,7 @@ public class DeploymentMCPServer {
             return pendingActionStore.stage(
                     "osirAppMoveToOwned",
                     "Order a VPS (package '" + packageId + "', " + prep.osDisplayName() + ", monthly) to move app '"
-                            + appName + "' onto an owned server — deducts from account balance",
+                            + appName + "' onto an owned server, deducts from account balance",
                     connection.id(),
                     DestructiveOpRateLimiter.Bucket.FINANCIAL,
                     () -> moveToOwnedService.orderAndMove(appName, packageId, prep, domain)
@@ -208,13 +270,21 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppDelete",
-            description = "Stage deletion of an Osir app. DESTRUCTIVE and irreversible — removes its microVM, image, "
-                    + "route, and data. Required: appId (string). Returns an actionId; present the summary to the user, "
-                    + "then call executeConfirmedAction with the actionId if they approve. Requires authentication.")
-    public ConfirmationRequiredResult osirAppDelete(String appId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+            description = "Stage deletion of an Osir app. DESTRUCTIVE and irreversible: removes its microVM, image, "
+                    + "route, and data. Returns an actionId; present the summary to the user, "
+                    + "then call executeConfirmedAction with the actionId if they approve. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Delete an app",
+                    readOnlyHint = false,
+                    destructiveHint = true,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public ConfirmationRequiredResult osirAppDelete(
+            @ToolArg(description = "App id from osirAppList.") String appId,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "osirAppDelete",
-                "Permanently delete app '" + appId + "' — removes its microVM, image, route, and all data. Irreversible.",
+                "Permanently delete app '" + appId + "', removes its microVM, image, route, and all data. Irreversible.",
                 connection.id(),
                 DestructiveOpRateLimiter.Bucket.DESTRUCTIVE,
                 () -> deploymentService.delete(appId)

@@ -61,7 +61,7 @@ public class McpAuditInterceptor {
         }
     }
 
-    /** Best-effort funnel event (A.7) — must never break the tool call it observes. */
+    /** Best-effort funnel event (A.7), must never break the tool call it observes. */
     private void emit(McpConnection connection, String toolName, long startNanos, boolean success, Object result) {
         if (connection == null || !telemetry.enabled()) return;
         try {

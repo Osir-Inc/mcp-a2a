@@ -237,7 +237,7 @@ public class JsonModeOllamaService {
                     LOG.infof("Domain check result: available=%s, message=%s",
                             domainResult.isAvailable(), domainResult.getMessage());
 
-                    // available=false means either taken or an error — the message carries which.
+                    // available=false means either taken or an error, the message carries which.
                     return domainResult.isAvailable()
                             ? "✅ " + domain + " is available!"
                             : "❌ " + domain + ": " + domainResult.getMessage();

@@ -20,7 +20,13 @@ public class AccountMCPServer {
     @Inject
     AccountService accountService;
 
-    @Tool(description = "Get the authenticated user's profile and account information including name, email, organization, balance, and domain/VPS counts. Requires authentication.")
+    @Tool(description = "Get the authenticated user's profile and account information including name, email, organization, balance, and domain/VPS counts. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get my profile",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public UserProfileResult getMyProfile(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return accountService.getMyProfile();
@@ -30,7 +36,13 @@ public class AccountMCPServer {
         }
     }
 
-    @Tool(description = "Get a comprehensive summary of the user's account: profile, balance, domain count, VPS count, and pending transfers. Requires authentication.")
+    @Tool(description = "Get a comprehensive summary of the user's account: profile, balance, domain count, VPS count, and pending transfers. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get account summary",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public AccountSummaryResult getAccountSummary(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return accountService.getAccountSummary();

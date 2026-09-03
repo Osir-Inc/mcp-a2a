@@ -1,6 +1,7 @@
 package com.osir.mcp.models.account;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 
 /**
  * POST /v1/public/account (anonymous) — backend v2.11.0 autonomous onboarding.
@@ -19,17 +20,28 @@ public class CreateAccountRequest {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Contact {
+        @JsonPropertyDescription("Principal's legal first name.")
         public String firstName;
+        @JsonPropertyDescription("Principal's legal last name.")
         public String lastName;
+        @JsonPropertyDescription("Organization name, required for ORGANIZATION accounts.")
         public String organization;
+        @JsonPropertyDescription("Contact email address; a valid mailbox that receives ICANN verification.")
         public String email;
-        public String phone;      // +CC.number
+        @JsonPropertyDescription("Phone number in +CC.number format, e.g. +355.42123456.")
+        public String phone;
+        @JsonPropertyDescription("First street address line.")
         public String street1;
+        @JsonPropertyDescription("Second street address line, if needed.")
         public String street2;
+        @JsonPropertyDescription("City or locality name.")
         public String city;
+        @JsonPropertyDescription("State, province, or region name.")
         public String state;
+        @JsonPropertyDescription("Postal or ZIP code.")
         public String postalCode;
-        public String country;    // ISO 3166-1 alpha-2
+        @JsonPropertyDescription("2-letter ISO 3166-1 alpha-2 country code, e.g. US.")
+        public String country;
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

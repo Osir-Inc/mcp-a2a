@@ -1,11 +1,19 @@
 package com.osir.mcp.models.contact;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+
 public class Address {
+    @JsonPropertyDescription("First street address line.")
     private String street1;
+    @JsonPropertyDescription("Second street address line, if needed.")
     private String street2;
+    @JsonPropertyDescription("City or locality name.")
     private String city;
+    @JsonPropertyDescription("State, province, or region name.")
     private String state;
+    @JsonPropertyDescription("Postal or ZIP code.")
     private String postalCode;
+    @JsonPropertyDescription("2-letter ISO 3166-1 alpha-2 country code, e.g. US.")
     private String country;
 
     public Address() {}

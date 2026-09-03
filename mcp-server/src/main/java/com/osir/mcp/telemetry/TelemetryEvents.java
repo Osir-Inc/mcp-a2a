@@ -22,7 +22,7 @@ public final class TelemetryEvents {
 
     /**
      * The funnel stage this tool call represents, or null when it doesn't advance the funnel.
-     * ponytail: "registered" is not observable here — it happens inside executeConfirmedAction's
+     * ponytail: "registered" is not observable here, it happens inside executeConfirmedAction's
      * staged callback; emit it from PendingActionStore if the funnel ever needs the distinction
      * beyond "confirmed".
      */

@@ -27,7 +27,7 @@ public class SessionAwareDomainService {
      */
     public DomainAvailabilityResult checkAvailability(String domain, String chatSessionId) {
         // Availability needs no auth: anonymous sessions use the public catalog endpoint
-        // (list pricing). Errors propagate — never a fabricated available:false (audit F1).
+        // (list pricing). Errors propagate, never a fabricated available:false (audit F1).
         String token = sessionAwareAuthService.getCurrentToken(chatSessionId);
         DomainAvailabilityResponse response = token != null
                 ? backendClient.checkAvailability(domain, token)

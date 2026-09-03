@@ -21,8 +21,14 @@ public class AuditMCPServer {
     @Inject
     AuditService auditService;
 
-    @Tool(description = "Get the audit trail (history of all changes) for a specific domain. Requires authentication. Required: domain (string)")
-    public AuditTrailResult getDomainAuditTrail(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Get the audit trail (history of all changes) for a specific domain. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get domain audit trail",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public AuditTrailResult getDomainAuditTrail(@ToolArg(description = "Fully qualified domain name to fetch the audit trail for (e.g. 'example.com').") String domain,@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return auditService.getDomainAuditTrail(domain);
         } catch (Exception e) {
@@ -31,8 +37,14 @@ public class AuditMCPServer {
         }
     }
 
-    @Tool(description = "Get recent audit logs for the authenticated user across all services. Requires authentication. Optional: page (Integer), size (Integer)")
-    public AuditLogListResult getMyAuditLogs(@ToolArg(required = false) Integer page, @ToolArg(required = false) Integer size, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Get recent audit logs for the authenticated user across all services. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get my audit logs",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public AuditLogListResult getMyAuditLogs(@ToolArg(required = false, description = "Zero-based page number for pagination.") Integer page, @ToolArg(required = false, description = "Number of log entries per page.") Integer size,@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return auditService.getMyAuditLogs(page, size);
         } catch (Exception e) {
@@ -41,7 +53,13 @@ public class AuditMCPServer {
         }
     }
 
-    @Tool(description = "Get the most recent activity across all domains and services for the user. Requires authentication.")
+    @Tool(description = "Get the most recent activity across all domains and services for the user. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Get recent activity",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public RecentActivityResult getRecentActivity(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return auditService.getRecentActivity();

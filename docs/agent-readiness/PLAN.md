@@ -71,6 +71,21 @@ Done in this repo:
 
 Still open (docs/TODO.md): Idempotency-Key pass-through (backend ledger), per-tool scope declarations (with A.0 inventory), telemetry "registered" stage.
 
+## Quality-score pass + MCP 2.x upgrade (2026-09-02)
+
+Directory scorecard feedback (score 41) worked in full:
+1. **Tool annotations** - all 105 tools carry `@Tool.Annotations` (title, readOnlyHint, destructiveHint, idempotentHint, openWorldHint=false). Deletes/unlock/OS-rebuild/executeConfirmedAction are destructiveHint=true; reads are readOnly+idempotent.
+2. **Parameter descriptions** - every non-session parameter described (enums, formats, ranges: DNS types, paymentTerm values, +CC.number phones, ISO country codes, years 1-10).
+3. **Output schemas** - `structuredContent=true` on the 11 most-chained tools (availability, pricing, quotes, bundle, balance, auth/device status, onboarding) + compatibility-mode so legacy clients still get text. Known gap: `@JsonPropertyDescription` on nested POJOs (RegistrantInfo, Contact) does not reach the generated schema in quarkus-mcp 2.0.0; the parameter-level descriptions carry the formats instead.
+4. **Server instructions** - `server-info.instructions` ships the 5-rule orientation in every initialize response.
+5. **Description length** - listCategorizedTlds 2002→373 chars, osirSiteDesignBrief 1513→369; zero em dashes remain in any tool metadata.
+6. **Prompts** - all @Prompt methods have descriptions.
+7. **Resources** - `osir://catalog/tlds` and `osir://catalog/products` (anonymous JSON, ~15 min cache).
+8. **Near-duplicates** - disambiguation wording added (keyword pair, transferDomain vs initiateTransfer, suggestAlternatives marked legacy).
+9. **Version signal** - serverInfo now explicit: name OSIR, title, version 2.2.0 (bump on every tool change!), websiteUrl, icon (osir.com/og-image.png 400x400).
+
+**MCP 2.x upgrade**: quarkus-mcp-server 1.11.0 → 2.0.0 (see docs/TODO.md "MCP transport" for the endpoint-layout compat notes). Stateless auto-init verified; all 218 mcp-server tests green; wire-level smoke confirmed annotations/schemas/resources/icons/instructions.
+
 ## Sequencing (matches the brief's cross-project steps)
 
 1. **Now:** F1 fix (MCP-side, self-contained) · A.0 inventory · A.1 phase-1 harness + baseline · MCP 2.x upgrade spike · A.8 `04-discovery.sh`

@@ -6,7 +6,7 @@ This project provides two complementary AI integration servers for the OSIR doma
 
 | Server | Port | Protocol | Purpose |
 |--------|------|----------|---------|
-| **MCP Server** | 8081 | Model Context Protocol (SSE) | 88 individual tools for AI assistants |
+| **MCP Server** | 8081 | Model Context Protocol (SSE) | 105 individual tools for AI assistants |
 | **A2A Server** | 8082 | Google Agent-to-Agent (JSON-RPC) | Specialist agents for task-level orchestration |
 
 **MCP** is for single-agent use: Claude, ChatGPT, or any MCP-compatible client calls individual tools like `checkDomainAvailability` or `registerDomain`.
@@ -87,7 +87,7 @@ Most tools require authentication. Use one of these methods:
 **Option B: Username/Password**
 1. Call `authenticateUser` with username and password
 
-### Available Tools (106 total)
+### Available Tools (105 total)
 
 #### Authentication (5)
 | Tool | Description |
@@ -476,7 +476,7 @@ docker-compose logs -f
 ┌──────▼──────┐ ┌─▼──────────────────────────┐
 │ MCP Server  │ │ A2A Server                  │
 │ :8081       │ │ :8082                       │
-│ 106 tools   │ │ Orchestrator                │
+│ 105 tools   │ │ Orchestrator                │
 │  11 prompts │ │  ├─ Domain Agent (13 skills)│
 │             │ │  ├─ DNS Agent (5 skills)    │
 │             │ │  ├─ VPS Agent (12 skills)   │
@@ -501,7 +501,7 @@ docker-compose logs -f
      └────────────────┘
 ```
 
-Both servers share the `common` module — same services, same REST clients, same models. The MCP server exposes them as 88 individual tools. The A2A server wraps them in 7 specialist agents with 50+ skills, coordinated by an orchestrator that handles multi-step workflows.
+Both servers share the `common` module — same services, same REST clients, same models. The MCP server exposes them as 105 individual tools. The A2A server wraps them in 7 specialist agents with 50+ skills, coordinated by an orchestrator that handles multi-step workflows.
 
 ### Security & Operations
 - **CORS:** restricted to configured origins (permissive in dev mode)

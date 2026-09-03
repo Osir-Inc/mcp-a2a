@@ -11,7 +11,7 @@ import org.jboss.logging.Logger;
  * MCP authorization challenge (RFC 9728 / MCP authorization spec).
  *
  * The MCP transport endpoints are OAuth-protected. An unauthenticated request gets a 401
- * whose WWW-Authenticate header points at the protected-resource metadata — that challenge
+ * whose WWW-Authenticate header points at the protected-resource metadata, that challenge
  * is what makes an OAuth-capable client (Claude.ai) run discovery + browser login and then
  * send {@code Authorization: Bearer} on every call. A Bearer header is the only identity that
  * survives such a client opening a new MCP session (new connection id) per request.
@@ -42,7 +42,7 @@ public class McpOAuthChallengeFilter {
                     && isMcpTransport(rc.normalizedPath())
                     && !"OPTIONS".equals(rc.request().method().name())
                     && !hasBearer(rc)) {
-                LOG.debugf("Unauthenticated %s %s — issuing OAuth challenge",
+                LOG.debugf("Unauthenticated %s %s, issuing OAuth challenge",
                         rc.request().method().name(), rc.normalizedPath());
                 rc.response()
                         .setStatusCode(401)

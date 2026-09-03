@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * RFC 9728 — OAuth 2.0 Protected Resource Metadata.
+ * RFC 9728, OAuth 2.0 Protected Resource Metadata.
  *
  * Claude's MCP connector fetches this first to discover which Authorization
  * Server issues tokens for this resource. The WWW-Authenticate header in the

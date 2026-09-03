@@ -17,7 +17,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 /**
- * Anonymous account onboarding (backend v2.11.0) — the autonomous-agent path to an ACTIVE
+ * Anonymous account onboarding (backend v2.11.0), the autonomous-agent path to an ACTIVE
  * account with no browser: createAccount → email verification code → verifyAccount.
  * Deliberately NOT @RequiresAuth: these tools exist precisely for callers with no account yet.
  */
@@ -32,7 +32,7 @@ public class AccountOnboardingMCPServer {
     @Inject
     DestructiveOpRateLimiter rateLimiter;
 
-    // ponytail: per-connection limit only — a churny client gets fresh buckets. The backend's
+    // ponytail: per-connection limit only, a churny client gets fresh buckets. The backend's
     // per-client/per-account velocity limits (B.3) are the authoritative abuse guard.
     private void rateLimit(McpConnection connection, String what) {
         if (!rateLimiter.tryAcquire(connection.id(), DestructiveOpRateLimiter.Bucket.DESTRUCTIVE)) {
@@ -41,29 +41,29 @@ public class AccountOnboardingMCPServer {
     }
 
     @Tool(description = """
-            Create a new OSIR customer account. No authentication required — this is step 1 of \
-            onboarding. The contact must be the PRINCIPAL's real ICANN registrant contact (the \
+            Create a new OSIR customer account; step 1 of onboarding, no authentication \
+            required. The contact must be the PRINCIPAL's real ICANN registrant contact (the \
             human or business the account is for), never the AI agent itself. Sends a \
-            verification email to the account email; the principal relays the emailed code to \
-            complete verification via verifyAccount. acceptedTerms must be true and requires the \
-            principal's actual consent to the OSIR terms (state the termsVersion you accepted). \
-            While PENDING_VERIFICATION the account can search, quote and fund; billable actions \
-            (registerDomain execution) need ACTIVE. Calling again for a PENDING account re-sends \
-            the verification email. Required: email, accountType (INDIVIDUAL|ORGANIZATION), \
-            contact {firstName, lastName, email, phone (+CC.number), street1, city, country \
-            (2-letter)}, acceptedTerms, termsVersion. Optional: password, agentName, agentVendor, \
-            principalReference (audit trail of which agent acted for whom). \
-            Next step: verifyAccount with the emailed code.""")
+            verification email; complete via verifyAccount with the emailed code. While \
+            PENDING_VERIFICATION the account can search, quote and fund; billable actions need \
+            ACTIVE. Calling again for a PENDING account re-sends the verification email.""",
+            structuredContent = true,
+            annotations = @Tool.Annotations(
+                    title = "Create account",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public CreateAccountResponse createAccount(
-            String email,
-            String accountType,
-            CreateAccountRequest.Contact contact,
-            boolean acceptedTerms,
-            String termsVersion,
-            @ToolArg(required = false) String password,
-            @ToolArg(required = false) String agentName,
-            @ToolArg(required = false) String agentVendor,
-            @ToolArg(required = false) String principalReference,
+            @ToolArg(description = "Account login email; valid mailbox that receives the verification code.") String email,
+            @ToolArg(description = "Account type: INDIVIDUAL or ORGANIZATION.") String accountType,
+            @ToolArg(description = "The principal's real ICANN registrant contact (firstName, lastName, email, phone, street1, city, country), never the AI agent itself.") CreateAccountRequest.Contact contact,
+            @ToolArg(description = "Must be true; requires the principal's actual consent to the OSIR terms of service.") boolean acceptedTerms,
+            @ToolArg(description = "Version of the OSIR terms the principal accepted, e.g. '2026-09'.") String termsVersion,
+            @ToolArg(required = false, description = "Optional account password; if omitted the account is agent-managed until a password is set.") String password,
+            @ToolArg(required = false, description = "Name of the AI agent acting for the principal, recorded for the audit trail.") String agentName,
+            @ToolArg(required = false, description = "Vendor of the AI agent acting for the principal, recorded for the audit trail.") String agentVendor,
+            @ToolArg(required = false, description = "Principal's own reference identifying who the agent acted for, recorded for the audit trail.") String principalReference,
             McpConnection connection) {
         rateLimit(connection, "account creation");
         if (!acceptedTerms) {
@@ -90,13 +90,22 @@ public class AccountOnboardingMCPServer {
     }
 
     @Tool(description = """
-            Verify a newly created OSIR account with the code from the verification email — \
+            Verify a newly created OSIR account with the code from the verification email; \
             step 2 of onboarding, no authentication required. The code is the same token as the \
             email link, so the principal can relay it to their agent. On success the account \
             becomes ACTIVE and billable actions are unlocked. If the code expired, call \
-            createAccount again with the same email to get a fresh one. \
-            Required: accountId (from createAccount), code.""")
-    public VerifyAccountResponse verifyAccount(String accountId, String code, McpConnection connection) {
+            createAccount again with the same email to get a fresh one.""",
+            structuredContent = true,
+            annotations = @Tool.Annotations(
+                    title = "Verify account",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public VerifyAccountResponse verifyAccount(
+            @ToolArg(description = "Account identifier returned by createAccount.") String accountId,
+            @ToolArg(description = "Verification code from the email sent by createAccount.") String code,
+            McpConnection connection) {
         rateLimit(connection, "verification");
         try {
             return backendClient.verifyAccount(new VerifyAccountRequest(accountId, code));

@@ -23,14 +23,14 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Orchestrates osirAppMoveToOwned: order a VPS on the CUSTOMER's account (staged through the
  * existing confirmation gate), wait for the OS build, then hand C2 the ready box (C2 ships the
- * image server-side — the app's files never pass through the LLM) and bind DNS.
+ * image server-side, the app's files never pass through the LLM) and bind DNS.
  *
  * <p><b>Money rule:</b> {@link #orderedInstances} records the instanceId the moment an order
- * succeeds, keyed per user+app. While an entry exists this service NEVER orders again — a build
+ * succeeds, keyed per user+app. While an entry exists this service NEVER orders again, a build
  * still in progress resumes by polling, a FAILED build is repaired with the free
  * buildVpsInstance, and only a completed move clears the entry.
  *
- * <p>ponytail: tracker is in-memory — a server restart forgets an in-flight move and the user
+ * <p>ponytail: tracker is in-memory, a server restart forgets an in-flight move and the user
  * would be told to order again. Persist to the DB task store if that ever bites.
  */
 @ApplicationScoped
@@ -54,12 +54,12 @@ public class MoveToOwnedService {
     @Inject
     AuthService authService;
 
-    /** Public half of the platform deploy keypair — injected into the customer's box so C2 can SSH in. */
+    /** Public half of the platform deploy keypair, injected into the customer's box so C2 can SSH in. */
     @ConfigProperty(name = "osir.vps.platform-ssh-pubkey")
     String platformSshPubkey;
 
     // "user-sub|appName" -> ordered instanceId (or ORDER_PENDING while the order call is in
-    // flight — the reservation that makes a concurrent/second execute unable to order again).
+    // flight, the reservation that makes a concurrent/second execute unable to order again).
     private final Map<String, String> orderedInstances = new ConcurrentHashMap<>();
 
     /** Sentinel tracker value: an order for this key is being placed right now. */
@@ -74,7 +74,7 @@ public class MoveToOwnedService {
 
     /**
      * Pre-flight: app exists/runs and belongs to the caller, OS template resolved FRESH
-     * (ids drift per install — never reuse a remembered one), platform key stored (idempotent).
+     * (ids drift per install, never reuse a remembered one), platform key stored (idempotent).
      * Throws IllegalStateException with an LLM-usable message on any failure.
      */
     public Prepared prepare(String appName, String packageId) {
@@ -86,7 +86,7 @@ public class MoveToOwnedService {
         String appState = status.app().status();
         if (appState != null && !"READY".equalsIgnoreCase(appState) && !"RUNNING".equalsIgnoreCase(appState)) {
             throw new IllegalStateException("App '" + appName + "' is in state " + appState
-                    + " — it must be running before it can be moved. Check osirAppStatus and fix it first.");
+                    + ", it must be running before it can be moved. Check osirAppStatus and fix it first.");
         }
 
         VpsOsTemplateListResult templates = vpsService.listOsTemplates(packageId, null, false);
@@ -128,10 +128,10 @@ public class MoveToOwnedService {
         String existing = orderedInstances.putIfAbsent(moveKey, ORDER_PENDING);
         if (ORDER_PENDING.equals(existing)) {
             return MoveToOwnedResult.fail("An order for '" + appName + "' is being placed right now. "
-                    + "Wait a moment, then call osirAppMoveToOwned again to check progress — do not order again.");
+                    + "Wait a moment, then call osirAppMoveToOwned again to check progress, do not order again.");
         }
         if (existing != null) {
-            LOG.infof("moveToOwned: duplicate execute for app %s — resuming instance %s instead of re-ordering",
+            LOG.infof("moveToOwned: duplicate execute for app %s, resuming instance %s instead of re-ordering",
                     appName, existing);
             return pollAndFinish(appName, moveKey, existing, domain);
         }
@@ -141,11 +141,11 @@ public class MoveToOwnedService {
             order = vpsService.orderVps(packageId, appName + "-owned.osir.app", "MONTHLY",
                     prep.osTemplateId(), List.of(prep.sshKeyId()));
         } catch (RuntimeException e) {
-            orderedInstances.remove(moveKey, ORDER_PENDING); // release reservation — retry allowed
+            orderedInstances.remove(moveKey, ORDER_PENDING); // release reservation, retry allowed
             throw e;
         }
         if (!order.isSuccess() || order.getInstanceId() == null) {
-            orderedInstances.remove(moveKey, ORDER_PENDING); // nothing bought — retry allowed
+            orderedInstances.remove(moveKey, ORDER_PENDING); // nothing bought, retry allowed
             throw new RuntimeException("VPS order failed: " + order.getMessage());
         }
         orderedInstances.put(moveKey, order.getInstanceId());
@@ -153,7 +153,7 @@ public class MoveToOwnedService {
         return pollAndFinish(appName, moveKey, order.getInstanceId(), domain);
     }
 
-    /** Continue a move whose VPS is already ordered — never orders again. */
+    /** Continue a move whose VPS is already ordered, never orders again. */
     public MoveToOwnedResult resume(String appName, String domain) {
         String moveKey = key(appName);
         String instanceId = orderedInstances.get(moveKey);
@@ -163,7 +163,7 @@ public class MoveToOwnedService {
         }
         if (ORDER_PENDING.equals(instanceId)) {
             return MoveToOwnedResult.fail("The order for '" + appName + "' is still being placed. "
-                    + "Wait a moment and call osirAppMoveToOwned again — do not order again.");
+                    + "Wait a moment and call osirAppMoveToOwned again, do not order again.");
         }
         return pollAndFinish(appName, moveKey, instanceId, domain);
     }
@@ -181,7 +181,7 @@ public class MoveToOwnedService {
             if ("FAILED".equalsIgnoreCase(buildState)) {
                 // Money rule: NEVER re-order. buildVpsInstance is a free, bounded rebuild.
                 return new MoveToOwnedResult(false, "BUILD_FAILED",
-                        "The OS install on VPS '" + instanceId + "' failed. Do NOT order again — the server is "
+                        "The OS install on VPS '" + instanceId + "' failed. Do NOT order again, the server is "
                                 + "already paid for. Rebuild it for free, then resume the move.",
                         instanceId, instance.getIpAddress(), domain, null,
                         "1) listVpsOsTemplates(instanceId=" + instanceId + ") to resolve the current Ubuntu 24.04 "
@@ -191,9 +191,9 @@ public class MoveToOwnedService {
             if (System.currentTimeMillis() >= deadline) {
                 return new MoveToOwnedResult(false, "BUILDING",
                         "VPS '" + instanceId + "' is still building (" + (buildState == null ? "status pending" : buildState)
-                                + "). The order is placed — nothing more will be charged.",
+                                + "). The order is placed, nothing more will be charged.",
                         instanceId, instance == null ? null : instance.getIpAddress(), domain, null,
-                        "Call osirAppMoveToOwned again with the same arguments in a minute — it resumes and never orders twice.");
+                        "Call osirAppMoveToOwned again with the same arguments in a minute, it resumes and never orders twice.");
             }
             try {
                 Thread.sleep(pollIntervalMs);
@@ -208,13 +208,13 @@ public class MoveToOwnedService {
     private MoveToOwnedResult finishMove(String appName, String moveKey, String instanceId, VpsInstanceSummary instance, String domain) {
         String ip = instance.getIpAddress();
         // Guard: a box can report COMPLETE before its IP field populates. Shipping ip=null would
-        // just bounce off C2's 422 — wait instead, the tracker keeps the move resumable.
+        // just bounce off C2's 422, wait instead, the tracker keeps the move resumable.
         if (ip == null || ip.isBlank()) {
             return new MoveToOwnedResult(false, "BUILDING",
                     "VPS '" + instanceId + "' is built but has no IP address assigned yet. "
-                            + "The order is placed — nothing more will be charged.",
+                            + "The order is placed, nothing more will be charged.",
                     instanceId, null, domain, null,
-                    "Call osirAppMoveToOwned again with the same arguments in a minute — it resumes and never orders twice.");
+                    "Call osirAppMoveToOwned again with the same arguments in a minute, it resumes and never orders twice.");
         }
         if (!deploymentService.moveToOwned(appName, instanceId, ip, domain)) {
             // Tracker entry kept; C2's endpoint is idempotent per instanceId, so resuming is safe.
@@ -226,7 +226,7 @@ public class MoveToOwnedService {
         }
 
         Boolean dnsBound = null;
-        // C2 accepted the move but ships asynchronously (~3-5 min) — the honest instruction is
+        // C2 accepted the move but ships asynchronously (~3-5 min), the honest instruction is
         // "poll osirAppStatus until tier reads owned", not "it's done".
         String nextStep = "Check osirAppStatus for '" + appName
                 + "' until tier reads 'owned' (typically a few minutes).";
@@ -239,7 +239,7 @@ public class MoveToOwnedService {
             }
         }
 
-        // Same key the operation started with — never re-derive identity mid-flight.
+        // Same key the operation started with, never re-derive identity mid-flight.
         orderedInstances.remove(moveKey);
         LOG.infof("moveToOwned: app %s handed to C2 for instance %s (%s)", appName, instanceId, ip);
         return new MoveToOwnedResult(true, "MOVING",
@@ -251,12 +251,12 @@ public class MoveToOwnedService {
 
     /**
      * Bind the apex A record to the new box when the zone is hosted with us. ALWAYS re-lists for
-     * the current record id right before updating — ids are content-derived, a stale id is a 500.
+     * the current record id right before updating, ids are content-derived, a stale id is a 500.
      */
     private boolean bindDomain(String domain, String ip) {
         DnsRecordListResult zone = dnsService.listRecords(domain);
         if (!zone.isSuccess() || zone.getRecords() == null) {
-            return false; // external NS (or zone unreadable) — caller returns manual instructions
+            return false; // external NS (or zone unreadable), caller returns manual instructions
         }
         DnsRecord apexA = zone.getRecords().stream()
                 .filter(r -> "A".equalsIgnoreCase(r.getType()))
@@ -274,7 +274,7 @@ public class MoveToOwnedService {
     }
 
     /**
-     * Money-rule tracker key: the caller's stable subject + app. FAIL-CLOSED — if the subject
+     * Money-rule tracker key: the caller's stable subject + app. FAIL-CLOSED, if the subject
      * cannot be resolved we refuse rather than bucket callers into a shared key: a shared bucket
      * would leak one user's move state to another AND let a re-keyed caller order twice.
      */
@@ -285,7 +285,7 @@ public class MoveToOwnedService {
         Object sub = claims == null ? null : claims.get("sub");
         if (sub == null || sub.toString().isBlank()) {
             throw new IllegalStateException("Could not resolve your identity from the session token. "
-                    + "Re-authenticate (loginWithDevice or reconnect) and try again — nothing was ordered.");
+                    + "Re-authenticate (loginWithDevice or reconnect) and try again, nothing was ordered.");
         }
         return sub + "|" + appName;
     }

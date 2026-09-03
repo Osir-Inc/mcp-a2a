@@ -8,8 +8,8 @@ import java.util.Map;
 
 /**
  * Turns a backend failure into an honest MCP tool error, passing through the backend's
- * machine-readable fields — {@code code}/{@code errorCode}, {@code message}/{@code error} and the
- * new {@code resolution} hint (backend v2.11.0) — instead of fabricating a domain-shaped result
+ * machine-readable fields, {@code code}/{@code errorCode}, {@code message}/{@code error} and the
+ * new {@code resolution} hint (backend v2.11.0), instead of fabricating a domain-shaped result
  * (audit F1: never report available:false for a non-domain reason).
  */
 public final class ToolErrors {

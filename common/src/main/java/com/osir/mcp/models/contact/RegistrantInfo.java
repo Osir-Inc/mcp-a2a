@@ -1,13 +1,22 @@
 package com.osir.mcp.models.contact;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+
 // Contact Information Models
 public class RegistrantInfo {
+    @JsonPropertyDescription("Registrant's legal first name.")
     private String firstName;
+    @JsonPropertyDescription("Registrant's legal last name.")
     private String lastName;
+    @JsonPropertyDescription("Organization name, if registering on behalf of a company.")
     private String organization;
+    @JsonPropertyDescription("Registrant's email address; a valid mailbox that receives ICANN verification.")
     private String email;
+    @JsonPropertyDescription("Phone number in +CC.number format, e.g. +355.42123456.")
     private String phone;
+    @JsonPropertyDescription("Fax number in +CC.number format, e.g. +355.42123456; rarely used.")
     private String fax;
+    @JsonPropertyDescription("Registrant's postal address.")
     private Address address;
 
     public RegistrantInfo() {}

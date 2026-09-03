@@ -7,7 +7,7 @@ import jakarta.enterprise.event.Observes;
 /**
  * Backwards compatibility for the published Streamable HTTP URL.
  *
- * quarkus-mcp-server 1.x served Streamable HTTP at /mcp/http (our published connector URL —
+ * quarkus-mcp-server 1.x served Streamable HTTP at /mcp/http (our published connector URL -
  * README, osir.com, every connected client). 2.x serves it at the root-path (/mcp) and the
  * legacy SSE transport at /mcp/sse. This filter reroutes /mcp/http to /mcp so both the old
  * and the new URL work. Do not remove without a client deprecation period.

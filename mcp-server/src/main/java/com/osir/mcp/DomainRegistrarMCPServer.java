@@ -54,7 +54,13 @@ public class DomainRegistrarMCPServer {
 
     // ── Authentication ────────────────────────────────────────────────────────
 
-    @Tool(name = "loginWithDevice", description = "Start a device authorization login (RFC 8628). Returns a verificationUri and userCode. Open the URI in your browser, enter the code, and sign in with your OSIR credentials. Then call checkDeviceLoginStatus with the returned deviceCode to complete login. No parameters required.")
+    @Tool(name = "loginWithDevice", description = "Start a device authorization login (RFC 8628). Returns a verificationUri and userCode. Open the URI in your browser, enter the code, and sign in with your OSIR credentials. Then call checkDeviceLoginStatus with the returned deviceCode to complete login. No parameters required.",
+            annotations = @Tool.Annotations(
+                    title = "Start device login",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
     public DeviceLoginResult loginWithDevice(McpConnection connection) {
         Log.infof("Starting device authorization login flow for connection %s", connection.id());
         try {
@@ -64,8 +70,17 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Poll for device login completion. Call this after loginWithDevice() once you have opened the verification URL and signed in. Required: deviceCode (the device_code returned by loginWithDevice). On success returns a sessionKey — pass it as the sessionKey argument on every subsequent authenticated tool call.")
-    public DeviceLoginStatusResult checkDeviceLoginStatus(String deviceCode, McpConnection connection) {
+    @Tool(description = "Poll for device login completion. Call this after loginWithDevice() once you have opened the verification URL and signed in. Required: deviceCode (the device_code returned by loginWithDevice). On success returns a sessionKey; pass it as the sessionKey argument on every subsequent authenticated tool call.",
+            structuredContent = true,
+            annotations = @Tool.Annotations(
+                    title = "Check device login status",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public DeviceLoginStatusResult checkDeviceLoginStatus(
+            @ToolArg(description = "The device_code value returned by loginWithDevice.") String deviceCode,
+            McpConnection connection) {
         Log.infof("Checking device login status for connection %s", connection.id());
         try {
             return sessionAuthService.checkDeviceLoginStatus(connection.id(), deviceCode);
@@ -74,7 +89,14 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Check whether the current session is authenticated. Returns authenticated status and token expiry. Optional: sessionKey (from checkDeviceLoginStatus).")
+    @Tool(description = "Check whether the current session is authenticated. Returns authenticated status and token expiry. Optional: sessionKey (from checkDeviceLoginStatus).",
+            structuredContent = true,
+            annotations = @Tool.Annotations(
+                    title = "Get authentication status",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public AuthStatusResult getAuthStatus(
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection) {
@@ -96,7 +118,13 @@ public class DomainRegistrarMCPServer {
         return connStatus;
     }
 
-    @Tool(description = "Log out: revokes the session's tokens at the identity provider immediately. Optional: sessionKey (from checkDeviceLoginStatus) — pass it to end that conversation session.")
+    @Tool(description = "Log out: revokes the session's tokens at the identity provider immediately. Optional: sessionKey (from checkDeviceLoginStatus); pass it to end that conversation session.",
+            annotations = @Tool.Annotations(
+                    title = "Log out",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public AuthResult logout(
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection) {
@@ -113,8 +141,17 @@ public class DomainRegistrarMCPServer {
     // ── Domain Availability ───────────────────────────────────────────────────
 
     // Domain Availability Tools
-    @Tool(description = "Check if a domain name is available for registration, with price. No authentication required — anonymous callers get list pricing; authenticated callers get their account pricing. Required: domain (e.g., 'example.com')")
-    public DomainAvailabilityResult checkDomainAvailability(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Check if a domain name is available for registration, with price. No authentication required; anonymous callers get list pricing, authenticated callers get their account pricing. Required: domain (e.g., 'example.com')",
+            structuredContent = true,
+            annotations = @Tool.Annotations(
+                    title = "Check domain availability",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DomainAvailabilityResult checkDomainAvailability(
+            @ToolArg(description = "Fully qualified domain name to check, like \"example.com\", without scheme.") String domain,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         mcpAuthHelper.setupAuth(connection, sessionKey);
         try {
             return domainService.checkAvailability(domain);
@@ -135,15 +172,21 @@ public class DomainRegistrarMCPServer {
 
     // Domain Registration Tools
     @RequiresAuth
-    @Tool(description = "Stage registration of a new domain name. Deducts from account balance. The DNS zone is initialised automatically after registration (asynchronously — if a createDnsRecord call right after registration reports a missing zone, retry after a few seconds); no separate initializeDnsZone call needed (pass initializeDnsZone:false to opt out). Required: domain (e.g., 'example.com'), years (1-10), registrantInfo (contact details), nameservers (e.g., ['ns1.example.com', 'ns2.example.com']). Optional: privacyProtection (true/false), autoRenew (true/false), initializeDnsZone (default true). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
+    @Tool(description = "Stage registration of a new domain name. Deducts from account balance. The DNS zone is initialised automatically after registration (asynchronously; if createDnsRecord right after registration reports a missing zone, retry after a few seconds). Pass initializeDnsZone:false to opt out. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+            annotations = @Tool.Annotations(
+                    title = "Register a domain",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
     public ConfirmationRequiredResult registerDomain(
-            String domain,
-            int years,
-            RegistrantInfo registrantInfo,
-            List<String> nameservers,
-            @ToolArg(required = false) Boolean privacyProtection,
-            @ToolArg(required = false) Boolean autoRenew,
-            @ToolArg(required = false) Boolean initializeDnsZone,
+            @ToolArg(description = "Fully qualified domain name to register, like \"example.com\", without scheme.") String domain,
+            @ToolArg(description = "Registration period in years, 1-10.") int years,
+            @ToolArg(description = "ICANN registrant contact of the domain owner: firstName, lastName, email, phone (+CC.number), and address (street, city, postalCode, country as 2-letter ISO code).") RegistrantInfo registrantInfo,
+            @ToolArg(description = "List of nameserver hostnames, e.g. [\"ns1.example.com\", \"ns2.example.com\"].") List<String> nameservers,
+            @ToolArg(required = false, description = "Enable WHOIS privacy protection; defaults to true.") Boolean privacyProtection,
+            @ToolArg(required = false, description = "Enable automatic renewal; defaults to true.") Boolean autoRenew,
+            @ToolArg(required = false, description = "Initialise the DNS zone after registration; defaults to true.") Boolean initializeDnsZone,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection
     ) {
@@ -151,7 +194,7 @@ public class DomainRegistrarMCPServer {
         boolean renew = autoRenew != null ? autoRenew : true;
         return pendingActionStore.stage(
                 "registerDomain",
-                "Register domain '" + domain + "' for " + years + " year(s) — deducts registration fee from account balance",
+                "Register domain '" + domain + "' for " + years + " year(s), deducts registration fee from account balance",
                 connection.id(),
                 DestructiveOpRateLimiter.Bucket.FINANCIAL,
                 () -> domainService.registerDomain(domain, years, registrantInfo, nameservers, privacy, renew, initializeDnsZone)
@@ -160,11 +203,21 @@ public class DomainRegistrarMCPServer {
 
     // Domain Transfer Tools
     @RequiresAuth
-    @Tool(description = "Stage transfer of a domain from another registrar to OSIR. Deducts from account balance. Required: domain (e.g., 'example.com'), authCode (EPP code from current registrar), registrantInfo (contact details). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult transferDomain(String domain, String authCode, RegistrantInfo registrantInfo, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Stage transfer of a domain from another registrar to OSIR. Deducts from account balance. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+            annotations = @Tool.Annotations(
+                    title = "Transfer a domain",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public ConfirmationRequiredResult transferDomain(
+            @ToolArg(description = "Fully qualified domain name to transfer, like \"example.com\", without scheme.") String domain,
+            @ToolArg(description = "EPP authorization code obtained from the current registrar.") String authCode,
+            @ToolArg(description = "ICANN registrant contact of the domain owner: firstName, lastName, email, phone (+CC.number), and address (street, city, postalCode, country as 2-letter ISO code).") RegistrantInfo registrantInfo,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "transferDomain",
-                "Transfer domain '" + domain + "' to OSIR — deducts transfer fee from account balance",
+                "Transfer domain '" + domain + "' to OSIR, deducts transfer fee from account balance",
                 connection.id(),
                 DestructiveOpRateLimiter.Bucket.FINANCIAL,
                 () -> domainService.transferDomain(domain, authCode, registrantInfo)
@@ -173,8 +226,17 @@ public class DomainRegistrarMCPServer {
 
     // Domain Management Tools
     @RequiresAuth
-    @Tool(description = "Update nameservers for a domain. Required: domain (e.g., 'example.com'), nameservers (e.g., ['ns1.example.com', 'ns2.example.com'])")
-    public NameserverUpdateResult updateNameservers(String domain, List<String> nameservers, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Update nameservers for a domain. Replaces the current nameserver set with the given list.",
+            annotations = @Tool.Annotations(
+                    title = "Update nameservers",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public NameserverUpdateResult updateNameservers(
+            @ToolArg(description = "Fully qualified domain name, like \"example.com\", without scheme.") String domain,
+            @ToolArg(description = "List of nameserver hostnames, e.g. [\"ns1.example.com\", \"ns2.example.com\"].") List<String> nameservers,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.updateNameservers(domain, nameservers);
         } catch (Exception e) {
@@ -183,8 +245,16 @@ public class DomainRegistrarMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Get detailed information about a domain including expiration date, nameservers, and status. Required: domain (e.g., 'example.com')")
-    public DomainInfoResult getDomainInfo(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Get detailed information about a domain including expiration date, nameservers, and status.",
+            annotations = @Tool.Annotations(
+                    title = "Get domain details",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DomainInfoResult getDomainInfo(
+            @ToolArg(description = "Fully qualified domain name, like \"example.com\", without scheme.") String domain,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.getDomainInfo(domain);
         } catch (Exception e) {
@@ -193,7 +263,13 @@ public class DomainRegistrarMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "List all domains owned by the authenticated user. No parameters required. Must be authenticated first.")
+    @Tool(description = "List all domains owned by the authenticated user. No parameters required. Must be authenticated first.",
+            annotations = @Tool.Annotations(
+                    title = "List my domains",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
     public UserDomainsResult listUserDomains(@ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.getUserDomains();
@@ -204,11 +280,20 @@ public class DomainRegistrarMCPServer {
 
     // Domain Renewal
     @RequiresAuth
-    @Tool(description = "Stage renewal of a domain for a specified number of years. Deducts from account balance. Required: domain (e.g., 'example.com'), years (1-10). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult renewDomain(String domain, int years, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Stage renewal of a domain for a specified number of years. Deducts from account balance. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+            annotations = @Tool.Annotations(
+                    title = "Renew a domain",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public ConfirmationRequiredResult renewDomain(
+            @ToolArg(description = "Fully qualified domain name to renew, like \"example.com\", without scheme.") String domain,
+            @ToolArg(description = "Renewal period in years, 1-10.") int years,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "renewDomain",
-                "Renew domain '" + domain + "' for " + years + " year(s) — deducts renewal fee from account balance",
+                "Renew domain '" + domain + "' for " + years + " year(s), deducts renewal fee from account balance",
                 connection.id(),
                 DestructiveOpRateLimiter.Bucket.FINANCIAL,
                 () -> domainService.renewDomain(domain, years)
@@ -217,8 +302,16 @@ public class DomainRegistrarMCPServer {
 
     // Domain Lock/Unlock
     @RequiresAuth
-    @Tool(description = "Enable registrar lock on a domain to prevent unauthorized transfers. Required: domain (e.g., 'example.com')")
-    public DomainActionResult lockDomain(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Enable registrar lock on a domain to prevent unauthorized transfers.",
+            annotations = @Tool.Annotations(
+                    title = "Lock a domain",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DomainActionResult lockDomain(
+            @ToolArg(description = "Fully qualified domain name to lock, like \"example.com\", without scheme.") String domain,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.lockDomain(domain);
         } catch (Exception e) {
@@ -227,11 +320,19 @@ public class DomainRegistrarMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Stage removal of registrar lock from a domain to allow transfers. DESTRUCTIVE — reduces domain security. Required: domain (e.g., 'example.com'). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult unlockDomain(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Stage removal of registrar lock from a domain to allow transfers. DESTRUCTIVE: reduces domain security. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+            annotations = @Tool.Annotations(
+                    title = "Unlock a domain",
+                    readOnlyHint = false,
+                    destructiveHint = true,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public ConfirmationRequiredResult unlockDomain(
+            @ToolArg(description = "Fully qualified domain name to unlock, like \"example.com\", without scheme.") String domain,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "unlockDomain",
-                "Remove registrar lock from domain '" + domain + "' — reduces security, enables transfers",
+                "Remove registrar lock from domain '" + domain + "', reduces security, enables transfers",
                 connection.id(),
                 DestructiveOpRateLimiter.Bucket.DESTRUCTIVE,
                 () -> domainService.unlockDomain(domain)
@@ -240,8 +341,17 @@ public class DomainRegistrarMCPServer {
 
     // Domain Settings
     @RequiresAuth
-    @Tool(description = "Enable or disable auto-renewal for a domain. Required: domain (e.g., 'example.com'), enabled (true/false)")
-    public DomainActionResult updateDomainAutoRenew(String domain, boolean enabled, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Enable or disable auto-renewal for a domain.",
+            annotations = @Tool.Annotations(
+                    title = "Set domain auto-renew",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public DomainActionResult updateDomainAutoRenew(
+            @ToolArg(description = "Fully qualified domain name, like \"example.com\", without scheme.") String domain,
+            @ToolArg(description = "true to enable automatic renewal, false to disable it.") boolean enabled,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.updateAutoRenew(domain, enabled);
         } catch (Exception e) {
@@ -250,8 +360,17 @@ public class DomainRegistrarMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "Enable or disable WHOIS privacy protection for a domain. Required: domain (e.g., 'example.com'), enabled (true/false)")
-    public DomainActionResult updateDomainPrivacy(String domain, boolean enabled, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Enable or disable WHOIS privacy protection for a domain.",
+            annotations = @Tool.Annotations(
+                    title = "Set WHOIS privacy",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public DomainActionResult updateDomainPrivacy(
+            @ToolArg(description = "Fully qualified domain name, like \"example.com\", without scheme.") String domain,
+            @ToolArg(description = "true to enable WHOIS privacy protection, false to disable it.") boolean enabled,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.updatePrivacyProtection(domain, enabled);
         } catch (Exception e) {
@@ -260,14 +379,31 @@ public class DomainRegistrarMCPServer {
     }
 
     // Utility Tools
-    @Tool(description = "Validate if a domain name format is correct. Required: domain (e.g., 'example.com')")
-    public ValidationResult validateDomainName(String domain, McpConnection connection) {
+    @Tool(description = "Validate if a domain name format is correct. No authentication required.",
+            annotations = @Tool.Annotations(
+                    title = "Validate domain name",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public ValidationResult validateDomainName(
+            @ToolArg(description = "Fully qualified domain name to validate, like \"example.com\", without scheme.") String domain,
+            McpConnection connection) {
         return domainService.validateDomainName(domain);
     }
 
     @RequiresAuth
-    @Tool(description = "Suggest alternative domain names if the requested one is unavailable (legacy method). Required: domain (e.g., 'example.com'). Optional: limit (default 10)")
-    public DomainSuggestionsResult suggestAlternatives(String domain, @ToolArg(required = false) Integer limit, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Suggest alternative domain names if the requested one is unavailable. Legacy; prefer generateDomainSuggestions.",
+            annotations = @Tool.Annotations(
+                    title = "Suggest alternative domains",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DomainSuggestionsResult suggestAlternatives(
+            @ToolArg(description = "Fully qualified domain name to find alternatives for, like \"example.com\", without scheme.") String domain,
+            @ToolArg(required = false, description = "Maximum number of suggestions to return; default 10.") Integer limit,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return domainService.suggestAlternatives(domain, limit != null ? limit : 10);
         } catch (Exception e) {
@@ -276,8 +412,20 @@ public class DomainRegistrarMCPServer {
     }
 
     // Domain Suggestion Tools
-    @Tool(description = "Generate domain name suggestions based on keywords. Required: name (e.g., 'mycompany'). Optional: tlds (e.g., 'com,net,org'), lang ('eng'), useNumbers (true/false), maxResults (20)")
-    public com.osir.mcp.models.suggestion.DomainSuggestionsResult generateDomainSuggestions(String name, @ToolArg(required = false) String tlds, @ToolArg(required = false) String lang, @ToolArg(required = false) Boolean useNumbers, @ToolArg(required = false) Integer maxResults, McpConnection connection) {
+    @Tool(description = "Generate domain name suggestions based on keywords. This is the preferred suggestion tool for a single keyword; use it over suggestAlternatives. Returns suggested names with availability.",
+            annotations = @Tool.Annotations(
+                    title = "Generate domain suggestions",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public com.osir.mcp.models.suggestion.DomainSuggestionsResult generateDomainSuggestions(
+            @ToolArg(description = "Keyword or base name to build suggestions from, e.g. \"mycompany\".") String name,
+            @ToolArg(required = false, description = "Comma-separated TLDs without leading dots, e.g. \"com,net\".") String tlds,
+            @ToolArg(required = false, description = "Language code; default \"eng\".") String lang,
+            @ToolArg(required = false, description = "Allow digits in generated suggestions (true/false).") Boolean useNumbers,
+            @ToolArg(required = false, description = "Maximum suggestions to return; default 20.") Integer maxResults,
+            McpConnection connection) {
         try {
             return domainSuggestionService.suggestDomains(name, tlds, lang, useNumbers, maxResults);
         } catch (Exception e) {
@@ -285,8 +433,21 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Generate domain suggestions by spinning/replacing words. Required: name (e.g., 'pizza,restaurant'). Optional: position (0-based index), similarity (0.0-1.0), tlds ('com,net'), lang ('eng'), maxResults (20)")
-    public com.osir.mcp.models.suggestion.DomainSuggestionsResult spinDomainWords(String name, @ToolArg(required = false) Integer position, @ToolArg(required = false) Double similarity, @ToolArg(required = false) String tlds, @ToolArg(required = false) String lang, @ToolArg(required = false) Integer maxResults, McpConnection connection) {
+    @Tool(description = "Generate domain suggestions by spinning/replacing words with similar alternatives.",
+            annotations = @Tool.Annotations(
+                    title = "Spin domain words",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public com.osir.mcp.models.suggestion.DomainSuggestionsResult spinDomainWords(
+            @ToolArg(description = "Comma-separated words to spin, e.g. \"pizza,restaurant\".") String name,
+            @ToolArg(required = false, description = "0-based index of the word to replace.") Integer position,
+            @ToolArg(required = false, description = "Similarity threshold for replacements, 0.0-1.0.") Double similarity,
+            @ToolArg(required = false, description = "Comma-separated TLDs without leading dots, e.g. \"com,net\".") String tlds,
+            @ToolArg(required = false, description = "Language code; default \"eng\".") String lang,
+            @ToolArg(required = false, description = "Maximum suggestions to return; default 20.") Integer maxResults,
+            McpConnection connection) {
         try {
             return domainSuggestionService.spinWord(name, position, similarity, tlds, lang, maxResults);
         } catch (Exception e) {
@@ -294,8 +455,20 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Generate domain suggestions by adding prefixes. Required: name (e.g., 'mycompany'). Optional: vocabulary ('@prefixes' or custom), tlds ('com,net'), lang ('eng'), maxResults (20)")
-    public com.osir.mcp.models.suggestion.DomainSuggestionsResult addPrefixToDomain(String name, @ToolArg(required = false) String vocabulary, @ToolArg(required = false) String tlds, @ToolArg(required = false) String lang, @ToolArg(required = false) Integer maxResults, McpConnection connection) {
+    @Tool(description = "Generate domain suggestions by adding prefixes to a base name.",
+            annotations = @Tool.Annotations(
+                    title = "Add domain prefixes",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public com.osir.mcp.models.suggestion.DomainSuggestionsResult addPrefixToDomain(
+            @ToolArg(description = "Base name to prefix, e.g. \"mycompany\".") String name,
+            @ToolArg(required = false, description = "Prefix vocabulary: \"@prefixes\" or a custom comma-separated list.") String vocabulary,
+            @ToolArg(required = false, description = "Comma-separated TLDs without leading dots, e.g. \"com,net\".") String tlds,
+            @ToolArg(required = false, description = "Language code; default \"eng\".") String lang,
+            @ToolArg(required = false, description = "Maximum suggestions to return; default 20.") Integer maxResults,
+            McpConnection connection) {
         try {
             return domainSuggestionService.addPrefix(name, vocabulary, tlds, lang, maxResults);
         } catch (Exception e) {
@@ -303,8 +476,20 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Generate domain suggestions by adding suffixes. Required: name (e.g., 'mycompany'). Optional: vocabulary ('@suffixes' or custom), tlds ('com,net'), lang ('eng'), maxResults (20)")
-    public com.osir.mcp.models.suggestion.DomainSuggestionsResult addSuffixToDomain(String name, @ToolArg(required = false) String vocabulary, @ToolArg(required = false) String tlds, @ToolArg(required = false) String lang, @ToolArg(required = false) Integer maxResults, McpConnection connection) {
+    @Tool(description = "Generate domain suggestions by adding suffixes to a base name.",
+            annotations = @Tool.Annotations(
+                    title = "Add domain suffixes",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public com.osir.mcp.models.suggestion.DomainSuggestionsResult addSuffixToDomain(
+            @ToolArg(description = "Base name to suffix, e.g. \"mycompany\".") String name,
+            @ToolArg(required = false, description = "Suffix vocabulary: \"@suffixes\" or a custom comma-separated list.") String vocabulary,
+            @ToolArg(required = false, description = "Comma-separated TLDs without leading dots, e.g. \"com,net\".") String tlds,
+            @ToolArg(required = false, description = "Language code; default \"eng\".") String lang,
+            @ToolArg(required = false, description = "Maximum suggestions to return; default 20.") Integer maxResults,
+            McpConnection connection) {
         try {
             return domainSuggestionService.addSuffix(name, vocabulary, tlds, lang, maxResults);
         } catch (Exception e) {
@@ -312,38 +497,19 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = """
-            Generate domain name suggestions for one or more keywords across a chosen \
-            set of TLDs. Returns suggestions grouped by originating keyword.
-
-            USAGE PATTERN:
-              This is typically called AFTER listCategorizedTlds. The standard flow is:
-                1. listCategorizedTlds → pick 3-6 TLDs based on the user's project
-                2. bulkDomainSuggestions → find specific available names on those TLDs
-
-            REQUIRED:
-              keywords: 1-10 keywords describing the project.
-              tlds: 1-6 TLDs (hard cap). Pass the TLDs chosen from listCategorizedTlds.
-                    Do not include the leading dot (use "tech" not ".tech").
-
-            OPTIONAL:
-              lang: language code, default "eng".
-              maxResults: max suggestions per keyword, default 20.
-
-            Returns:
-              groups: [
-                { keyword: "voice", suggestions: [...] },
-                { keyword: "biomarker", suggestions: [...] }
-              ]
-              requestedTlds: echo of the TLDs passed in.
-              returnedTlds: TLDs that actually had suggestions (may be a subset).
-
-            Note: availability per suggestion may be "available", "taken", or "unknown". \
-            For "unknown" results, follow up with checkDomainAvailability on specific \
-            names the user is interested in. Suggestions on premium-tier TLDs may have \
-            premium pricing — confirm with checkDomainAvailability before recommending \
-            to the user.""")
-    public BulkDomainSuggestionsResult bulkDomainSuggestions(List<String> keywords, List<String> tlds, @ToolArg(required = false) String lang, @ToolArg(required = false) Integer maxResults, McpConnection connection) {
+    @Tool(description = "Generate domain suggestions for 1-10 keywords across 1-6 TLDs (hard cap), grouped by originating keyword. Typical flow: call listCategorizedTlds first to pick 3-6 TLDs, then this tool. Per-suggestion availability may be \"available\", \"taken\", or \"unknown\"; confirm \"unknown\" or premium-TLD names with checkDomainAvailability before recommending.",
+            annotations = @Tool.Annotations(
+                    title = "Bulk domain suggestions",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public BulkDomainSuggestionsResult bulkDomainSuggestions(
+            @ToolArg(description = "1-10 keywords describing the project.") List<String> keywords,
+            @ToolArg(description = "1-6 TLDs without leading dots (use \"tech\", not \".tech\"), chosen from listCategorizedTlds.") List<String> tlds,
+            @ToolArg(required = false, description = "Language code; default \"eng\".") String lang,
+            @ToolArg(required = false, description = "Maximum suggestions per keyword; default 20.") Integer maxResults,
+            McpConnection connection) {
         if (tlds != null && tlds.size() > 6) {
             return new BulkDomainSuggestionsResult(false,
                     "tlds must contain between 1 and 6 entries (received " + tlds.size() +
@@ -360,8 +526,18 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Check keyword availability across all supported TLDs and registries with detailed results. Required: keyword (e.g., 'example'). Optional: registries ('verisign,pir,id,centralnic'), tlds ('com,net,org')")
-    public Object checkKeywordAvailability(String keyword, @ToolArg(required = false) String registries, @ToolArg(required = false) String tlds, McpConnection connection) {
+    @Tool(description = "Check keyword availability across all supported TLDs and registries with detailed per-domain results. Use checkKeywordAvailabilitySummary instead when you only need counts; it is faster.",
+            annotations = @Tool.Annotations(
+                    title = "Check keyword availability",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public Object checkKeywordAvailability(
+            @ToolArg(description = "Keyword to check, without a TLD, e.g. \"example\".") String keyword,
+            @ToolArg(required = false, description = "Comma-separated registry filter, e.g. \"verisign,pir,id,centralnic\".") String registries,
+            @ToolArg(required = false, description = "Comma-separated TLDs without leading dots, e.g. \"com,net\".") String tlds,
+            McpConnection connection) {
         try {
             return domainSuggestionService.checkKeywordAvailability(keyword, registries, tlds);
         } catch (Exception e) {
@@ -370,8 +546,18 @@ public class DomainRegistrarMCPServer {
         }
     }
 
-    @Tool(description = "Check keyword availability summary statistics without detailed domain results (faster). Required: keyword (e.g., 'example'). Optional: registries ('verisign,pir'), tlds ('com,net')")
-    public Object checkKeywordAvailabilitySummary(String keyword, @ToolArg(required = false) String registries, @ToolArg(required = false) String tlds, McpConnection connection) {
+    @Tool(description = "Check keyword availability across TLDs and registries. Summary statistics only (no per-domain results), faster than checkKeywordAvailability.",
+            annotations = @Tool.Annotations(
+                    title = "Keyword availability summary",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public Object checkKeywordAvailabilitySummary(
+            @ToolArg(description = "Keyword to check, without a TLD, e.g. \"example\".") String keyword,
+            @ToolArg(required = false, description = "Comma-separated registry filter, e.g. \"verisign,pir\".") String registries,
+            @ToolArg(required = false, description = "Comma-separated TLDs without leading dots, e.g. \"com,net\".") String tlds,
+            McpConnection connection) {
         try {
             return domainSuggestionService.checkKeywordAvailabilitySummary(keyword, registries, tlds);
         } catch (Exception e) {

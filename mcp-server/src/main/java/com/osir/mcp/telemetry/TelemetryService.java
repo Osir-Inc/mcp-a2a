@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Buffers MCP session events and batch-posts them to the backend funnel (A.7 → B.6).
  * Fire-and-forget by design: recording never blocks a tool call, a full buffer or a failed
  * POST drops events (telemetry is not a ledger), and everything is off unless an API key
- * (role api-user, issued for the MCP service) is configured — that key is what lets
+ * (role api-user, issued for the MCP service) is configured, that key is what lets
  * ANONYMOUS sessions be reported too.
  */
 @ApplicationScoped

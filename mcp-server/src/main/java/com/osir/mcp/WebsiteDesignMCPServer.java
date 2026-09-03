@@ -18,7 +18,7 @@ import jakarta.inject.Inject;
 
 /**
  * Website design via the CALLING LLM. The server never calls a model: osirSiteDesignBrief returns
- * the design prompt as a tool result (works in any client — Claude.ai, our own chat, Claude Code),
+ * the design prompt as a tool result (works in any client, Claude.ai, our own chat, Claude Code),
  * the LLM writes the HTML in-conversation, and osirSitePublish ships it to *.osir.app.
  */
 @McpAudited
@@ -59,35 +59,31 @@ public class WebsiteDesignMCPServer {
             4. REVISE. For each change I ask for, follow the returned editRules: republish with the same name,
                the full updated document, and designContract: true, then tell me what changed and the URL.
 
-            (If I already HAVE a website — my own HTML — skip all of the above: just call
+            (If I already HAVE a website, my own HTML, skip all of the above: just call
             osirSitePublish(name, html) without designContract; for a multi-file site use
             osirAppCreateUpload + osirAppDeploy with a zip.)
             """));
     }
 
     @Tool(name = "osirSiteDesignBrief",
-            description = "Step 1 of designing a website with OSIR. BEFORE calling: ask the user for any "
-                    + "required field you would otherwise have to guess, and offer the optional extras in ONE "
-                    + "batch — logo, brand colours, own photos, real content (tagline, services with prices, "
-                    + "contact details), reference sites plus what they like about each, language, tone. Don't "
-                    + "invent what the user could simply tell you; skipped extras are fine. "
-                    + "Validates the client's brief and returns "
-                    + "'systemPrompt' — the design instructions YOU must then follow to write one complete "
-                    + "self-contained HTML page — plus 'editRules' for later revisions. Required: businessName, "
-                    + "whatItIs (what the business concretely does/sells), audience (who visits and why), pageJob "
-                    + "(get_contact|sell_product|book_appointment|collect_signups|inform_portfolio|other), "
-                    + "primaryAction (the one CTA, e.g. 'Book a table'). Optional briefJson: a JSON object with "
-                    + "site_type, sections[], language (ISO, default en), tone (warm|premium|playful|technical|"
-                    + "minimal|bold), mood_words[] (max 5), brand{logo_url, primary_color '#RRGGBB', "
-                    + "secondary_color, fonts[], existing_site_url, references[{url, what_you_like}] (max 3; "
-                    + "direction only, never copied), dislikes}, content{tagline, services_or_products[{name,"
-                    + "description,price}], about_text, contact{phone,email,address,hours,social[]}, "
-                    + "image_urls[], testimonials[{quote,name}] (real only)}, constraints{dark_mode, animations "
-                    + "(none|subtle|expressive), form_endpoint, legal_footer}. No authentication needed. "
-                    + "Afterwards publish with osirSitePublish.")
-    public DesignBriefResult osirSiteDesignBrief(String businessName, String whatItIs, String audience,
-                                                 String pageJob, String primaryAction,
-                                                 @ToolArg(required = false) String briefJson) {
+            description = "Step 1 of designing a NEW website with OSIR. Validates the brief and returns "
+                    + "'systemPrompt', the structured design brief and constraints YOU must then follow to write "
+                    + "one complete self-contained HTML page, plus 'editRules' for later revisions. Call it before "
+                    + "osirSitePublish for a new site, then publish the finished page with osirSitePublish. "
+                    + "No authentication needed.",
+            annotations = @Tool.Annotations(
+                    title = "Create site design brief",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DesignBriefResult osirSiteDesignBrief(
+            @ToolArg(description = "The business or project name.") String businessName,
+            @ToolArg(description = "What the business concretely does or sells.") String whatItIs,
+            @ToolArg(description = "Who visits the site and why.") String audience,
+            @ToolArg(description = "The page's single job: get_contact, sell_product, book_appointment, collect_signups, inform_portfolio, or other.") String pageJob,
+            @ToolArg(description = "The one primary call to action, e.g. 'Book a table'.") String primaryAction,
+            @ToolArg(required = false, description = "Optional JSON object with extras the user provided: site_type, sections[], language (ISO code, default en), tone (warm|premium|playful|technical|minimal|bold), mood_words[] (max 5), brand{logo_url, primary_color '#RRGGBB', secondary_color, fonts[], existing_site_url, references[{url, what_you_like}] (max 3; direction only, never copied), dislikes}, content{tagline, services_or_products[{name,description,price}], about_text, contact{phone,email,address,hours,social[]}, image_urls[], testimonials[{quote,name}] (real only)}, constraints{dark_mode, animations (none|subtle|expressive), form_endpoint, legal_footer}. Ask the user rather than inventing values; skipped extras are fine.") String briefJson) {
         try {
             return designBriefService.build(businessName, whatItIs, audience, pageJob, primaryAction, briefJson);
         } catch (Exception e) {
@@ -98,19 +94,22 @@ public class WebsiteDesignMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirSitePublish",
-            description = "Publish a single-page website to a live HTTPS URL on Osir (free tier) — ANY complete "
+            description = "Publish a single-page website to a live HTTPS URL on Osir (free tier). ANY complete "
                     + "HTML document works: the user's own site, a page designed in this chat, or one from the "
-                    + "osirSiteDesignBrief flow. Required: name (lowercase letters/digits/hyphens, e.g. "
-                    + "'bar-mediterran'), html (complete <html> document, max 1 MiB). Calling again with the same "
-                    + "name redeploys the new version. Optional: region ('us'|'al'); designContract (true ONLY "
-                    + "for pages generated via the osirSiteDesignBrief flow — additionally enforces its output "
-                    + "contract: exactly one <h1>, self-contained, no external scripts/CSS except Google Fonts, "
-                    + "no iframes; never set it for a user's own site). For MULTI-FILE sites (separate CSS/JS/"
-                    + "images) use osirAppCreateUpload + osirAppDeploy with a zip instead. Then poll osirAppStatus "
-                    + "until READY. Requires authentication.")
-    public DeployResult osirSitePublish(String name, String html,
-                                        @ToolArg(required = false) String region,
-                                        @ToolArg(required = false) Boolean designContract,
+                    + "osirSiteDesignBrief flow. Calling again with the same name redeploys the new version. For "
+                    + "MULTI-FILE sites (separate CSS/JS/images) use osirAppCreateUpload + osirAppDeploy with a "
+                    + "zip instead. Then poll osirAppStatus until READY. Requires authentication.",
+            annotations = @Tool.Annotations(
+                    title = "Publish a website",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public DeployResult osirSitePublish(
+                                        @ToolArg(description = "Site name: lowercase letters, digits, and hyphens, e.g. 'bar-mediterran'.") String name,
+                                        @ToolArg(description = "The complete <html> document to publish (max 1 MiB).") String html,
+                                        @ToolArg(required = false, description = "Region: 'us' or 'al' ('al' is Albania/Tirana).") String region,
+                                        @ToolArg(required = false, description = "Set true ONLY for pages generated via the osirSiteDesignBrief flow; additionally enforces its output contract (exactly one <h1>, self-contained, no external scripts/CSS except Google Fonts, no iframes). Never set it for a user's own site.") Boolean designContract,
                                         @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
                                         McpConnection connection) {
         try {

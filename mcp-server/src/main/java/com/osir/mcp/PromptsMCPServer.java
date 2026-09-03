@@ -13,7 +13,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class PromptsMCPServer {
 
-    @Prompt(name = "getting_started")
+    @Prompt(name = "getting_started", description = "First steps with OSIR: authenticate, search and register a domain, set up DNS, and review your portfolio.")
     public PromptMessage gettingStarted() {
         return PromptMessage.withUserRole(new TextContent("""
             Getting Started with OSIR Domain Registrar
@@ -48,10 +48,10 @@ public class PromptsMCPServer {
             """));
     }
 
-    @Prompt(name = "vps_setup_guide")
+    @Prompt(name = "vps_setup_guide", description = "Order and provision a VPS end to end: pick a package, store an SSH key, order, wait for the OS build, connect your domain.")
     public PromptMessage vpsSetupGuide() {
         return PromptMessage.withUserRole(new TextContent("""
-            VPS Setup Guide — Step by Step
+            VPS Setup Guide, Step by Step
 
             1. BROWSE OPTIONS
                - listVpsPackages() to see available plans (CPU, RAM, storage, price)
@@ -70,7 +70,7 @@ public class PromptsMCPServer {
                - Payment terms: MONTHLY, SEMI_ANNUAL, ANNUAL, BIENNIAL, TRIENNIAL
                - operatingSystemId is an integer template id, NOT a name like "ubuntu-22.04". Resolve it
                  with listVpsOsTemplates(instanceId) against any instance the user already has. The ids
-                 are per-install and change when templates are re-imported — never reuse a remembered id.
+                 are per-install and change when templates are re-imported, never reuse a remembered id.
                - Omit operatingSystemId and the server is created with NO operating system on it.
                - orderVps stages: present the summary, then executeConfirmedAction(actionId) if approved.
 
@@ -89,7 +89,7 @@ public class PromptsMCPServer {
                - getVpsInstanceDetails(instanceId) for status, IP, buildState and installed OS
                - changeVpsPaymentTerm(instanceId, "ANNUAL") for discounts
                - buildVpsInstance(instanceId, operatingSystemId) to reinstall the OS.
-                 ERASES ALL DATA on the server — always confirm with the user before staging it.
+                 ERASES ALL DATA on the server, always confirm with the user before staging it.
                  A failed install can be retried with this at no extra charge; never re-order for that.
                - deleteVpsInstance(instanceId) to terminate (irreversible!)
 
@@ -100,7 +100,7 @@ public class PromptsMCPServer {
             """));
     }
 
-    @Prompt(name = "dns_setup_guide")
+    @Prompt(name = "dns_setup_guide", description = "DNS record types explained with copy-paste setups for a website and for email (MX, SPF, DKIM).")
     public PromptMessage dnsSetupGuide() {
         return PromptMessage.withUserRole(new TextContent("""
             DNS Setup Guide
@@ -131,7 +131,7 @@ public class PromptsMCPServer {
             """));
     }
 
-    @Prompt(name = "billing_overview")
+    @Prompt(name = "billing_overview", description = "How OSIR billing works: balance, adding funds via Stripe, invoices, fees, and payment history.")
     public PromptMessage billingOverview() {
         return PromptMessage.withUserRole(new TextContent("""
             Billing & Payments Overview
@@ -163,19 +163,19 @@ public class PromptsMCPServer {
             """));
     }
 
-    @Prompt(name = "domain_management_guide")
+    @Prompt(name = "domain_management_guide", description = "Best practices for domains you own: locking, privacy, renewal, nameservers, and transfers.")
     public PromptMessage domainManagementGuide() {
         return PromptMessage.withUserRole(new TextContent("""
             Domain Management Best Practices
 
             SECURITY
-            - lockDomain("domain.com") — prevents unauthorized transfers
-            - updateDomainPrivacy("domain.com", true) — hides personal info from WHOIS
+            - lockDomain("domain.com"), prevents unauthorized transfers
+            - updateDomainPrivacy("domain.com", true), hides personal info from WHOIS
             - Keep authorization/EPP codes confidential
 
             RENEWAL
-            - updateDomainAutoRenew("domain.com", true) — prevents accidental expiration
-            - renewDomain("domain.com", 2) — manually renew for 1-10 years
+            - updateDomainAutoRenew("domain.com", true), prevents accidental expiration
+            - renewDomain("domain.com", 2), manually renew for 1-10 years
             - Domains in redemption period cost significantly more to recover
 
             NAMESERVERS
@@ -191,12 +191,12 @@ public class PromptsMCPServer {
             - Domain must be 60+ days old and not expiring within 30 days
 
             MONITORING
-            - listUserDomains() — review all domains regularly
-            - getDomainInfo("domain.com") — check expiry dates and status
+            - listUserDomains(), review all domains regularly
+            - getDomainInfo("domain.com"), check expiry dates and status
             """));
     }
 
-    @Prompt(name = "hosting_comparison")
+    @Prompt(name = "hosting_comparison", description = "Choose between VPS and dedicated servers by workload and budget, with cost-saving tips.")
     public PromptMessage hostingComparison() {
         return PromptMessage.withUserRole(new TextContent("""
             Hosting Options Comparison
@@ -227,7 +227,7 @@ public class PromptsMCPServer {
             """));
     }
 
-    @Prompt(name = "troubleshooting")
+    @Prompt(name = "troubleshooting", description = "Fixes for common failures: authentication, domains not resolving, transfers, registrations, and billing.")
     public PromptMessage troubleshooting() {
         return PromptMessage.withUserRole(new TextContent("""
             Troubleshooting Guide
@@ -263,7 +263,7 @@ public class PromptsMCPServer {
             """));
     }
 
-    @Prompt(name = "security_best_practices")
+    @Prompt(name = "security_best_practices", description = "Security checklist for account, domains, and DNS: locks, WHOIS privacy, SPF/DKIM/DMARC, audit logs.")
     public PromptMessage securityBestPractices() {
         return PromptMessage.withUserRole(new TextContent("""
             Security Best Practices for Domain Management

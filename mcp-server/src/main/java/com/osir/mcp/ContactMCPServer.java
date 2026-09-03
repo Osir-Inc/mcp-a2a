@@ -25,8 +25,16 @@ public class ContactMCPServer {
     @Inject
     PendingActionStore pendingActionStore;
 
-    @Tool(description = "List all contacts for the authenticated user with optional search. Requires authentication. Optional: search (search by name/email/org)")
-    public ContactListResult listContacts(@ToolArg(required = false) String search, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "List all contacts for the authenticated user, optionally filtered by a search term. Requires authentication. Returns each contact with its id for use in getContact, updateContact, deleteContact, or domain registration.",
+            annotations = @Tool.Annotations(
+                    title = "List contacts",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public ContactListResult listContacts(
+            @ToolArg(required = false, description = "Optional search term matched against contact name, email, or organization.") String search,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.listContacts(search);
         } catch (Exception e) {
@@ -35,8 +43,16 @@ public class ContactMCPServer {
         }
     }
 
-    @Tool(description = "Get detailed information about a specific contact. Requires authentication. Required: contactId (string)")
-    public ContactDetailResult getContact(String contactId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Get detailed information about a specific contact. Requires authentication. Get the contactId from listContacts. Returns name, email, phone, organization, and address.",
+            annotations = @Tool.Annotations(
+                    title = "Get contact",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public ContactDetailResult getContact(
+            @ToolArg(description = "Identifier of the contact to fetch, as returned by listContacts.") String contactId,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.getContact(contactId);
         } catch (Exception e) {
@@ -45,11 +61,26 @@ public class ContactMCPServer {
         }
     }
 
-    @Tool(description = "Create a new contact for use with domain registrations. Requires authentication. Required: firstName, lastName, email, phone (E.164 format), street1, city, postalCode, country (ISO 3166-1 alpha-2). Optional: organization, street2, state")
-    public ContactResult createContact(String firstName, String lastName, String email, String phone,
-                                        @ToolArg(required = false) String organization, String street1, @ToolArg(required = false) String street2,
-                                        String city, @ToolArg(required = false) String state, String postalCode, String country,
-                                        @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Create a new contact for use with domain registrations. Requires authentication. Returns the created contact including its id for assignment to domains.",
+            annotations = @Tool.Annotations(
+                    title = "Create contact",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public ContactResult createContact(
+            @ToolArg(description = "Contact's first name.") String firstName,
+            @ToolArg(description = "Contact's last name.") String lastName,
+            @ToolArg(description = "Contact's email address.") String email,
+            @ToolArg(description = "Phone number in '+CC.number' format, e.g. '+1.5551234567'.") String phone,
+            @ToolArg(required = false, description = "Organization or company name, if any.") String organization,
+            @ToolArg(description = "First street address line.") String street1,
+            @ToolArg(required = false, description = "Second street address line, if needed.") String street2,
+            @ToolArg(description = "City name.") String city,
+            @ToolArg(required = false, description = "State, province, or region, if applicable.") String state,
+            @ToolArg(description = "Postal or ZIP code.") String postalCode,
+            @ToolArg(description = "Country as a 2-letter ISO 3166-1 alpha-2 code, e.g. 'US'.") String country,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.createContact(firstName, lastName, email, phone, organization,
                     street1, street2, city, state, postalCode, country);
@@ -59,11 +90,27 @@ public class ContactMCPServer {
         }
     }
 
-    @Tool(description = "Update an existing contact's information. Requires authentication. Required: contactId (string). Optional: firstName, lastName, email, phone, organization, street1, street2, city, state, postalCode, country")
-    public ContactResult updateContact(String contactId, @ToolArg(required = false) String firstName, @ToolArg(required = false) String lastName, @ToolArg(required = false) String email,
-                                        @ToolArg(required = false) String phone, @ToolArg(required = false) String organization, @ToolArg(required = false) String street1, @ToolArg(required = false) String street2,
-                                        @ToolArg(required = false) String city, @ToolArg(required = false) String state, @ToolArg(required = false) String postalCode, @ToolArg(required = false) String country,
-                                        @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Update an existing contact's information. Requires authentication. Only the fields you provide are changed; omitted fields keep their current values. Get the contactId from listContacts. Returns the updated contact.",
+            annotations = @Tool.Annotations(
+                    title = "Update contact",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public ContactResult updateContact(
+            @ToolArg(description = "Identifier of the contact to update, as returned by listContacts.") String contactId,
+            @ToolArg(required = false, description = "New first name.") String firstName,
+            @ToolArg(required = false, description = "New last name.") String lastName,
+            @ToolArg(required = false, description = "New email address.") String email,
+            @ToolArg(required = false, description = "New phone number in '+CC.number' format, e.g. '+1.5551234567'.") String phone,
+            @ToolArg(required = false, description = "New organization or company name.") String organization,
+            @ToolArg(required = false, description = "New first street address line.") String street1,
+            @ToolArg(required = false, description = "New second street address line.") String street2,
+            @ToolArg(required = false, description = "New city name.") String city,
+            @ToolArg(required = false, description = "New state, province, or region.") String state,
+            @ToolArg(required = false, description = "New postal or ZIP code.") String postalCode,
+            @ToolArg(required = false, description = "New country as a 2-letter ISO 3166-1 alpha-2 code, e.g. 'US'.") String country,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.updateContact(contactId, firstName, lastName, email, phone, organization,
                     street1, street2, city, state, postalCode, country);
@@ -73,8 +120,16 @@ public class ContactMCPServer {
         }
     }
 
-    @Tool(description = "Stage deletion of a contact. DESTRUCTIVE — cannot delete if assigned to active domains. Requires authentication. Required: contactId (string). Returns an actionId — present the summary to the user, then call executeConfirmedAction with the actionId if they approve.")
-    public ConfirmationRequiredResult deleteContact(String contactId, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Stage deletion of a contact. DESTRUCTIVE; fails if the contact is assigned to active domains. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+            annotations = @Tool.Annotations(
+                    title = "Delete contact",
+                    readOnlyHint = false,
+                    destructiveHint = true,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public ConfirmationRequiredResult deleteContact(
+            @ToolArg(description = "Identifier of the contact to delete, as returned by listContacts.") String contactId,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         return pendingActionStore.stage(
                 "deleteContact",
                 "Permanently delete contact '" + contactId + "'",
@@ -84,8 +139,16 @@ public class ContactMCPServer {
         );
     }
 
-    @Tool(description = "Get all contacts (registrant, admin, tech, billing) assigned to a domain. Requires authentication. Required: domain (e.g., 'example.com')")
-    public DomainContactsResult getContactsForDomain(String domain, @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+    @Tool(description = "Get all contacts (registrant, admin, tech, billing) assigned to a domain. Requires authentication. Returns the contact assigned to each role.",
+            annotations = @Tool.Annotations(
+                    title = "Get domain contacts",
+                    readOnlyHint = true,
+                    destructiveHint = false,
+                    idempotentHint = true,
+                    openWorldHint = false))
+    public DomainContactsResult getContactsForDomain(
+            @ToolArg(description = "Fully qualified domain name whose contacts to fetch, e.g. 'example.com'.") String domain,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.getContactsForDomain(domain);
         } catch (Exception e) {
