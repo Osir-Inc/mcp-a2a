@@ -298,7 +298,7 @@ curl -X POST http://localhost:8082/a2a \
   -d '{"jsonrpc":"2.0","id":"5","method":"tasks/cancel","params":{"id":"task-001"}}'
 ```
 
-### Available Agents & Skills (84 skills across 9 agents)
+### Available Agents & Skills (89 skills across 9 agents)
 
 **Domain Agent** (`agent: "domain-agent"`)
 `check_availability`, `register_domain`, `get_domain_info`, `list_domains`, `renew_domain`, `lock_domain`, `unlock_domain`, `suggest_domains`, `transfer_domain`, `enable_privacy`, `disable_privacy`, `enable_autorenew`, `disable_autorenew`, `validate_domain_name`, `get_domain_extensions`, `bulk_suggest_domains`, `add_prefix`, `add_suffix`, `spin_domain_words`, `check_keyword_availability`, `update_nameservers`, `get_transfer_quote`, `get_transfer_status`, `list_pending_transfers`, `check_host_availability`, `get_hosts_for_domain`
@@ -317,6 +317,14 @@ curl -X POST http://localhost:8082/a2a \
 
 **Account Agent** (`agent: "account-agent"`)
 `get_profile`, `get_account_summary`, `get_auth_status`, `get_audit_logs`, `get_domain_audit`, `get_recent_activity`
+
+**Confirmation gate.** Skills that spend money or destroy data do not run on the first call. The agent
+replies `input-required` with a summary and an `actionId`; send a second message **on the same task**
+with `{"skill": "execute_confirmed_action", "actionId": "<id>"}` to go ahead. The staged parameters are
+frozen at stage time, so the confirm message cannot change what runs. Confirmations are single-use,
+expire after 5 minutes, and only the session that staged one can confirm it. Gated today:
+`order_vps`, `build_vps`, `delete_vps`, `register_domain`, `renew_domain`, `transfer_domain`,
+`pay_invoice`, `create_payment`, `delete_contact`, `delete_dns_record`.
 
 **Mail Agent** (`agent: "mail-agent"`)
 `list_mail_plans`, `get_mailbox_quote`, `enable_mail_domain`, `list_mail_domains`, `get_mail_dns_records`, `verify_mail_dns`, `list_mailboxes`, `get_mailbox_usage`
@@ -507,7 +515,7 @@ docker-compose logs -f
      └────────────────┘
 ```
 
-Both servers share the `common` module — same services, same REST clients, same models. The MCP server exposes them as 105 individual tools. The A2A server wraps them in 9 specialist agents with 84 skills, coordinated by an orchestrator that handles multi-step workflows.
+Both servers share the `common` module — same services, same REST clients, same models. The MCP server exposes them as 105 individual tools. The A2A server wraps them in 9 specialist agents with 89 skills, coordinated by an orchestrator that handles multi-step workflows.
 
 ### Security & Operations
 - **CORS:** restricted to configured origins (permissive in dev mode)

@@ -2,6 +2,8 @@ package com.osir.a2a.agents;
 
 import com.osir.a2a.protocol.*;
 import com.osir.mcp.services.VpsService;
+import com.osir.a2a.security.ConfirmationGate;
+import com.osir.mcp.security.DestructiveOpRateLimiter.Bucket;
 import com.osir.mcp.services.CatalogService;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -9,6 +11,7 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @ApplicationScoped
@@ -35,7 +38,8 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
         return Set.of("list_vps_packages", "list_vps_locations", "order_vps",
                 "list_vps_instances", "get_vps_details", "delete_vps", "vps_panel_login", "get_catalog",
                 "list_os_templates", "build_vps", "list_ssh_keys", "add_ssh_key",
-                "get_vps_package_details", "count_vps_instances", "get_dedicated_catalog");
+                "get_vps_package_details", "count_vps_instances", "get_dedicated_catalog",
+                ConfirmationGate.CONFIRM_SKILL);
     }
 
     @Override
@@ -57,6 +61,13 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
             // otherwise skill=delete_vps with "terminate it, I lost the ssh key" would hit the bare
             // contains("ssh") branch and list keys instead of terminating.
             String lower = skill != null ? "" : text.toLowerCase();
+
+            // FIRST, before anything text-matched: a message carrying an actionId is confirming an
+            // action already staged on this task. Otherwise "yes, terminate it" re-enters the
+            // delete branch below on a bare contains() and stages a SECOND delete.
+            if (isConfirming(task)) {
+                return runConfirmed(task);
+            }
 
             // Read-only lookups, explicit-skill only: their words ("details", "how many", "catalog")
             // overlap the branches below, and a wrong guess there costs a server.
@@ -89,22 +100,21 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
                             + "(comma-separated), hostname, swap. WARNING: on a server that already has an OS this "
                             + "ERASES ALL DATA on it, including any deployed application, and cannot be undone.");
                 }
-                // A2A has no PendingActionStore - that lives in the MCP module - so this in-band token is
-                // the confirmation gate. Without it an agent-to-agent call could wipe a live server with
-                // no human ever seeing a warning.
-                if (!"ERASE".equals(meta(task, "confirm"))) {
-                    return askForInput(task,
-                            "Installing an OS on instance '" + instanceId + "' ERASES ALL DATA on that server, "
-                            + "including any deployed application, and cannot be undone. If the owner has agreed, "
-                            + "resend the whole request - instanceId, operatingSystemId and any other metadata - "
-                            + "with confirm=ERASE added. Continuation replaces the task's metadata rather than "
-                            + "merging it, so sending confirm on its own drops the rest and lands back here.");
-                }
-                var result = vpsService.buildInstance(instanceId, operatingSystemId, meta(task, "hostname"),
-                        metaIntList(task, "sshKeyIds"), metaDouble(task, "swap"));
-                return completeWithResult(task, "vps-build", result, result.isSuccess(),
-                        result.isSuccess() ? "OS install queued. Poll 'get VPS details' until buildState is COMPLETE."
-                                : result.getMessage());
+                // Staged, not run: the parameters are frozen on the task now and the confirm message
+                // carries only the actionId, so the caller cannot re-send different ones. (The old
+                // in-band confirm=ERASE token needed the whole request repeated, which dropped
+                // metadata, because a continuation replaces it rather than merging.)
+                Map<String, Object> params = new java.util.LinkedHashMap<>();
+                params.put("instanceId", instanceId);
+                params.put("operatingSystemId", operatingSystemId);
+                putIfPresent(params, "hostname", meta(task, "hostname"));
+                putIfPresent(params, "sshKeyIds", meta(task, "sshKeyIds"));
+                putIfPresent(params, "swap", metaDouble(task, "swap"));
+                return stage(task, "build_vps", params,
+                        "Install an operating system on VPS '" + instanceId + "' (template "
+                                + operatingSystemId + "). This ERASES ALL DATA on that server, including any "
+                                + "deployed application, and cannot be undone.",
+                        Bucket.DESTRUCTIVE);
             } else if ("list_os_templates".equals(skill) || lower.contains("template")
                     || lower.contains("operating system")) {
                 String templatePackageId = meta(task, "packageId");
@@ -160,10 +170,17 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
                             "with no operating system), sshKeyIds (comma-separated key ids). " +
                             "Use 'list VPS packages' to see available options.");
                 }
-                var result = vpsService.orderVps(packageId, hostname, paymentTerm,
-                        metaInt(task, "operatingSystemId"), metaIntList(task, "sshKeyIds"));
-                return completeWithResult(task, "vps-order", result, result.isSuccess(),
-                        result.isSuccess() ? "VPS ordered successfully." : result.getMessage());
+                Map<String, Object> params = new java.util.LinkedHashMap<>();
+                params.put("packageId", packageId);
+                params.put("hostname", hostname);
+                params.put("paymentTerm", paymentTerm);
+                putIfPresent(params, "operatingSystemId", metaInt(task, "operatingSystemId"));
+                putIfPresent(params, "sshKeyIds", meta(task, "sshKeyIds"));
+                return stage(task, "order_vps", params,
+                        "Order a VPS: package '" + packageId + "', hostname '" + hostname + "', term "
+                                + paymentTerm + ". This DEDUCTS FROM THE ACCOUNT BALANCE and starts a "
+                                + "recurring charge.",
+                        Bucket.FINANCIAL);
             } else if ("get_vps_details".equals(skill)) {
                 String instanceId = meta(task, "instanceId");
                 if (instanceId == null) return askForInput(task, "Please provide the VPS instance ID in metadata.");
@@ -173,9 +190,10 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
             } else if ("delete_vps".equals(skill) || lower.contains("delete") || lower.contains("terminate")) {
                 String instanceId = meta(task, "instanceId");
                 if (instanceId == null) return askForInput(task, "Please provide the VPS instance ID to terminate.");
-                var result = vpsService.deleteInstance(instanceId);
-                return completeWithResult(task, "vps-delete", result, result.isSuccess(),
-                        result.isSuccess() ? "VPS instance terminated." : result.getMessage());
+                return stage(task, "delete_vps", Map.of("instanceId", instanceId),
+                        "Terminate VPS '" + instanceId + "'. This DESTROYS the server and everything on it, "
+                                + "cannot be undone, and does not refund the remaining term.",
+                        Bucket.DESTRUCTIVE);
             } else if ("get_catalog".equals(skill) || lower.contains("catalog")) {
                 var result = catalogService.getProductCatalog();
                 return completeWithResult(task, "catalog", result, result.isSuccess(),
@@ -194,6 +212,58 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
             LOG.errorf(e, "VPS agent error: %s", e.getMessage());
             return failWithError(task, e.getMessage());
         }
+    }
+
+    /**
+     * Run what was staged, from the parameters frozen at stage time — never from the confirm
+     * message, which carries only the actionId.
+     */
+    private A2ATask runConfirmed(A2ATask task) {
+        var claim = confirmationGate.claim(task);
+        if (!claim.ok()) {
+            return failWithError(task, claim.error());
+        }
+        Map<String, Object> p = claim.action().params();
+        switch (claim.action().skill()) {
+            case "order_vps" -> {
+                var result = vpsService.orderVps(str(p, "packageId"), str(p, "hostname"), str(p, "paymentTerm"),
+                        integer(p, "operatingSystemId"), parseIds(str(p, "sshKeyIds")));
+                return completeWithResult(task, "vps-order", result, result.isSuccess(),
+                        result.isSuccess() ? "VPS ordered successfully." : result.getMessage());
+            }
+            case "delete_vps" -> {
+                var result = vpsService.deleteInstance(str(p, "instanceId"));
+                return completeWithResult(task, "vps-delete", result, result.isSuccess(),
+                        result.isSuccess() ? "VPS instance terminated." : result.getMessage());
+            }
+            case "build_vps" -> {
+                Double swap = p.get("swap") instanceof Number n ? n.doubleValue() : null;
+                var result = vpsService.buildInstance(str(p, "instanceId"), integer(p, "operatingSystemId"),
+                        str(p, "hostname"), parseIds(str(p, "sshKeyIds")), swap);
+                return completeWithResult(task, "vps-build", result, result.isSuccess(),
+                        result.isSuccess() ? "OS install queued. Poll 'get VPS details' until buildState is COMPLETE."
+                                : result.getMessage());
+            }
+            default -> {
+                return failWithError(task, "Cannot run '" + claim.action().skill() + "': unknown staged action.");
+            }
+        }
+    }
+
+    private static void putIfPresent(Map<String, Object> params, String key, Object value) {
+        if (value != null) {
+            params.put(key, value);
+        }
+    }
+
+    private static String str(Map<String, Object> params, String key) {
+        Object v = params.get(key);
+        return v == null ? null : v.toString();
+    }
+
+    private static Integer integer(Map<String, Object> params, String key) {
+        Object v = params.get(key);
+        return v instanceof Number n ? n.intValue() : null;
     }
 
     private A2ATask handlePackageDetails(A2ATask task) {
@@ -281,6 +351,11 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
                         "How many servers the account currently has",
                         List.of("vps", "instances", "count"),
                         List.of("How many servers do I have?", "Am I close to my server limit?")),
+                new Skill(ConfirmationGate.CONFIRM_SKILL, "Confirm A Staged Action",
+                        "Run an action this agent staged: send the actionId it returned, on the same task",
+                        List.of("confirmation", "safety"),
+                        List.of("Confirm action a2a_1f4c... on this task",
+                                "Yes, go ahead with the order you summarised")),
                 new Skill("get_dedicated_catalog", "Get Dedicated Server Catalog",
                         "Dedicated (bare metal) server configurations and prices",
                         List.of("dedicated", "bare-metal", "catalog"),
@@ -299,7 +374,11 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
 
     /** Comma-separated ids, e.g. "3,7". Returns null when absent so the backend sees no key list. */
     private List<Integer> metaIntList(A2ATask task, String key) {
-        String raw = meta(task, key);
+        return parseIds(meta(task, key));
+    }
+
+    /** Same parsing for a value read back from a staged action's frozen parameters. */
+    private static List<Integer> parseIds(String raw) {
         if (raw == null || raw.isBlank()) return null;
         List<Integer> ids = new java.util.ArrayList<>();
         for (String part : raw.split(",")) {

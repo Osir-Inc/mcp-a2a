@@ -25,6 +25,7 @@ class ContactSpecialistAgentTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        GateTestSupport.wire(agent);
         agent.init();
     }
 
@@ -76,6 +77,6 @@ class ContactSpecialistAgentTest {
     @Test
     void getAgentCard_cached() {
         assertSame(agent.getAgentCard(), agent.getAgentCard());
-        assertEquals(6, agent.getAgentCard().getSkills().size());
+        assertEquals(7, agent.getAgentCard().getSkills().size());   // + execute_confirmed_action
     }
 }

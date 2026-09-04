@@ -5,6 +5,8 @@ import com.osir.mcp.models.*;
 import com.osir.mcp.services.DomainService;
 import com.osir.mcp.services.DomainSuggestionService;
 import com.osir.mcp.services.TransferService;
+import com.osir.a2a.security.ConfirmationGate;
+import com.osir.mcp.security.DestructiveOpRateLimiter.Bucket;
 import com.osir.mcp.services.CatalogService;
 import com.osir.mcp.services.HostService;
 import jakarta.annotation.PostConstruct;
@@ -47,7 +49,8 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
             "add_prefix", "add_suffix", "spin_domain_words", "check_keyword_availability",
             "update_nameservers",
             "get_transfer_quote", "get_transfer_status", "list_pending_transfers",
-            "check_host_availability", "get_hosts_for_domain"
+            "check_host_availability", "get_hosts_for_domain",
+            ConfirmationGate.CONFIRM_SKILL
     );
 
     @Inject DomainService domainService;
@@ -113,6 +116,11 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
     @Override
     public A2ATask handle(A2ATask task) {
         try {
+            // Before any routing: a message carrying an actionId confirms what is already staged on
+            // this task. Otherwise "yes, register it" re-enters the register branch and stages again.
+            if (isConfirming(task)) {
+                return runConfirmed(task);
+            }
             String skill = getSkillFromMetadata(task);
             if (skill != null) {
                 return handleBySkill(task, skill);
@@ -238,22 +246,12 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
         String domain = extractDomain(text);
         if (domain == null) return askForDomain(task, "register");
 
-        // Registration requires registrant info — ask if not provided
-        // For now, attempt with defaults; backend will return a clear error if registrant is missing
-        DomainRegistrationResult result = domainService.registerDomain(domain, 1, null, null, true, true);
-        if (!result.isSuccess() && result.getMessage() != null
-                && result.getMessage().toLowerCase().contains("registrant")) {
-            task.transitionTo(TaskState.INPUT_REQUIRED);
-            task.addMessage(new Message("agent",
-                    "Domain " + domain + " registration requires registrant contact information. " +
-                    "Please provide: firstName, lastName, email, phone, street, city, state, postalCode, country."));
-            return task;
-        }
-
-        task.addArtifact(Artifact.ofData("registration-result", toMap(result)));
-        task.addMessage(new Message("agent", result.getMessage()));
-        task.transitionTo(result.isSuccess() ? TaskState.COMPLETED : TaskState.FAILED);
-        return task;
+        int years = metaInt(task, "years") == null ? 1 : metaInt(task, "years");
+        return stage(task, "register_domain", Map.of("domain", domain, "years", years),
+                "Register " + domain + " for " + years + " year(s). This CHARGES THE ACCOUNT the "
+                        + "registration fee (getDomainPricing has the exact amount) and starts an annual "
+                        + "renewal. Domain registrations are not refundable.",
+                Bucket.FINANCIAL);
     }
 
     private A2ATask handleGetDomainInfo(A2ATask task, String text) {
@@ -279,11 +277,11 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
         String domain = extractDomain(text);
         if (domain == null) return askForDomain(task, "renew");
 
-        DomainRenewalResult result = domainService.renewDomain(domain, 1);
-        task.addArtifact(Artifact.ofData("renewal-result", toMap(result)));
-        task.addMessage(new Message("agent", result.getMessage()));
-        task.transitionTo(result.isSuccess() ? TaskState.COMPLETED : TaskState.FAILED);
-        return task;
+        int years = metaInt(task, "years") == null ? 1 : metaInt(task, "years");
+        return stage(task, "renew_domain", Map.of("domain", domain, "years", years),
+                "Renew " + domain + " for " + years + " year(s). This CHARGES THE ACCOUNT the renewal "
+                        + "fee and is not refundable.",
+                Bucket.FINANCIAL);
     }
 
     private A2ATask handleLockDomain(A2ATask task, String text) {
@@ -338,11 +336,13 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
         }
 
         String authCode = authMatcher.group(1);
-        var result = transferService.initiateTransfer(domain, authCode);
-        task.addArtifact(Artifact.ofData("transfer-result", toMap(result)));
-        task.addMessage(new Message("agent", result.getMessage()));
-        task.transitionTo(result.isSuccess() ? TaskState.COMPLETED : TaskState.FAILED);
-        return task;
+        // The auth code is frozen with the rest: it is already in this task's message history either
+        // way, so staging adds no exposure it did not already have.
+        return stage(task, "transfer_domain", Map.of("domain", domain, "authCode", authCode),
+                "Transfer " + domain + " to OSIR. This CHARGES THE ACCOUNT a transfer fee (which adds a "
+                        + "year to the registration) and starts a registry process that takes up to 5 days "
+                        + "and cannot be cancelled once the losing registrar approves it.",
+                Bucket.FINANCIAL);
     }
 
     /**
@@ -360,6 +360,37 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
         task.addMessage(new Message("agent", result.getMessage()));
         task.transitionTo(result.isSuccess() ? TaskState.COMPLETED : TaskState.FAILED);
         return task;
+    }
+
+    /** Run what was staged, from the parameters frozen at stage time. */
+    private A2ATask runConfirmed(A2ATask task) {
+        var claim = confirmationGate.claim(task);
+        if (!claim.ok()) {
+            return failWithError(task, claim.error());
+        }
+        Map<String, Object> p = claim.action().params();
+        String domain = String.valueOf(p.get("domain"));
+        int years = p.get("years") instanceof Number n ? n.intValue() : 1;
+        switch (claim.action().skill()) {
+            case "register_domain" -> {
+                var result = domainService.registerDomain(domain, years, null, null, true, true);
+                return completeWithResult(task, "registration-result", result, result.isSuccess(),
+                        result.getMessage());
+            }
+            case "renew_domain" -> {
+                var result = domainService.renewDomain(domain, years);
+                return completeWithResult(task, "renewal-result", result, result.isSuccess(),
+                        result.getMessage());
+            }
+            case "transfer_domain" -> {
+                var result = transferService.initiateTransfer(domain, String.valueOf(p.get("authCode")));
+                return completeWithResult(task, "transfer-result", result, result.isSuccess(),
+                        result.getMessage());
+            }
+            default -> {
+                return failWithError(task, "Cannot run '" + claim.action().skill() + "': unknown staged action.");
+            }
+        }
     }
 
     // ---- Lookups and free operations that the MCP has always had (drift closed 2026-09-04) ----
@@ -573,6 +604,11 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
                         "Disable automatic domain renewal",
                         List.of("domains", "autorenew", "renewal"),
                         List.of("Turn off auto-renew for silvergate.net, I am letting it expire")),
+                new Skill(ConfirmationGate.CONFIRM_SKILL, "Confirm A Staged Action",
+                        "Run an action this agent staged: send the actionId it returned, on the same task",
+                        List.of("confirmation", "safety"),
+                        List.of("Confirm action a2a_1f4c... on this task",
+                                "Yes, go ahead with the registration you summarised")),
                 new Skill("validate_domain_name", "Validate Domain Name",
                         "Check whether a name is syntactically registrable, before spending a lookup on it",
                         List.of("domains", "validate", "syntax"),

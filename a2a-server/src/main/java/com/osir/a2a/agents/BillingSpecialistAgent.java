@@ -1,6 +1,8 @@
 package com.osir.a2a.agents;
 
 import com.osir.a2a.protocol.*;
+import com.osir.a2a.security.ConfirmationGate;
+import com.osir.mcp.security.DestructiveOpRateLimiter.Bucket;
 import com.osir.mcp.services.BillingService;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -36,7 +38,7 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
     protected Set<String> getSkillIds() {
         return Set.of("get_balance", "list_invoices", "get_invoice", "pay_invoice",
                 "invoice_statistics", "create_payment", "get_transactions", "preview_fees",
-                "get_domain_pricing", "get_hosting_bundle");
+                "get_domain_pricing", "get_hosting_bundle", ConfirmationGate.CONFIRM_SKILL);
     }
 
     @Override
@@ -51,6 +53,11 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
             String skill = getSkillFromMetadata(task);
             String text = getLatestUserMessage(task);
             String lower = text.toLowerCase();
+
+            // Before any text matching: an actionId means "run what you staged", not "stage again".
+            if (isConfirming(task)) {
+                return runConfirmed(task);
+            }
 
             if ("get_hosting_bundle".equals(skill)) {
                 return handleHostingBundle(task, text);
@@ -96,15 +103,22 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
             } else if ("pay_invoice".equals(skill) || lower.contains("pay")) {
                 String invoiceId = meta(task, "invoiceId");
                 if (invoiceId == null) return askForInput(task, "Please provide the invoice ID to pay.");
-                var result = billingService.payInvoice(invoiceId);
-                return completeWithResult(task, "payment", result, result.isSuccess(),
-                        result.isSuccess() ? "Invoice paid successfully." : result.getMessage());
+                return stage(task, "pay_invoice", java.util.Map.of("invoiceId", invoiceId),
+                        "Pay invoice '" + invoiceId + "' from the account balance. This MOVES MONEY and "
+                                + "cannot be undone from here.",
+                        Bucket.FINANCIAL);
             } else if ("create_payment".equals(skill) || lower.contains("checkout") || lower.contains("add funds")) {
                 Double amount = metaDouble(task, "amount");
                 if (amount == null) return askForInput(task, "Please provide the amount to add to your account balance.");
-                var result = billingService.createPaymentSession(amount, meta(task, "currency"));
-                return completeWithResult(task, "payment-session", result, result.isSuccess(),
-                        result.isSuccess() ? "Payment session created. Use the URL to complete checkout." : result.getMessage());
+                String currency = meta(task, "currency");
+                java.util.Map<String, Object> params = new java.util.LinkedHashMap<>();
+                params.put("amount", amount);
+                if (currency != null) params.put("currency", currency);
+                return stage(task, "create_payment", params,
+                        "Open a checkout session to add " + amount + " " + (currency == null ? "" : currency)
+                                + " to the account balance. The card is charged when the person completes "
+                                + "checkout at the returned URL.",
+                        Bucket.FINANCIAL);
             } else {
                 var result = billingService.getAccountBalance();
                 return completeWithResult(task, "balance", result, result.isSuccess(),
@@ -113,6 +127,34 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
         } catch (Exception e) {
             LOG.errorf(e, "Billing agent error: %s", e.getMessage());
             return failWithError(task, e.getMessage());
+        }
+    }
+
+    /** Run what was staged, from the parameters frozen at stage time. */
+    private A2ATask runConfirmed(A2ATask task) {
+        var claim = confirmationGate.claim(task);
+        if (!claim.ok()) {
+            return failWithError(task, claim.error());
+        }
+        java.util.Map<String, Object> p = claim.action().params();
+        switch (claim.action().skill()) {
+            case "pay_invoice" -> {
+                var result = billingService.payInvoice(String.valueOf(p.get("invoiceId")));
+                return completeWithResult(task, "payment", result, result.isSuccess(),
+                        result.isSuccess() ? "Invoice paid successfully." : result.getMessage());
+            }
+            case "create_payment" -> {
+                Double amount = p.get("amount") instanceof Number n ? n.doubleValue() : null;
+                Object currency = p.get("currency");
+                var result = billingService.createPaymentSession(amount,
+                        currency == null ? null : currency.toString());
+                return completeWithResult(task, "payment-session", result, result.isSuccess(),
+                        result.isSuccess() ? "Payment session created. Use the URL to complete checkout."
+                                : result.getMessage());
+            }
+            default -> {
+                return failWithError(task, "Cannot run '" + claim.action().skill() + "': unknown staged action.");
+            }
         }
     }
 
@@ -172,6 +214,11 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
                 new Skill("get_domain_pricing", "Get Domain Pricing", "Get pricing for domain extensions",
                         List.of("billing", "pricing", "domains"),
                         List.of("How much does a .io domain cost?", "What is the price for .com registrations?")),
+                new Skill(ConfirmationGate.CONFIRM_SKILL, "Confirm A Staged Action",
+                        "Run an action this agent staged: send the actionId it returned, on the same task",
+                        List.of("confirmation", "safety"),
+                        List.of("Confirm action a2a_1f4c... on this task",
+                                "Yes, pay that invoice")),
                 new Skill("get_hosting_bundle", "Get Hosting Bundle",
                         "Hosting options and exact prices for one domain: recommended VPS, mail plan and totals",
                         List.of("billing", "pricing", "hosting", "bundle"),

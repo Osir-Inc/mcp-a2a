@@ -20,6 +20,24 @@ public abstract class BaseSpecialistAgent implements SpecialistAgent {
     @Inject
     ObjectMapper objectMapper;
 
+    /**
+     * Two-step confirmation for skills that spend money or destroy data. Injected here so every
+     * agent shares one mechanism; see ConfirmationGate for what it does and does not protect.
+     */
+    @jakarta.inject.Inject
+    protected com.osir.a2a.security.ConfirmationGate confirmationGate;
+
+    /** Record the action and hand the caller a summary; nothing runs until they confirm. */
+    protected A2ATask stage(A2ATask task, String skill, java.util.Map<String, Object> params,
+                            String summary, com.osir.mcp.security.DestructiveOpRateLimiter.Bucket bucket) {
+        return confirmationGate.stage(task, getId(), skill, params, summary, bucket);
+    }
+
+    /** True when this message is confirming something already staged on the task. */
+    protected boolean isConfirming(A2ATask task) {
+        return confirmationGate.isConfirming(task);
+    }
+
     /** Keywords that give this agent a score boost. Override to customize. */
     protected abstract Set<String> getKeywords();
 

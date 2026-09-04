@@ -1,6 +1,8 @@
 # A2A Confirmation Gate — Spec
 
-**Status:** proposed, not implemented. No code in this repo has been changed for it.
+**Status: IMPLEMENTED 2026-09-04** as Layer A (see §6). §1 and §2 still hold and are the reason this
+is only one layer of four — read §2 before treating the gate as a security control. §3 records the
+design that was proposed; §6 records what was built instead, and why it differs in three places.
 **Raised from:** the Osir Deploy Platform side, which needs the owned tier (single-tenant VPS) and
 audited this surface before automating VPS builds. Written 2026-07-17.
 **Scope:** `a2a-server` — `VpsSpecialistAgent`. Touches `common` and `mcp-server` only by moving one
@@ -177,6 +179,45 @@ that the stage→confirm round trip holds, which a stubbed store fakes.
 
 - `changeVpsPaymentTerm` is a billing change that doesn't stage, on either transport.
 - Whether the A2A agent card should advertise destructive skills at all (§2).
+
+## 6. What was actually built (2026-09-04)
+
+`a2a-server/…/security/ConfirmationGate.java`, wired into `BaseSpecialistAgent` and pinned in
+`A2AResource`. Staging returns `INPUT_REQUIRED` with a `confirmation-required` artifact; the caller
+continues the SAME task with `{"skill": "execute_confirmed_action", "actionId": "…"}`.
+
+Scope is wider than §3.4's `VpsSpecialistAgent`: leaving `register_domain` or `pay_invoice` ungated
+after building the gate would have kept the inconsistency that prompted it. Gated: `order_vps`,
+`build_vps`, `delete_vps` (VPS), `register_domain`, `renew_domain`, `transfer_domain` (Domain),
+`pay_invoice`, `create_payment` (Billing), `delete_contact` (Contact), `delete_dns_record` (DNS).
+
+**Three deliberate departures from §3:**
+
+1. **The store was not moved or reused (§3.1/§3.2).** `PendingActionStore` holds a `Callable`, which
+   is why an MCP restart forgets every staged action — the same in-memory assumption that produced
+   the move-to-owned SEV-1 a day earlier. A2A tasks are already persisted, so a staged action is
+   recorded ON the task as DATA (skill + frozen params) and survives a restart with it. Only
+   `DestructiveOpRateLimiter` moved to `common`, so both transports share one set of limits; its
+   `Bucket` now carries its own per-minute limit instead of a two-way ternary.
+2. **Caller identity is the JWT `sub`, not a token fingerprint (§3.3).** §3.3's own "known wart" —
+   `TokenRefreshService` rotating the token between stage and confirm — disappears, and it matches
+   how the MCP side keys its money rule (`MoveToOwnedService.key()`).
+3. **The confirm must echo the actionId.** §3.4 allowed `skill=execute_confirmed_action` alone; a
+   bare "yes, go ahead" is now refused, so the caller has to repeat an id it did not choose.
+
+**One trap §3 did not name:** `A2AResource` REPLACES task metadata on a continuation and re-scores
+routing from scratch. So the frozen parameters must never be re-read from caller metadata at confirm
+time (they are not), and a task with a live staged action is now pinned to the agent that staged it —
+otherwise "yes, terminate it" is handed to whichever agent those words happen to match.
+
+Tests: `VpsSpecialistAgentTest` covers stage-then-confirm, single use, confirm-with-different-params,
+confirm-without-actionId, the price warning, and staging while unauthenticated, against a REAL gate
+(`GateTestSupport`). a2a-server: 121 tests, 0 failures.
+
+**Still missing, and this is the important part:** Layers B (per-tool `osir:*` scopes), C (a backend
+spend/velocity cap) and D (out-of-band approval to a channel the calling agent does not control).
+Layer A does not stop an unattended caller and was never going to — §2 said so, and it is tracked in
+`docs/TODO.md` so the gap is not mistaken for closed.
 
 ## 5. Before committing this
 

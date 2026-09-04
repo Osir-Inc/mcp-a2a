@@ -1,6 +1,8 @@
 package com.osir.a2a.agents;
 
 import com.osir.a2a.protocol.*;
+import com.osir.a2a.security.ConfirmationGate;
+import com.osir.mcp.security.DestructiveOpRateLimiter.Bucket;
 import com.osir.mcp.services.DnsService;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -33,7 +35,7 @@ public class DnsSpecialistAgent extends BaseSpecialistAgent {
     @Override
     protected Set<String> getSkillIds() {
         return Set.of("list_dns_records", "create_dns_record", "update_dns_record", "delete_dns_record",
-                "get_dns_record", "initialize_dns_zone");
+                "get_dns_record", "initialize_dns_zone", ConfirmationGate.CONFIRM_SKILL);
     }
 
     @Override
@@ -50,6 +52,11 @@ public class DnsSpecialistAgent extends BaseSpecialistAgent {
             String skill = getSkillFromMetadata(task);
             String text = getLatestUserMessage(task);
             String lower = text.toLowerCase();
+
+            // Before the keyword chain: an actionId confirms a staged delete rather than re-staging it.
+            if (isConfirming(task)) {
+                return runConfirmed(task);
+            }
 
             if ("initialize_dns_zone".equals(skill)) {
                 return handleInitializeZone(task, text);
@@ -141,10 +148,26 @@ public class DnsSpecialistAgent extends BaseSpecialistAgent {
                     "Use 'list DNS records for " + domain + "' to see available records."));
             return task;
         }
-        var result = dnsService.deleteRecord(domain, m.group(1));
-        task.addMessage(new Message("agent", result.isSuccess() ? "DNS record deleted." : result.getMessage()));
-        task.transitionTo(result.isSuccess() ? TaskState.COMPLETED : TaskState.FAILED);
-        return task;
+        String recordId = m.group(1);
+        return stage(task, "delete_dns_record", java.util.Map.of("domain", domain, "recordId", recordId),
+                "Delete DNS record " + recordId + " from " + domain + ". Removing a live record can take "
+                        + "the site or its mail offline, and it cannot be undone from here.",
+                Bucket.DESTRUCTIVE);
+    }
+
+    /** Run what was staged, from the parameters frozen at stage time. */
+    private A2ATask runConfirmed(A2ATask task) {
+        var claim = confirmationGate.claim(task);
+        if (!claim.ok()) {
+            return failWithError(task, claim.error());
+        }
+        java.util.Map<String, Object> p = claim.action().params();
+        if (!"delete_dns_record".equals(claim.action().skill())) {
+            return failWithError(task, "Cannot run '" + claim.action().skill() + "': unknown staged action.");
+        }
+        var result = dnsService.deleteRecord(String.valueOf(p.get("domain")), String.valueOf(p.get("recordId")));
+        return completeWithResult(task, "dns-record-delete", result, result.isSuccess(),
+                result.isSuccess() ? "DNS record deleted." : result.getMessage());
     }
 
     /** Create the zone itself. Idempotent and free; without it every record call answers "zone not found". */
@@ -185,6 +208,10 @@ public class DnsSpecialistAgent extends BaseSpecialistAgent {
                 new Skill("get_dns_record", "Get DNS Record", "Get details of a specific DNS record",
                         List.of("dns", "records", "details"),
                         List.of("Show me record 5512 on cedarloop.com")),
+                new Skill(ConfirmationGate.CONFIRM_SKILL, "Confirm A Staged Action",
+                        "Run an action this agent staged: send the actionId it returned, on the same task",
+                        List.of("confirmation", "safety"),
+                        List.of("Confirm action a2a_1f4c... on this task", "Yes, delete that record")),
                 new Skill("initialize_dns_zone", "Initialize DNS Zone",
                         "Create the DNS zone for a domain hosted on OSIR nameservers (idempotent, free)",
                         List.of("dns", "zone", "setup"),

@@ -311,6 +311,38 @@ Returns an array of all specialist agent cards:
 | `get_domain_audit` | View audit trail for a specific domain |
 | `get_recent_activity` | View recent activity across services |
 
+### Confirmation gate (`execute_confirmed_action`)
+
+Skills that spend money or destroy data are STAGED, not run. The first call answers
+`input-required` with a `confirmation-required` artifact:
+
+```json
+{ "name": "confirmation-required",
+  "parts": [{ "type": "data", "data": {
+      "actionId": "a2a_9f1c…", "skill": "order_vps", "summary": "Order a VPS: … DEDUCTS FROM THE ACCOUNT BALANCE …",
+      "expiresInSeconds": 300, "params": { "packageId": "OSIR-S-US", "hostname": "box.example.com" } } }] }
+```
+
+To go ahead, send a second `tasks/send` **with the same task id** and
+`{"skill": "execute_confirmed_action", "actionId": "<the id>"}`. Rules:
+
+| Rule | Behaviour |
+|---|---|
+| Parameters are frozen at stage time | the confirm message carries only the actionId; anything else in it is ignored |
+| The actionId must be echoed | a bare "yes, go ahead" is refused |
+| Single use | a replayed actionId is refused, the action does not run twice |
+| 5-minute expiry | after that, re-send the original request to stage a fresh one |
+| Caller match | only the session (JWT subject) that staged it can confirm it |
+| Rate limited | 5/min financial, 3/min destructive, per caller |
+| Agent pinned | the confirm is routed to the agent that staged it, never re-scored |
+
+Gated: `order_vps`, `build_vps`, `delete_vps`, `register_domain`, `renew_domain`, `transfer_domain`,
+`pay_invoice`, `create_payment`, `delete_contact`, `delete_dns_record`.
+
+**This is not an authorization control.** A caller holding the actionId can send it back
+unattended; what the gate provides is an audit trail with the summary, a bounded blast radius, and
+one confirmation mechanism shared with the MCP transport. See `A2A-CONFIRMATION-GATE-SPEC.md` §2.
+
 ### Mail Agent (`mail-agent`)
 
 | Skill ID | Description |

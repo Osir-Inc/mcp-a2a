@@ -20,7 +20,24 @@
 
 ## A2A (needs a decision, not just code)
 
-- [ ] **A2A confirmation gate** — `docs/A2A-CONFIRMATION-GATE-SPEC.md` is proposed but NOT implemented: A2A `register_domain` (Domain Agent) and the VPS order path call billable services directly, with none of the staged-confirmation discipline every MCP tool has. Same failure class as the 2026-09-03 SEV-1, one door over. Decide: implement the gate, or strip billable skills from the A2A cards until it exists.
+- [x] **A2A confirmation gate — Layer A** (2026-09-04) — `ConfirmationGate` stages every billable or
+  destructive skill on all five agents that had one: order/build/delete VPS, register/renew/transfer
+  domain, pay invoice, create payment, delete contact, delete DNS record. Staging returns
+  INPUT_REQUIRED with a summary; the caller confirms by echoing the actionId on the SAME task.
+  Single-use, 5-minute expiry, caller matched on the JWT subject, rate limited per bucket.
+  **It is not a security control** — see the spec's §2 and the class javadoc: a caller holding the
+  actionId can simply send it back. What it buys is audit, blast radius, and one mechanism across
+  both transports.
+- [ ] **A2A gate — Layer B: per-tool `osir:*` scopes.** THE control that actually stops an unattended
+  caller from spending: a token without `osir:vps.write` / `osir:billing.write` cannot order however
+  many confirmations it sends. Blocked on Keycloak scope definitions (B.2), same item as the
+  agent-readiness scope work.
+- [ ] **A2A gate — Layer C: a backend spend/velocity cap.** Neither transport can enforce this
+  credibly (multiple instances, restarts, and the REST API is reachable directly).
+- [ ] **A2A gate — Layer D: out-of-band approval**, if a real human-in-the-loop is wanted for agent
+  callers: the approval has to reach a channel the CALLING agent does not control (the account
+  owner's email or the portal). Note the existing push-notification webhook is caller-supplied, so it
+  is not that channel.
 
 ## MCP transport
 

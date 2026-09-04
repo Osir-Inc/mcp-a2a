@@ -29,6 +29,7 @@ class VpsSpecialistAgentTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        GateTestSupport.wire(agent);
         agent.init();
     }
 
@@ -55,15 +56,110 @@ class VpsSpecialistAgentTest {
      */
     @Test
     void handle_explicitSkillWinsOverTextKeywords() {
+        A2ATask task = new A2ATask("t1", new Message("user", "terminate the server, I lost the ssh key"));
+        task.setMetadata(Map.of("skill", "delete_vps", "instanceId", "vps-1"));
+        A2ATask out = agent.handle(task);
+
+        // Routing still resolves to delete rather than the bare contains("ssh") branch — but a
+        // terminate now STAGES, it does not run.
+        assertEquals(TaskState.INPUT_REQUIRED, out.getStatus());
+        assertNotNull(GateTestSupport.stagedActionId(out));
+        verify(vpsService, never()).deleteInstance(anyString());
+        verify(vpsService, never()).listSshKeys();
+    }
+
+    @Test
+    void handle_deleteVps_stageThenConfirmRunsIt() {
         when(vpsService.deleteInstance("vps-1"))
                 .thenReturn(new com.osir.mcp.models.vps.VpsActionResult(true, "OK"));
 
-        A2ATask task = new A2ATask("t1", new Message("user", "terminate the server, I lost the ssh key"));
+        A2ATask task = new A2ATask("t1", new Message("user", "terminate it"));
         task.setMetadata(Map.of("skill", "delete_vps", "instanceId", "vps-1"));
-        agent.handle(task);
+        A2ATask staged = agent.handle(task);
+        assertEquals(TaskState.INPUT_REQUIRED, staged.getStatus());
+        verifyNoInteractions(vpsService);
+
+        A2ATask out = agent.handle(GateTestSupport.confirmOn(staged));
+
+        assertEquals(TaskState.COMPLETED, out.getStatus());
+        verify(vpsService).deleteInstance("vps-1");
+    }
+
+    @Test
+    void handle_confirmIsSingleUse() {
+        when(vpsService.deleteInstance("vps-1"))
+                .thenReturn(new com.osir.mcp.models.vps.VpsActionResult(true, "OK"));
+
+        A2ATask task = new A2ATask("t1", new Message("user", "terminate it"));
+        task.setMetadata(Map.of("skill", "delete_vps", "instanceId", "vps-1"));
+        A2ATask staged = agent.handle(task);
+        agent.handle(GateTestSupport.confirmOn(staged));
+
+        // A replayed actionId must not terminate a second time.
+        A2ATask replay = agent.handle(GateTestSupport.confirmOn(staged));
+
+        assertEquals(TaskState.FAILED, replay.getStatus());
+        verify(vpsService, times(1)).deleteInstance("vps-1");
+    }
+
+    @Test
+    void handle_confirmRunsTheStagedParameters_notResentOnes() {
+        when(vpsService.deleteInstance("vps-1"))
+                .thenReturn(new com.osir.mcp.models.vps.VpsActionResult(true, "OK"));
+
+        A2ATask task = new A2ATask("t1", new Message("user", "terminate it"));
+        task.setMetadata(Map.of("skill", "delete_vps", "instanceId", "vps-1"));
+        A2ATask staged = agent.handle(task);
+
+        // The caller confirms, but names a DIFFERENT instance in the same message.
+        Map<String, Object> sneaky = new java.util.HashMap<>();
+        sneaky.put("skill", "execute_confirmed_action");
+        sneaky.put("actionId", GateTestSupport.stagedActionId(staged));
+        sneaky.put("instanceId", "vps-999");
+        staged.setMetadata(sneaky);
+        agent.handle(staged);
 
         verify(vpsService).deleteInstance("vps-1");
-        verify(vpsService, never()).listSshKeys();
+        verify(vpsService, never()).deleteInstance("vps-999");
+    }
+
+    @Test
+    void handle_confirmWithoutActionIdIsRefused() {
+        A2ATask task = new A2ATask("t1", new Message("user", "terminate it"));
+        task.setMetadata(Map.of("skill", "delete_vps", "instanceId", "vps-1"));
+        A2ATask staged = agent.handle(task);
+
+        // A bare "yes, go ahead" must not spend or destroy: the caller has to echo the id.
+        staged.setMetadata(Map.of("skill", "execute_confirmed_action"));
+        A2ATask out = agent.handle(staged);
+
+        assertEquals(TaskState.FAILED, out.getStatus());
+        verify(vpsService, never()).deleteInstance(anyString());
+    }
+
+    @Test
+    void handle_orderVps_stagesWithAPriceWarning() {
+        A2ATask task = new A2ATask("t1", new Message("user", "order a server"));
+        task.setMetadata(Map.of("skill", "order_vps", "packageId", "OSIR-S-US",
+                "hostname", "box.example.com", "paymentTerm", "MONTHLY"));
+        A2ATask out = agent.handle(task);
+
+        assertEquals(TaskState.INPUT_REQUIRED, out.getStatus());
+        String summary = out.getHistory().get(out.getHistory().size() - 1).getTextContent();
+        assertTrue(summary.contains("DEDUCTS FROM THE ACCOUNT BALANCE"), summary);
+        verify(vpsService, never()).orderVps(anyString(), anyString(), anyString(), any(), any());
+    }
+
+    @Test
+    void handle_stagingWithoutASessionIsRefused() {
+        GateTestSupport.wireUnauthenticated(agent);
+
+        A2ATask task = new A2ATask("t1", new Message("user", "terminate it"));
+        task.setMetadata(Map.of("skill", "delete_vps", "instanceId", "vps-1"));
+        A2ATask out = agent.handle(task);
+
+        assertEquals(TaskState.FAILED, out.getStatus());
+        verifyNoInteractions(vpsService);
     }
 
     /**
@@ -105,10 +201,16 @@ class VpsSpecialistAgentTest {
                 .thenReturn(new com.osir.mcp.models.vps.VpsBuildResult(true, "queued"));
 
         A2ATask task = new A2ATask("t1", new Message("user", "install template 46"));
-        task.setMetadata(Map.of("skill", "build_vps", "instanceId", "vps-1",
-                "operatingSystemId", "46", "confirm", "ERASE"));
-        agent.handle(task);
+        task.setMetadata(Map.of("skill", "build_vps", "instanceId", "vps-1", "operatingSystemId", "46"));
+        A2ATask staged = agent.handle(task);
 
+        // Routing still lands on build (not the template listing), and the wipe is staged first.
+        assertEquals(TaskState.INPUT_REQUIRED, staged.getStatus());
+        String summary = staged.getHistory().get(staged.getHistory().size() - 1).getTextContent();
+        assertTrue(summary.contains("ERASES ALL DATA"), summary);
+        verifyNoInteractions(vpsService);
+
+        agent.handle(GateTestSupport.confirmOn(staged));
         verify(vpsService).buildInstance("vps-1", 46, null, null, null);
     }
 

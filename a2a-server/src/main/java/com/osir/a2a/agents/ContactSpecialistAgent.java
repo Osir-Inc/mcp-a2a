@@ -1,6 +1,8 @@
 package com.osir.a2a.agents;
 
 import com.osir.a2a.protocol.*;
+import com.osir.a2a.security.ConfirmationGate;
+import com.osir.mcp.security.DestructiveOpRateLimiter.Bucket;
 import com.osir.mcp.services.ContactService;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -30,7 +32,8 @@ public class ContactSpecialistAgent extends BaseSpecialistAgent {
 
     @Override
     protected Set<String> getSkillIds() {
-        return Set.of("list_contacts", "get_contact", "create_contact", "update_contact", "delete_contact", "get_domain_contacts");
+        return Set.of("list_contacts", "get_contact", "create_contact", "update_contact", "delete_contact",
+                "get_domain_contacts", ConfirmationGate.CONFIRM_SKILL);
     }
 
     @Override
@@ -44,6 +47,10 @@ public class ContactSpecialistAgent extends BaseSpecialistAgent {
     @Override
     public A2ATask handle(A2ATask task) {
         try {
+            // Before the keyword chain: an actionId confirms a staged delete rather than re-staging it.
+            if (isConfirming(task)) {
+                return runConfirmed(task);
+            }
             String skill = getSkillFromMetadata(task);
             String text = getLatestUserMessage(task);
             String lower = text.toLowerCase();
@@ -98,9 +105,10 @@ public class ContactSpecialistAgent extends BaseSpecialistAgent {
             } else if ("delete_contact".equals(skill) || lower.contains("delete") || lower.contains("remove")) {
                 String contactId = meta(task, "contactId");
                 if (contactId == null) return askForInput(task, "Please provide the contact ID to delete.");
-                var result = contactService.deleteContact(contactId);
-                return completeWithResult(task, "contact-delete", result, result.isSuccess(),
-                        result.isSuccess() ? "Contact deleted." : result.getMessage());
+                return stage(task, "delete_contact", java.util.Map.of("contactId", contactId),
+                        "Delete contact '" + contactId + "'. This is permanent, and a contact still "
+                                + "attached to a domain cannot be deleted.",
+                        Bucket.DESTRUCTIVE);
             } else {
                 var result = contactService.listContacts(null);
                 return completeWithResult(task, "contacts", result, result.isSuccess(), "Here are your contacts.");
@@ -109,6 +117,20 @@ public class ContactSpecialistAgent extends BaseSpecialistAgent {
             LOG.errorf(e, "Contact agent error: %s", e.getMessage());
             return failWithError(task, e.getMessage());
         }
+    }
+
+    /** Run what was staged, from the parameters frozen at stage time. */
+    private A2ATask runConfirmed(A2ATask task) {
+        var claim = confirmationGate.claim(task);
+        if (!claim.ok()) {
+            return failWithError(task, claim.error());
+        }
+        if (!"delete_contact".equals(claim.action().skill())) {
+            return failWithError(task, "Cannot run '" + claim.action().skill() + "': unknown staged action.");
+        }
+        var result = contactService.deleteContact(String.valueOf(claim.action().params().get("contactId")));
+        return completeWithResult(task, "contact-delete", result, result.isSuccess(),
+                result.isSuccess() ? "Contact deleted." : result.getMessage());
     }
 
     private AgentCard buildAgentCard() {
@@ -135,6 +157,10 @@ public class ContactSpecialistAgent extends BaseSpecialistAgent {
                         List.of("contacts", "update", "edit"),
                         List.of("Update the email on contact C-1042 to billing@cedarloop.com",
                                 "Change the phone number on my registrant contact")),
+                new Skill(ConfirmationGate.CONFIRM_SKILL, "Confirm A Staged Action",
+                        "Run an action this agent staged: send the actionId it returned, on the same task",
+                        List.of("confirmation", "safety"),
+                        List.of("Confirm action a2a_1f4c... on this task", "Yes, delete that contact")),
                 new Skill("delete_contact", "Delete Contact", "Delete a contact",
                         List.of("contacts", "delete", "remove"),
                         List.of("Delete contact C-1042", "Remove my old billing contact")),

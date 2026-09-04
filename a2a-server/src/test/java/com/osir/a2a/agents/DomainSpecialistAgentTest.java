@@ -33,6 +33,7 @@ class DomainSpecialistAgentTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        GateTestSupport.wire(agent);
         // Trigger @PostConstruct manually since Mockito doesn't call it
         agent.init();
     }

@@ -32,6 +32,7 @@ public class A2AResource {
     @Inject AuthContext authContext;
     @Inject AuditLogger auditLogger;
     @Inject PushNotificationService pushService;
+    @Inject com.osir.a2a.security.ConfirmationGate confirmationGate;
     @Inject TokenRefreshService tokenRefreshService;
     @Inject TaskMetrics metrics;
 
@@ -160,8 +161,14 @@ public class A2AResource {
                 metrics.taskCreated();
             }
 
-            // Route to the best specialist agent
-            var agent = agentRegistry.findAgentForTask(task);
+            // Route to the best specialist agent. A task waiting on a staged confirmation is PINNED to
+            // the agent that staged it: a continuation is re-scored from scratch, so "yes, go ahead"
+            // would otherwise be handed to whichever agent those words happen to match, not the one
+            // holding the staged spend.
+            final A2ATask routingTask = task;
+            var agent = confirmationGate.pendingAgentId(routingTask)
+                    .flatMap(agentRegistry::findById)
+                    .or(() -> agentRegistry.findAgentForTask(routingTask));
             if (agent.isEmpty()) {
                 task.transitionTo(TaskState.FAILED);
                 task.addMessage(new Message("agent", "No agent available to handle this request."));

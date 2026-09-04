@@ -28,6 +28,7 @@ class BillingSpecialistAgentTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        GateTestSupport.wire(agent);
         agent.init();
     }
 

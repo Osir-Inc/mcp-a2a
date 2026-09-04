@@ -28,6 +28,10 @@ dependencies {
     // Cache API
     api 'io.quarkus:quarkus-cache'
 
+    // Scheduler: DestructiveOpRateLimiter sweeps its windows on @Scheduled, and the limiter is
+    // shared by both transports, so it lives in common.
+    api 'io.quarkus:quarkus-scheduler'
+
     // Test dependencies
     testImplementation platform('org.junit:junit-bom:5.10.5')
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
