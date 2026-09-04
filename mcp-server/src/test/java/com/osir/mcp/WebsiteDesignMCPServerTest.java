@@ -2,6 +2,7 @@ package com.osir.mcp;
 
 import com.osir.mcp.models.deploy.DeployDtos.DeployResult;
 import com.osir.mcp.models.design.DesignBriefResult;
+import com.osir.mcp.security.DestructiveOpRateLimiter;
 import com.osir.mcp.services.DeploymentService;
 import com.osir.mcp.services.DesignBriefService;
 import io.quarkiverse.mcp.server.McpConnection;
@@ -12,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class WebsiteDesignMCPServerTest {
@@ -23,6 +25,9 @@ class WebsiteDesignMCPServerTest {
     DeploymentService deploymentService;
 
     @Mock
+    DestructiveOpRateLimiter rateLimiter;
+
+    @Mock
     McpConnection mockConnection;
 
     @InjectMocks
@@ -32,6 +37,20 @@ class WebsiteDesignMCPServerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         when(mockConnection.id()).thenReturn("test-conn-id");
+        lenient().when(rateLimiter.tryAcquire(anyString(), any())).thenReturn(true);
+    }
+
+    @Test
+    void osirSitePublish_isRateLimited() {
+        // A looping agent can call this every turn with nothing but inline HTML, and the backend
+        // throttles nothing - so the refusal has to happen here, before the deploy.
+        when(rateLimiter.tryAcquire("test-conn-id", DestructiveOpRateLimiter.Bucket.PUBLISH)).thenReturn(false);
+
+        DeployResult r = server.osirSitePublish("x", "<html>", null, null, null, mockConnection);
+
+        assertFalse(r.success());
+        assertTrue(r.message().contains("Too many publishes"), r.message());
+        verify(deploymentService, never()).publishStatic(any(), any(), any(), anyBoolean());
     }
 
     @Test

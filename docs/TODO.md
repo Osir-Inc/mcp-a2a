@@ -4,7 +4,7 @@
 
 - [x] **`getHostingBundle` tool** — shipped (CatalogMCPServer, anonymous; passthrough model).
 - [x] **`createPaymentSession` poll fields** — `pollTool`/`pollEndpoint`/`expiresAt` passed through; tool description explains the poll loop.
-- [x] **Telemetry emission** — `telemetry/` package: every audited tool call → buffered event → batched POST /v1/agent/telemetry every 30 s (≤200/batch, drop on failure/overflow). **Disabled until `OSIR_TELEMETRY_API_KEY` is set — needs an api-user key issued for the MCP service (ask Armand/issue in Keycloak).**
+- [x] **Telemetry emission** — `telemetry/` package: every audited tool call → buffered event → batched POST /v1/agent/telemetry every 30 s (≤200/batch, drop on failure/overflow). `OSIR_TELEMETRY_API_KEY` is set in production (2026-09-04), so emission is live from the next deploy — confirm events land after it.
 - [ ] **Telemetry "registered" stage** — not observable in the audit interceptor (happens inside executeConfirmedAction's callback); emit from PendingActionStore if the funnel needs it beyond "confirmed".
 - [ ] **Idempotency-Key pass-through** on mutating tools — blocked on backend ledger work (handoff §7).
 - [ ] **Per-tool `osir:*` scope declarations** (handoff §7) — do together with the A.0 tool inventory; tokens already carry all 8 scopes since device login now requests them.
@@ -13,10 +13,14 @@
 
 - [ ] **TODO(contact-form)** — build an OSIR form-handling endpoint (POST name/email/message → forward to the site owner's mailbox). Until then `DesignBriefService` defaults to `tel:`/`mailto:`/WhatsApp links and renders a `<form>` only when the client supplies `constraints.form_endpoint`. When it ships: set it as the default `form_endpoint`, flip the default to contact_form=true, drop the fallback line.
 - [ ] **Screenshot critique (Prompt B from the design pack)** — extend C2's post-deploy QA (`osirAppStatus.qa`) to return screenshot URLs at 1280px and 390px, then add a step to the `website_designer` prompt: "look at the screenshots, list what looks templated/broken, fix, republish". No Playwright in this repo.
-- [ ] **Rate limit on `osirSitePublish`** — same exposure as `osirAppDeploy`: a looping agent could redeploy every turn. Confirm C2 throttles per tenant; if not, add a `DestructiveOpRateLimiter` bucket (e.g. 10/min) on publish.
+- [x] **Rate limit on `osirSitePublish`** (2026-09-04) — C2 throttles nothing (no rate limiting in the deploy backend at all), so `DestructiveOpRateLimiter` grew a `PUBLISH` bucket, 10/min per connection, checked before the deploy. `osirAppDeploy` is left ungated on purpose: it needs an upload ticket and a zip PUT first, which a looping model does not produce by accident. Revisit if that stops being true.
 - [ ] **E2E test in Claude.ai** — `website_designer` → interview → `osirSitePublish` → `osirAppStatus` READY → open `liveUrl`; then one revision under the same name. Also try from the osir.com DeepSeek chat loop (tool results must reach the model).
 - [ ] **Custom domains for `*.osir.app` static sites** — customers will ask ("I want it on my own domain"). Needs C2 route support for a customer domain → app mapping; the MCP side already has registerDomain + DNS tools to complete the story.
 - [ ] Version history / revert beyond the last deploy — only if clients ask (`osirAppGetSource` covers the last version).
+
+## A2A (needs a decision, not just code)
+
+- [ ] **A2A confirmation gate** — `docs/A2A-CONFIRMATION-GATE-SPEC.md` is proposed but NOT implemented: A2A `register_domain` (Domain Agent) and the VPS order path call billable services directly, with none of the staged-confirmation discipline every MCP tool has. Same failure class as the 2026-09-03 SEV-1, one door over. Decide: implement the gate, or strip billable skills from the A2A cards until it exists.
 
 ## MCP transport
 
@@ -25,4 +29,8 @@
 
 ## Docs
 
-- [ ] `PromptsMCPServerTest` hardcodes `assertEquals(8, …)` no-arg prompts — an implicit inventory; consider counting `@Prompt` annotations across all `*MCPServer` classes instead.
+- [x] `PromptsMCPServerTest` no longer hardcodes a prompt count (2026-09-04) — it asserts every no-arg `PromptMessage` method is annotated `@Prompt` and returns content, which is the invariant the number was standing in for.
+
+## Health
+
+- [x] **`McpHealthCheck` told the truth** (2026-09-04) — it reported `version 1.0.0` / `protocol MCP 2025-03-26` on a 2.3.0 Streamable server and `testBackendConnection()` was a `return true` with a TODO. It now reports the configured version and a real (10 s-cached, 2 s-timeout) HEAD probe of the domain backend as `backend: reachable|unreachable`. Readiness deliberately stays UP on a backend blip — a DOWN would pull the MCP from the load balancer and turn a degraded backend into a full outage.

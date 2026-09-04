@@ -1,5 +1,6 @@
 package com.osir.mcp;
 
+import io.quarkiverse.mcp.server.Prompt;
 import io.quarkiverse.mcp.server.PromptMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,6 +9,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -69,22 +71,27 @@ class PromptsMCPServerTest {
         assertNotNull(msg);
     }
 
+    /**
+     * Every no-arg PromptMessage method must be a REGISTERED prompt that actually returns content.
+     * Deliberately no expected count: a hardcoded number is an inventory that goes stale the day
+     * someone adds a prompt, and it fails for the wrong reason when they do.
+     */
     @Test
-    void allPromptMethods_returnNonNull() {
-        // Verify every public method that returns PromptMessage works
-        long promptCount = Arrays.stream(PromptsMCPServer.class.getMethods())
+    void everyPromptMethodIsRegisteredAndReturnsContent() {
+        List<Method> promptMethods = Arrays.stream(PromptsMCPServer.class.getMethods())
                 .filter(m -> m.getReturnType() == PromptMessage.class)
                 .filter(m -> m.getParameterCount() == 0)
-                .map(m -> {
-                    try {
-                        assertNotNull(m.invoke(prompts), m.getName() + " returned null");
-                        return m;
-                    } catch (Exception e) {
-                        fail(m.getName() + " threw: " + e.getMessage());
-                        return null;
-                    }
-                })
-                .count();
-        assertEquals(8, promptCount, "Expected 8 no-arg prompt methods");
+                .toList();
+
+        assertFalse(promptMethods.isEmpty(), "no no-arg prompt methods found - wrong class?");
+        for (Method m : promptMethods) {
+            assertTrue(m.isAnnotationPresent(Prompt.class),
+                    m.getName() + " returns a PromptMessage but is not annotated @Prompt, so no client can call it");
+            try {
+                assertNotNull(m.invoke(prompts), m.getName() + " returned null");
+            } catch (Exception e) {
+                fail(m.getName() + " threw: " + e.getMessage());
+            }
+        }
     }
 }

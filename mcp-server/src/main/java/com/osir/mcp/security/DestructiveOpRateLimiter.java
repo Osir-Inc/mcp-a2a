@@ -8,18 +8,33 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Per-connection rate limiter for destructive and financial MCP tool operations.
- * Two independent buckets per connection, each with a 1-minute sliding window.
+ * Per-connection rate limiter for MCP tool operations that cost money, destroy data, or publish.
+ * Independent buckets per connection, each with a 1-minute sliding window.
  */
 @ApplicationScoped
 public class DestructiveOpRateLimiter {
 
     private static final Logger LOG = Logger.getLogger(DestructiveOpRateLimiter.class);
 
-    public enum Bucket { FINANCIAL, DESTRUCTIVE }
+    /**
+     * PUBLISH is deliberately looser than the other two: publishing costs nothing and redeploying is
+     * a normal part of iterating on a site. It exists because a looping agent can call
+     * osirSitePublish every turn with nothing but inline HTML, and the backend throttles nothing.
+     */
+    public enum Bucket {
+        FINANCIAL(5), DESTRUCTIVE(3), PUBLISH(10);
 
-    private static final int FINANCIAL_LIMIT = 5;
-    private static final int DESTRUCTIVE_LIMIT = 3;
+        private final int perMinute;
+
+        Bucket(int perMinute) {
+            this.perMinute = perMinute;
+        }
+
+        public int perMinute() {
+            return perMinute;
+        }
+    }
+
     private static final long WINDOW_MS = 60_000;
 
     private static final class BucketState {
@@ -47,7 +62,7 @@ public class DestructiveOpRateLimiter {
             return existing;
         });
 
-        int limit = bucket == Bucket.FINANCIAL ? FINANCIAL_LIMIT : DESTRUCTIVE_LIMIT;
+        int limit = bucket.perMinute();
         if (resultCount[0] > limit) {
             LOG.warnf("Rate limit exceeded: conn=%s bucket=%s count=%d limit=%d",
                     connectionId, bucket, resultCount[0], limit);

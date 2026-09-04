@@ -308,8 +308,9 @@ public class DeploymentService {
     /**
      * Tenant = the session subject. FAIL-CLOSED: if there is no authenticated subject we refuse
      * rather than bucket the caller into a shared tenant (isolation safety, §1.1).
-     * TODO: the backend must VALIDATE this forwarded JWT and derive the tenant itself — until then
-     * /v1/apps trusts the X-Osir-Tenant header (tracked as a critical backend TODO).
+     * C2 no longer takes our word for it: its CallerIdentity derives tenant_&lt;sub&gt; from the
+     * VALIDATED KeyCloak JWT and does not read X-Osir-Tenant at all (verified 2026-09-04). The
+     * header stays as a compat/diagnostic hint for older backends; it grants nothing.
      */
     private String tenant() {
         String token = authService.getCurrentToken();

@@ -2,6 +2,7 @@ package com.osir.mcp;
 
 import com.osir.mcp.models.deploy.DeployDtos.DeployResult;
 import com.osir.mcp.models.design.DesignBriefResult;
+import com.osir.mcp.security.DestructiveOpRateLimiter;
 import com.osir.mcp.security.McpAudited;
 import com.osir.mcp.security.RequiresAuth;
 import com.osir.mcp.services.DeploymentService;
@@ -30,6 +31,9 @@ public class WebsiteDesignMCPServer {
 
     @Inject
     DeploymentService deploymentService;
+
+    @Inject
+    DestructiveOpRateLimiter rateLimiter;
 
     @Prompt(name = "website_designer",
             description = "Design and publish a website for the user with OSIR: interview, design, revise, publish.")
@@ -112,6 +116,12 @@ public class WebsiteDesignMCPServer {
                                         @ToolArg(required = false, description = "Set true ONLY for pages generated via the osirSiteDesignBrief flow; additionally enforces its output contract (exactly one <h1>, self-contained, no external scripts/CSS except Google Fonts, no iframes). Never set it for a user's own site.") Boolean designContract,
                                         @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
                                         McpConnection connection) {
+        if (!rateLimiter.tryAcquire(connection.id(), DestructiveOpRateLimiter.Bucket.PUBLISH)) {
+            return DeployResult.fail("Too many publishes in the last minute (limit "
+                    + DestructiveOpRateLimiter.Bucket.PUBLISH.perMinute() + "). Wait a minute, then publish "
+                    + "the FINISHED page - revise the HTML in this conversation rather than republishing "
+                    + "after every edit.");
+        }
         try {
             return deploymentService.publishStatic(name, html, region, Boolean.TRUE.equals(designContract));
         } catch (Exception e) {
