@@ -4,6 +4,7 @@ import com.osir.mcp.models.deploy.DeployDtos.AppDto;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
 import com.osir.mcp.models.deploy.DeployDtos.OwnedMoveDto;
 import com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedResult;
+import com.osir.mcp.models.DomainInfoResult;
 import com.osir.mcp.models.dns.DnsActionResult;
 import com.osir.mcp.models.dns.DnsRecord;
 import com.osir.mcp.models.dns.DnsRecordListResult;
@@ -34,6 +35,7 @@ class MoveToOwnedServiceTest {
     @Mock DeploymentService deploymentService;
     @Mock VpsService vpsService;
     @Mock DnsService dnsService;
+    @Mock DomainService domainService;
     @Mock AuthService authService;
 
     @InjectMocks
@@ -43,6 +45,7 @@ class MoveToOwnedServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service.platformSshPubkey = "ssh-ed25519 AAAA test@platform";
+        service.nameserverSuffix = "osir.com";
         service.pollIntervalMs = 1;
         service.pollBudgetMs = 50;
         identity("user-1");
@@ -72,6 +75,13 @@ class MoveToOwnedServiceTest {
     /** The app already has a box recorded on C2 — the durable "don't order again" signal. */
     private void appBoundToBox(String name, String instanceId, String ip) {
         when(deploymentService.getStatus(name)).thenReturn(statusOf(name, instanceId, null));
+    }
+
+    /** Which nameservers a domain is delegated to — only ours make creating a zone here useful. */
+    private void delegation(String domain, String... nameservers) {
+        DomainInfoResult info = new DomainInfoResult(domain, true, "ok");
+        info.setNameservers(List.of(nameservers));
+        when(domainService.getDomainInfo(domain)).thenReturn(info);
     }
 
     /** C2's audit-derived view of a move: MOVING must suppress a re-dispatch, FAILED must not. */
@@ -356,7 +366,7 @@ class MoveToOwnedServiceTest {
         instanceState("vps-9", "COMPLETE", "1.2.3.4");
         when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any())).thenReturn(null);
         when(dnsService.listRecords("external.com")).thenReturn(new DnsRecordListResult(false, "zone not found"));
-        when(dnsService.initializeZone("external.com")).thenReturn(new DnsActionResult(false, "not hosted here"));
+        delegation("external.com", "ns1.cloudflare.com", "ns2.cloudflare.com");
 
         MoveToOwnedResult result = service.orderAndMove("app1", "OSIR-S",
                 new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", List.of(20)), "external.com");
@@ -365,6 +375,8 @@ class MoveToOwnedServiceTest {
         assertEquals(Boolean.FALSE, result.dnsBound());
         assertTrue(result.nextStep().contains("1.2.3.4"));
         assertTrue(result.nextStep().contains("A record"));
+        // Creating a zone here would write a record no resolver reads, then claim DNS was bound.
+        verify(dnsService, never()).initializeZone(anyString());
     }
 
     @Test
@@ -474,6 +486,8 @@ class MoveToOwnedServiceTest {
         instanceState("vps-9", "BUILDING", null);
         service.orderAndMove("app1", "OSIR-S", new MoveToOwnedService.Prepared(42, "u", List.of(20)), null);
 
+        instanceState("vps-other", "COMPLETE", "5.6.7.8");   // a real box of theirs, just not this move's
+
         MoveToOwnedResult result = service.attach("app1", "vps-other", null);
 
         assertFalse(result.success());
@@ -483,9 +497,53 @@ class MoveToOwnedServiceTest {
     @Test
     void findExistingBoxPrefersC2Binding() {
         appBoundToBox("app1", "vps-bound", "1.2.3.4");
+        instanceState("vps-bound", "COMPLETE", "1.2.3.4");
 
         assertEquals("vps-bound", service.findExistingBox("app1"));
         verify(vpsService, never()).listMyInstances();   // C2's binding is authoritative
+    }
+
+    @Test
+    void aBindingToAVanishedBoxIsIgnoredSoAReplacementCanStillBeOrdered() {
+        // The customer cancelled the VPS; C2 still records the binding. Returning it would send every
+        // call into attach ("could not be read") and leave no path to a replacement server.
+        appBoundToBox("app1", "vps-gone", "1.2.3.4");
+        when(vpsService.getInstanceDetails("vps-gone"))
+                .thenReturn(new VpsInstanceDetailResult(false, "not found"));
+        myInstances(instance("vps-7", "unrelated.example"));
+
+        assertNull(service.findExistingBox("app1"));
+    }
+
+    @Test
+    void unreadableStatusRefusesToDecideThereIsNoBox() {
+        // FAIL CLOSED: "could not check" must not be spent as "no box" — that stages a second order.
+        when(deploymentService.getStatus("app1")).thenReturn(AppStatusResult.fail("backend down"));
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> service.findExistingBox("app1"));
+        assertTrue(e.getMessage().contains("Nothing was ordered"), e.getMessage());
+    }
+
+    @Test
+    void unreadableVpsListAlsoRefusesToDecide() {
+        appRunning("app1");
+        when(vpsService.listMyInstances()).thenReturn(new VpsInstanceListResult(false, "backend down"));
+
+        assertThrows(IllegalStateException.class, () -> service.findExistingBox("app1"));
+    }
+
+    @Test
+    void aBoxWithNoOperatingSystemIsNotTreatedAsStillBuilding() {
+        // Reachable only via attach: a server the customer owns that this tool never built.
+        instanceState("vps-bare", "UNBUILT", "1.2.3.4");
+
+        MoveToOwnedResult result = service.attach("app1", "vps-bare", null);
+
+        assertEquals("BUILD_FAILED", result.status());
+        assertTrue(result.message().contains("no operating system"), result.message());
+        assertTrue(result.nextStep().contains("buildVpsInstance"));
+        verify(deploymentService, never()).moveToOwned(any(), any(), any(), any());
     }
 
     @Test
@@ -515,6 +573,7 @@ class MoveToOwnedServiceTest {
         when(dnsService.listRecords("fresh.com"))
                 .thenReturn(new DnsRecordListResult(false, "zone not found"))   // first look: no zone
                 .thenReturn(empty);                                             // after init: empty zone
+        delegation("fresh.com", "ns1.osir.com", "ns3.osir.com");
         when(dnsService.initializeZone("fresh.com")).thenReturn(new DnsActionResult(true, "created"));
         when(dnsService.createRecord("fresh.com", "@", "A", "1.2.3.4", 3600, null))
                 .thenReturn(new DnsRecordResult(true, "created"));

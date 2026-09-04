@@ -182,12 +182,16 @@ public class DeploymentService {
         if (move == null || move.state() == null) {
             return "OK";
         }
+        // Every field but state is nullable on the wire; an unfilled one must not reach the model as
+        // the word "null".
+        String stage = move.stage() == null || move.stage().isBlank() ? "in progress" : move.stage();
+        String detail = move.detail() == null || move.detail().isBlank() ? "no reason recorded" : move.detail();
         return switch (move.state().toUpperCase()) {
-            case "MOVING" -> "OK. A move onto the user's own VPS is in progress (stage " + move.stage()
+            case "MOVING" -> "OK. A move onto the user's own VPS is in progress (stage " + stage
                     + "). It takes about two minutes end to end; poll this tool until tier reads 'owned'.";
             case "MOVED" -> "OK. This app runs on the user's own VPS.";
             case "FAILED", "REFUSED" -> "OK. The last move onto the user's own VPS did not complete: "
-                    + move.detail() + ". Calling osirAppMoveToOwned again retries it - it does not order "
+                    + detail + ". Calling osirAppMoveToOwned again retries it - it does not order "
                     + "a second server.";
             default -> "OK";
         };

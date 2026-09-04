@@ -3,6 +3,7 @@ package com.osir.mcp.services;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
 import com.osir.mcp.models.deploy.DeployDtos.OwnedMoveDto;
 import com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedResult;
+import com.osir.mcp.models.DomainInfoResult;
 import com.osir.mcp.models.dns.DnsRecord;
 import com.osir.mcp.models.dns.DnsRecordListResult;
 import com.osir.mcp.models.dns.DnsRecordResult;
@@ -59,11 +60,18 @@ public class MoveToOwnedService {
     DnsService dnsService;
 
     @Inject
+    DomainService domainService;
+
+    @Inject
     AuthService authService;
 
     /** Public half of the platform deploy keypair, injected into the customer's box so C2 can SSH in. */
     @ConfigProperty(name = "osir.vps.platform-ssh-pubkey")
     String platformSshPubkey;
+
+    /** Suffix of our own nameservers. A zone here only serves domains delegated to them. */
+    @ConfigProperty(name = "osir.dns.nameserver-suffix", defaultValue = "osir.com")
+    String nameserverSuffix;
 
     // "user-sub|appName" -> ordered instanceId (or ORDER_PENDING while the order call is in
     // flight, the reservation that makes a concurrent/second execute unable to order again).
@@ -160,20 +168,38 @@ public class MoveToOwnedService {
      */
     public String findExistingBox(String appName) {
         AppStatusResult status = deploymentService.getStatus(appName);
-        if (status.success() && status.ownedInstanceId() != null && !status.ownedInstanceId().isBlank()) {
-            LOG.infof("moveToOwned: app %s is already bound to owned box %s (per C2)",
-                    appName, status.ownedInstanceId());
-            return status.ownedInstanceId();
+        if (status == null || !status.success()) {
+            // FAIL CLOSED. "I could not check" must never be spent as "there is no box" — that is
+            // precisely the reading that would stage a second order for a box they already own.
+            throw new IllegalStateException("Could not check whether you already have a server for '"
+                    + appName + "' - either that app does not exist (osirAppList shows the ones that do), or "
+                    + "the platform is briefly unreachable. Nothing was ordered; try again.");
+        }
+        String bound = status.ownedInstanceId();
+        if (bound != null && !bound.isBlank()) {
+            // Trust it only if the box is still there: a binding to an instance the customer has
+            // since cancelled would otherwise wedge the app — attach fails, and the order path is
+            // never reached, leaving no way to get a replacement server.
+            VpsInstanceDetailResult box = vpsService.getInstanceDetails(bound);
+            if (box.isSuccess() && box.getInstance() != null) {
+                LOG.infof("moveToOwned: app %s is already bound to owned box %s (per C2)", appName, bound);
+                return bound;
+            }
+            LOG.warnf("moveToOwned: C2 binds app %s to instance %s, which is not readable on the "
+                    + "customer's account (%s) — ignoring it", appName, bound, box.getMessage());
         }
         VpsInstanceListResult mine = vpsService.listMyInstances();
-        if (mine.isSuccess() && mine.getInstances() != null) {
-            String hostname = appName + "-owned.osir.app";
-            for (VpsInstanceSummary i : mine.getInstances()) {
-                if (i.getId() != null && hostname.equalsIgnoreCase(i.getHostname())) {
-                    LOG.infof("moveToOwned: app %s already has box %s (%s) on the customer's account",
-                            appName, i.getId(), hostname);
-                    return i.getId();
-                }
+        if (mine == null || !mine.isSuccess() || mine.getInstances() == null) {
+            throw new IllegalStateException("Could not read the servers on your account, so nothing was "
+                    + "ordered (ordering one while an existing server is invisible could buy a second). "
+                    + "Try osirAppMoveToOwned again in a moment.");
+        }
+        String hostname = appName + "-owned.osir.app";
+        for (VpsInstanceSummary i : mine.getInstances()) {
+            if (i.getId() != null && hostname.equalsIgnoreCase(i.getHostname())) {
+                LOG.infof("moveToOwned: app %s already has box %s (%s) on the customer's account",
+                        appName, i.getId(), hostname);
+                return i.getId();
             }
         }
         return null;
@@ -189,7 +215,15 @@ public class MoveToOwnedService {
      */
     public MoveToOwnedResult attach(String appName, String instanceId, String domain) {
         String moveKey = key(appName);
-        String tracked = orderedInstances.get(moveKey);
+        VpsInstanceDetailResult details = vpsService.getInstanceDetails(instanceId);
+        if (!details.isSuccess() || details.getInstance() == null) {
+            return MoveToOwnedResult.fail("VPS '" + instanceId + "' could not be read on your account: "
+                    + details.getMessage() + ". Use listMyVpsInstances to see the servers you own and pass "
+                    + "one of their ids as instanceId. Nothing was ordered.");
+        }
+        // Reserve atomically, like the order path: a plain get-then-put lets two concurrent calls
+        // naming different boxes both pass the one-box-at-a-time guard.
+        String tracked = orderedInstances.putIfAbsent(moveKey, instanceId);
         if (ORDER_PENDING.equals(tracked)) {
             return MoveToOwnedResult.fail("An order for '" + appName + "' is being placed right now. "
                     + "Wait a moment, then call osirAppMoveToOwned again to check progress, do not order again.");
@@ -199,13 +233,6 @@ public class MoveToOwnedService {
                     + "' is already in progress, and an app can have only one owned box at a time. Call "
                     + "osirAppMoveToOwned without instanceId to resume that one.");
         }
-        VpsInstanceDetailResult details = vpsService.getInstanceDetails(instanceId);
-        if (!details.isSuccess() || details.getInstance() == null) {
-            return MoveToOwnedResult.fail("VPS '" + instanceId + "' could not be read on your account: "
-                    + details.getMessage() + ". Use listMyVpsInstances to see the servers you own and pass "
-                    + "one of their ids as instanceId. Nothing was ordered.");
-        }
-        orderedInstances.put(moveKey, instanceId);
         LOG.infof("moveToOwned: attaching app %s to instance %s the customer already owns (no order)",
                 appName, instanceId);
         return pollAndFinish(appName, moveKey, instanceId, domain);
@@ -285,10 +312,23 @@ public class MoveToOwnedService {
                                 + "template id. 2) buildVpsInstance with that id (confirm via executeConfirmedAction). "
                                 + "3) Call osirAppMoveToOwned again with the same arguments to resume.");
             }
+            // UNBUILT is not a phase that passes on its own: the box has no operating system, which
+            // is reachable now that a customer can attach a server this tool never built. Waiting it
+            // out would burn the whole poll budget and then advise a retry that cannot converge.
+            if ("UNBUILT".equalsIgnoreCase(buildState)) {
+                return new MoveToOwnedResult(false, "BUILD_FAILED",
+                        "VPS '" + instanceId + "' has no operating system installed, so the app cannot be "
+                                + "shipped onto it yet. Installing one is free - the server is already paid for.",
+                        instanceId, instance.getIpAddress(), domain, null,
+                        "1) listVpsOsTemplates(instanceId=" + instanceId + ") to resolve the current Ubuntu 24.04 "
+                                + "template id. 2) buildVpsInstance with that id (confirm via executeConfirmedAction). "
+                                + "3) Call osirAppMoveToOwned again with the same arguments to resume. Installing an OS "
+                                + "ERASES the server, so confirm with the user that it holds nothing they need.");
+            }
             if (System.currentTimeMillis() >= deadline) {
                 return new MoveToOwnedResult(false, "BUILDING",
                         "VPS '" + instanceId + "' is still building (" + (buildState == null ? "status pending" : buildState)
-                                + "). The order is placed, nothing more will be charged.",
+                                + "). Nothing more will be charged.",
                         instanceId, instance == null ? null : instance.getIpAddress(), domain, null,
                         "Call osirAppMoveToOwned again with the same arguments in a minute, it resumes and never orders twice.");
             }
@@ -309,7 +349,7 @@ public class MoveToOwnedService {
         if (ip == null || ip.isBlank()) {
             return new MoveToOwnedResult(false, "BUILDING",
                     "VPS '" + instanceId + "' is built but has no IP address assigned yet. "
-                            + "The order is placed, nothing more will be charged.",
+                            + "Nothing more will be charged.",
                     instanceId, null, domain, null,
                     "Call osirAppMoveToOwned again with the same arguments in a minute, it resumes and never orders twice.");
         }
@@ -325,7 +365,7 @@ public class MoveToOwnedService {
             shipRefusals.remove(moveKey);
             return new MoveToOwnedResult(true, "MOVING",
                     "The platform is already moving app '" + appName + "' onto VPS '" + instanceId + "' ("
-                            + ip + ") - stage " + move.stage() + " since " + move.since()
+                            + ip + ") - stage " + orUnknown(move.stage()) + ", since " + orUnknown(move.since())
                             + ". Nothing was re-sent and nothing more will be charged.",
                     instanceId, ip, domain, dnsBound, pollAdvice(appName));
         }
@@ -396,10 +436,11 @@ public class MoveToOwnedService {
     private boolean bindDomain(String domain, String ip) {
         DnsRecordListResult zone = dnsService.listRecords(domain);
         if (!zone.isSuccess() || zone.getRecords() == null) {
-            // "No zone" is indistinguishable from "external nameservers" from here, and a domain of
-            // ours can simply never have had its zone created - that is the "Zone not found in
-            // PowerDNS" the customer hit. Initialize once and re-list before giving up.
-            if (!dnsService.initializeZone(domain).isSuccess()) {
+            // A domain of ours can simply never have had its zone created - that is the "Zone not
+            // found in PowerDNS" the customer hit - so initialize once and re-list. ONLY for a domain
+            // delegated to our nameservers: creating a zone for one pointed elsewhere would write a
+            // record no resolver ever reads and then report DNS as bound.
+            if (!delegatedToUs(domain) || !dnsService.initializeZone(domain).isSuccess()) {
                 return false; // external NS (or zone unreadable), caller returns manual instructions
             }
             zone = dnsService.listRecords(domain);
@@ -442,6 +483,24 @@ public class MoveToOwnedService {
     private OwnedMoveDto moveState(String appName) {
         AppStatusResult status = deploymentService.getStatus(appName);
         return status == null || !status.success() ? null : status.ownedMove();
+    }
+
+    /**
+     * Is this domain actually pointed at our nameservers? A zone we create only answers queries for
+     * domains delegated to us; for anything else the honest result is dnsBound=false plus manual
+     * instructions. A domain we cannot read (not on the account) counts as not ours.
+     */
+    private boolean delegatedToUs(String domain) {
+        DomainInfoResult info = domainService.getDomainInfo(domain);
+        List<String> ns = info == null ? null : info.getNameservers();
+        if (ns == null) {
+            return false;
+        }
+        return ns.stream().anyMatch(n -> n != null && n.toLowerCase().endsWith(nameserverSuffix.toLowerCase()));
+    }
+
+    private static String orUnknown(String value) {
+        return value == null || value.isBlank() ? "unknown" : value;
     }
 
     /** Tally consecutive identical refusals for one move; a different reason restarts the count. */
