@@ -36,12 +36,25 @@ public final class DeployDtos {
     public record QaDto(String status, int httpStatus, List<String> findings, String checkedAt) {
     }
 
+    /**
+     * How a move onto a customer-owned box is going. C2 derives this from the audit rows the move
+     * writes, so it survives a C2 restart (its in-memory tracker does not, and must not be the
+     * source of this answer). Null when no move was ever attempted for the app.
+     *
+     * <p>{@code state} is MOVING | MOVED | FAILED | REFUSED — and only MOVING means "leave it
+     * alone": a repeat call on a FAILED move is how a transient ship failure recovers.
+     * {@code stage} is the audit stage (OWNED_PREPPING_BOX, OWNED_SHIPPING_IMAGE, ...).
+     */
+    public record OwnedMoveDto(String state, String stage, String detail, String since) {
+    }
+
     /** C2's status payload. {@code ownedInstanceId}/{@code boxIp} are set once a move onto a
      *  customer-owned VPS has started — the DURABLE answer to "does this app already have a box?",
-     *  which is what keeps a retry from ordering a second one. */
+     *  which is what keeps a retry from ordering a second one. {@code ownedMove} answers the other
+     *  half, "is it still going?", which tier/status cannot: both stay instant/READY throughout. */
     public record StatusEnvelope(AppDto app, DeploymentDto deployment, HealthDto health,
                                  List<RecentErrorDto> recentErrors, QaDto qa,
-                                 String ownedInstanceId, String boxIp) {
+                                 String ownedInstanceId, String boxIp, OwnedMoveDto ownedMove) {
     }
 
     public record ConfirmationEnvelope(String confirmationId, String summary) {
@@ -93,12 +106,13 @@ public final class DeployDtos {
         }
     }
 
-    /** {@code ownedInstanceId}/{@code boxIp}: the customer-owned VPS this app is bound to, if any. */
+    /** {@code ownedInstanceId}/{@code boxIp}: the customer-owned VPS this app is bound to, if any.
+     *  {@code ownedMove}: how the move onto it is going (null if none was ever attempted). */
     public record AppStatusResult(boolean success, String message, AppDto app, HealthDto health,
                                   String deploymentState, List<RecentErrorDto> recentErrors, QaDto qa,
-                                  String ownedInstanceId, String boxIp) {
+                                  String ownedInstanceId, String boxIp, OwnedMoveDto ownedMove) {
         public static AppStatusResult fail(String msg) {
-            return new AppStatusResult(false, msg, null, null, null, List.of(), null, null, null);
+            return new AppStatusResult(false, msg, null, null, null, List.of(), null, null, null, null);
         }
     }
 

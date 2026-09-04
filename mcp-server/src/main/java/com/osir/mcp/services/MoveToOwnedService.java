@@ -1,6 +1,7 @@
 package com.osir.mcp.services;
 
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
+import com.osir.mcp.models.deploy.DeployDtos.OwnedMoveDto;
 import com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedResult;
 import com.osir.mcp.models.dns.DnsRecord;
 import com.osir.mcp.models.dns.DnsRecordListResult;
@@ -312,6 +313,23 @@ public class MoveToOwnedService {
                     instanceId, null, domain, null,
                     "Call osirAppMoveToOwned again with the same arguments in a minute, it resumes and never orders twice.");
         }
+        // C2 is ALREADY shipping this app: re-POSTing would re-dispatch a move that is running.
+        // Only MOVING suppresses. FAILED and REFUSED must still re-dispatch — a repeat call is how a
+        // transient ship failure recovers (proven live 2026-09-04: scp exit 255, then done in 42s).
+        OwnedMoveDto move = moveState(appName);
+        if (move != null && "MOVING".equalsIgnoreCase(move.state())) {
+            LOG.infof("moveToOwned: app %s is already moving (stage %s), not re-dispatching",
+                    appName, move.stage());
+            Boolean dnsBound = domain == null || domain.isBlank() ? null : bindDomain(domain, ip);
+            orderedInstances.remove(moveKey);
+            shipRefusals.remove(moveKey);
+            return new MoveToOwnedResult(true, "MOVING",
+                    "The platform is already moving app '" + appName + "' onto VPS '" + instanceId + "' ("
+                            + ip + ") - stage " + move.stage() + " since " + move.since()
+                            + ". Nothing was re-sent and nothing more will be charged.",
+                    instanceId, ip, domain, dnsBound, pollAdvice(appName));
+        }
+
         String refusal = deploymentService.moveToOwned(appName, instanceId, ip, domain);
         if (refusal != null) {
             // Tracker entry kept; C2's endpoint is idempotent per instanceId, so resuming is safe.
@@ -343,10 +361,9 @@ public class MoveToOwnedService {
         }
 
         boolean dnsBound = false;
-        // C2 accepted the move but ships asynchronously (~3-5 min), the honest instruction is
-        // "poll osirAppStatus until tier reads owned", not "it's done".
-        String nextStep = "Check osirAppStatus for '" + appName
-                + "' until tier reads 'owned' (typically a few minutes).";
+        // C2 accepted the move but ships asynchronously, the honest instruction is "poll
+        // osirAppStatus until tier reads owned", not "it's done".
+        String nextStep = pollAdvice(appName);
         if (domain != null && !domain.isBlank()) {
             dnsBound = bindDomain(domain, ip);
             if (!dnsBound) {
@@ -403,6 +420,28 @@ public class MoveToOwnedService {
             LOG.warnf("moveToOwned: DNS bind failed for %s -> %s: %s", domain, ip, result.getMessage());
         }
         return result.isSuccess();
+    }
+
+    /**
+     * How the caller should watch a move that is under way. Real timings from the 2026-09-04 run:
+     * box prep ~60s (~4s when a move resumes), image ship ~40s. The ten minutes seen once was a C2
+     * host-key bug, since fixed — do not pace off it.
+     */
+    private static String pollAdvice(String appName) {
+        return "Check osirAppStatus for '" + appName + "' every 20-30 seconds until tier reads 'owned' "
+                + "- about two minutes in total (box prep ~60s, image ship ~40s). ownedMove.stage in that "
+                + "response shows where it is; ownedMove.state FAILED means call osirAppMoveToOwned again, "
+                + "which retries the ship and never orders a second server.";
+    }
+
+    /**
+     * C2's durable view of this app's move (audit-derived, so it survives a C2 restart). Best-effort:
+     * an unreadable status returns null, and the caller then dispatches as before — a status blip
+     * must never block a move.
+     */
+    private OwnedMoveDto moveState(String appName) {
+        AppStatusResult status = deploymentService.getStatus(appName);
+        return status == null || !status.success() ? null : status.ownedMove();
     }
 
     /** Tally consecutive identical refusals for one move; a different reason restarts the count. */

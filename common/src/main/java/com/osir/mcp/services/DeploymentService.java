@@ -13,6 +13,7 @@ import com.osir.mcp.models.deploy.DeployDtos.DeployResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppLogsResult;
 import com.osir.mcp.models.deploy.DeployDtos.DeleteResult;
 import com.osir.mcp.models.deploy.DeployDtos.LogsEnvelope;
+import com.osir.mcp.models.deploy.DeployDtos.OwnedMoveDto;
 import com.osir.mcp.models.deploy.DeployDtos.ProvisionDbEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.RecentErrorDto;
 import com.osir.mcp.models.deploy.DeployDtos.ProvisionDbResult;
@@ -165,12 +166,31 @@ public class DeploymentService {
             StatusEnvelope e = client.status(appId, bearer(), tenant());
             String depState = e.deployment() == null ? null : e.deployment().state();
             var errors = e.recentErrors() == null ? java.util.List.<RecentErrorDto>of() : e.recentErrors();
-            return new AppStatusResult(true, "OK", e.app(), e.health(), depState, errors, e.qa(),
-                    e.ownedInstanceId(), e.boxIp());
+            return new AppStatusResult(true, moveNote(e.ownedMove()), e.app(), e.health(), depState,
+                    errors, e.qa(), e.ownedInstanceId(), e.boxIp(), e.ownedMove());
         } catch (Exception ex) {
             LOG.errorf(ex, "getStatus failed for %s", appId);
             return AppStatusResult.fail("Could not get the app status right now. Please try again.");
         }
+    }
+
+    /**
+     * A move onto an owned box leaves tier=instant and status=READY for its whole run, so a bare
+     * "OK" reads as "nothing is happening" — say what is happening instead.
+     */
+    private static String moveNote(OwnedMoveDto move) {
+        if (move == null || move.state() == null) {
+            return "OK";
+        }
+        return switch (move.state().toUpperCase()) {
+            case "MOVING" -> "OK. A move onto the user's own VPS is in progress (stage " + move.stage()
+                    + "). It takes about two minutes end to end; poll this tool until tier reads 'owned'.";
+            case "MOVED" -> "OK. This app runs on the user's own VPS.";
+            case "FAILED", "REFUSED" -> "OK. The last move onto the user's own VPS did not complete: "
+                    + move.detail() + ". Calling osirAppMoveToOwned again retries it - it does not order "
+                    + "a second server.";
+            default -> "OK";
+        };
     }
 
     public SetSecretResult setSecret(String appId, String key, String value) {

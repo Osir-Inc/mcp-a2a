@@ -2,6 +2,7 @@ package com.osir.mcp.services;
 
 import com.osir.mcp.models.deploy.DeployDtos.AppDto;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
+import com.osir.mcp.models.deploy.DeployDtos.OwnedMoveDto;
 import com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedResult;
 import com.osir.mcp.models.dns.DnsActionResult;
 import com.osir.mcp.models.dns.DnsRecord;
@@ -45,6 +46,10 @@ class MoveToOwnedServiceTest {
         service.pollIntervalMs = 1;
         service.pollBudgetMs = 50;
         identity("user-1");
+        // Default: the app exists, owns no box and has no move running, so the durable checks stay
+        // quiet unless a test says otherwise.
+        lenient().when(deploymentService.getStatus(anyString()))
+                .thenAnswer(inv -> statusOf(inv.getArgument(0), null, null));
     }
 
     /** Stub the resolved caller identity — the money-rule tracker keys on the token's sub. */
@@ -55,17 +60,24 @@ class MoveToOwnedServiceTest {
 
     // ---- helpers ----
 
-    private void appRunning(String name) {
+    private AppStatusResult statusOf(String name, String ownedInstanceId, OwnedMoveDto move) {
         AppDto app = new AppDto(name, name, "us", "shared", null, "node", "READY", "https://" + name + ".osir.app", "v1");
-        when(deploymentService.getStatus(name)).thenReturn(
-                new AppStatusResult(true, "OK", app, null, null, List.of(), null, null, null));
+        return new AppStatusResult(true, "OK", app, null, null, List.of(), null, ownedInstanceId, null, move);
+    }
+
+    private void appRunning(String name) {
+        when(deploymentService.getStatus(name)).thenReturn(statusOf(name, null, null));
     }
 
     /** The app already has a box recorded on C2 — the durable "don't order again" signal. */
     private void appBoundToBox(String name, String instanceId, String ip) {
-        AppDto app = new AppDto(name, name, "us", "shared", null, "node", "READY", "https://" + name + ".osir.app", "v1");
-        when(deploymentService.getStatus(name)).thenReturn(
-                new AppStatusResult(true, "OK", app, null, null, List.of(), null, instanceId, ip));
+        when(deploymentService.getStatus(name)).thenReturn(statusOf(name, instanceId, null));
+    }
+
+    /** C2's audit-derived view of a move: MOVING must suppress a re-dispatch, FAILED must not. */
+    private void moveState(String name, String instanceId, String state, String stage) {
+        when(deploymentService.getStatus(name)).thenReturn(statusOf(name, instanceId,
+                new OwnedMoveDto(state, stage, "scp-to failed (exit 255)", "2026-09-04T09:12:00Z")));
     }
 
     private void myInstances(VpsInstanceSummary... instances) {
@@ -266,6 +278,45 @@ class MoveToOwnedServiceTest {
             assertFalse(r.nextStep().startsWith("STOP retrying"), r.nextStep());
             assertTrue(r.nextStep().contains("WITHOUT instanceId"), r.nextStep());
         }
+    }
+
+    // ---- C2's ownedMove: suppress a re-dispatch only while the move is RUNNING ----
+
+    @Test
+    void movingIsReportedInsteadOfReDispatched() {
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        moveState("app1", "vps-own", "MOVING", "OWNED_SHIPPING_IMAGE");
+
+        MoveToOwnedResult result = service.attach("app1", "vps-own", null);
+
+        assertTrue(result.success());
+        assertEquals("MOVING", result.status());
+        assertTrue(result.message().contains("OWNED_SHIPPING_IMAGE"), result.message());
+        verify(deploymentService, never()).moveToOwned(any(), any(), any(), any());
+        assertTrue(result.nextStep().contains("two minutes"), result.nextStep());
+    }
+
+    @Test
+    void aFailedMoveIsStillReDispatched() {
+        // The live recovery on 2026-09-04: first ship failed, the re-POST finished it.
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        moveState("app1", "vps-own", "FAILED", "MOVE_TO_OWNED_FAILED");
+        when(deploymentService.moveToOwned("app1", "vps-own", "1.2.3.4", null)).thenReturn(null);
+
+        MoveToOwnedResult result = service.attach("app1", "vps-own", null);
+
+        assertTrue(result.success());
+        verify(deploymentService).moveToOwned("app1", "vps-own", "1.2.3.4", null);
+    }
+
+    @Test
+    void anUnreadableStatusDoesNotBlockTheMove() {
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        when(deploymentService.getStatus("app1")).thenReturn(AppStatusResult.fail("backend down"));
+        when(deploymentService.moveToOwned("app1", "vps-own", "1.2.3.4", null)).thenReturn(null);
+
+        assertTrue(service.attach("app1", "vps-own", null).success());
+        verify(deploymentService).moveToOwned("app1", "vps-own", "1.2.3.4", null);
     }
 
     // ---- DNS ----

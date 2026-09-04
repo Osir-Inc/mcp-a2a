@@ -114,6 +114,10 @@ public class DeploymentMCPServer {
                     + "and redeploy. 'qa' is an independent black-box check of the LIVE app after deploy: "
                     + "qa.status PASSED means it loaded and worked; FAILED means it deployed but didn't "
                     + "actually work, and qa.findings lists the problems so you can fix and redeploy. "
+                    + "'ownedMove' tracks a move onto the user's own VPS, which leaves tier and status "
+                    + "unchanged while it runs: state MOVING (in progress, stage says where, ~2 minutes "
+                    + "in total), MOVED (done - tier reads 'owned'), FAILED or REFUSED (call "
+                    + "osirAppMoveToOwned again to retry; it never orders a second server). "
                     + "Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get app status",
@@ -236,9 +240,10 @@ public class DeploymentMCPServer {
                     + "executeConfirmedAction only if they approve. Before staging any order this tool checks whether "
                     + "the user ALREADY has a box for this app (its C2 binding, then their own VPS list) and attaches "
                     + "that instead - a retry after a failed move never buys a second server. After the move starts "
-                    + "the platform ships the app onto the box server-side. If the result status is BUILDING or "
-                    + "BUILD_FAILED, follow its nextStep; calling again with the same arguments RESUMES. Requires "
-                    + "authentication.",
+                    + "the platform ships the app onto the box server-side, which takes about two minutes; watch it "
+                    + "with osirAppStatus ('ownedMove'). Calling this tool again while a move is still running just "
+                    + "reports its progress, and calling it after one FAILED retries the ship. If the result status "
+                    + "is BUILDING or BUILD_FAILED, follow its nextStep. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Move app to owned VPS",
                     readOnlyHint = false,
