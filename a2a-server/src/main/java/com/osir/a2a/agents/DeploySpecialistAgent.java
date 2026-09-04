@@ -37,7 +37,7 @@ public class DeploySpecialistAgent extends BaseSpecialistAgent {
 
     @Override
     protected Set<String> getSkillIds() {
-        return Set.of("list_apps", "get_app_status", "get_app_logs", "deploy_app");
+        return Set.of("list_apps", "get_app_status", "get_app_logs", "deploy_app", "get_app_source");
     }
 
     @Override
@@ -64,10 +64,13 @@ public class DeploySpecialistAgent extends BaseSpecialistAgent {
                     case "get_app_status": return handleGetStatus(task);
                     case "get_app_logs": return handleGetLogs(task);
                     case "list_apps": return handleListApps(task);
+                    case "get_app_source": return handleGetSource(task);
                     default: break;
                 }
             }
-            if (lower.contains("deploy") || lower.contains("publish")) {
+            if (lower.contains("source") || lower.contains("download")) {
+                return handleGetSource(task);
+            } else if (lower.contains("deploy") || lower.contains("publish")) {
                 return handleDeployApp(task);
             } else if (lower.contains("log")) {
                 return handleGetLogs(task);
@@ -86,6 +89,19 @@ public class DeploySpecialistAgent extends BaseSpecialistAgent {
         var result = deploymentService.listApps();
         return completeWithResult(task, "app-list", result, result.success(),
                 result.success() ? "Apps retrieved." : result.message());
+    }
+
+    /** Signed download URL for the app's current source zip. The zip never passes through this server. */
+    private A2ATask handleGetSource(A2ATask task) {
+        String appId = appIdFrom(task);
+        if (appId == null) {
+            return askForInput(task,
+                    "To download an app's source, please provide in metadata: appId (or name). " +
+                    "Use the list_apps skill to see your deployed apps.");
+        }
+        var result = deploymentService.getSource(appId);
+        return completeWithResult(task, "app-source", result, result.success(),
+                result.success() ? "Signed source download URL issued." : result.message());
     }
 
     private A2ATask handleGetStatus(A2ATask task) {
@@ -153,7 +169,12 @@ public class DeploySpecialistAgent extends BaseSpecialistAgent {
                         List.of("Show me the logs for my-api", "Why is my app failing? Check the logs")),
                 new Skill("deploy_app", "Deploy App", "Trigger a deployment of an app; provide name and language, plus an optional uploadTicket for new source",
                         List.of("deploy", "publish", "app", "site"),
-                        List.of("Deploy my node app called my-shop", "Publish my website"))
+                        List.of("Deploy my node app called my-shop", "Publish my website")),
+                new Skill("get_app_source", "Get App Source",
+                        "Short-lived signed download URL for an app's current source zip",
+                        List.of("deploy", "app", "source", "download"),
+                        List.of("Give me the source of my-shop so I can edit it",
+                                "Download the current code for my-api"))
         ));
         return card;
     }

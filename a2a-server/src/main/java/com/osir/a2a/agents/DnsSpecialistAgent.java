@@ -32,7 +32,8 @@ public class DnsSpecialistAgent extends BaseSpecialistAgent {
 
     @Override
     protected Set<String> getSkillIds() {
-        return Set.of("list_dns_records", "create_dns_record", "update_dns_record", "delete_dns_record", "get_dns_record");
+        return Set.of("list_dns_records", "create_dns_record", "update_dns_record", "delete_dns_record",
+                "get_dns_record", "initialize_dns_zone");
     }
 
     @Override
@@ -50,7 +51,9 @@ public class DnsSpecialistAgent extends BaseSpecialistAgent {
             String text = getLatestUserMessage(task);
             String lower = text.toLowerCase();
 
-            if ("list_dns_records".equals(skill) || lower.contains("list") || lower.contains("show")) {
+            if ("initialize_dns_zone".equals(skill)) {
+                return handleInitializeZone(task, text);
+            } else if ("list_dns_records".equals(skill) || lower.contains("list") || lower.contains("show")) {
                 return handleListRecords(task, text);
             } else if ("create_dns_record".equals(skill) || lower.contains("create") || lower.contains("add")) {
                 return handleCreateRecord(task, text);
@@ -144,6 +147,17 @@ public class DnsSpecialistAgent extends BaseSpecialistAgent {
         return task;
     }
 
+    /** Create the zone itself. Idempotent and free; without it every record call answers "zone not found". */
+    private A2ATask handleInitializeZone(A2ATask task, String text) {
+        String domain = meta(task, "domain");
+        if (domain == null) domain = extractDomain(text);
+        if (domain == null) return askForDomain(task, "initialize a DNS zone for");
+
+        var result = dnsService.initializeZone(domain);
+        return completeWithResult(task, "dns-zone", result, result.isSuccess(),
+                result.isSuccess() ? "DNS zone initialized for " + domain + "." : result.getMessage());
+    }
+
     private AgentCard buildAgentCard() {
         AgentCard card = new AgentCard();
         card.setName("OSIR DNS Agent");
@@ -170,7 +184,12 @@ public class DnsSpecialistAgent extends BaseSpecialistAgent {
                         List.of("Delete record 5512 from cedarloop.com", "Remove the old TXT record on brahaj.al")),
                 new Skill("get_dns_record", "Get DNS Record", "Get details of a specific DNS record",
                         List.of("dns", "records", "details"),
-                        List.of("Show me record 5512 on cedarloop.com"))
+                        List.of("Show me record 5512 on cedarloop.com")),
+                new Skill("initialize_dns_zone", "Initialize DNS Zone",
+                        "Create the DNS zone for a domain hosted on OSIR nameservers (idempotent, free)",
+                        List.of("dns", "zone", "setup"),
+                        List.of("Set up DNS hosting for cedarloop.com",
+                                "Create the zone for brahaj.al so I can add records"))
         ));
         return card;
     }

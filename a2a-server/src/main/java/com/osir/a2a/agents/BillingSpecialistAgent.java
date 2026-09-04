@@ -17,6 +17,10 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
 
     @Inject BillingService billingService;
 
+    @Inject
+    @org.eclipse.microprofile.rest.client.inject.RestClient
+    com.osir.mcp.clients.CatalogBackendClient catalogBackendClient;
+
     private AgentCard cachedCard;
 
     @PostConstruct
@@ -31,7 +35,8 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
     @Override
     protected Set<String> getSkillIds() {
         return Set.of("get_balance", "list_invoices", "get_invoice", "pay_invoice",
-                "invoice_statistics", "create_payment", "get_transactions", "preview_fees", "get_domain_pricing");
+                "invoice_statistics", "create_payment", "get_transactions", "preview_fees",
+                "get_domain_pricing", "get_hosting_bundle");
     }
 
     @Override
@@ -47,7 +52,9 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
             String text = getLatestUserMessage(task);
             String lower = text.toLowerCase();
 
-            if ("get_balance".equals(skill) || lower.contains("balance")) {
+            if ("get_hosting_bundle".equals(skill)) {
+                return handleHostingBundle(task, text);
+            } else if ("get_balance".equals(skill) || lower.contains("balance")) {
                 var result = billingService.getAccountBalance();
                 return completeWithResult(task, "balance", result, result.isSuccess(),
                         result.isSuccess() ? "Account balance retrieved." : result.getMessage());
@@ -109,6 +116,25 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
         }
     }
 
+    /**
+     * Hosting options + exact prices for ONE domain. Anonymous on the backend, so it also answers
+     * "what would this cost me" before the caller has an account.
+     */
+    private A2ATask handleHostingBundle(A2ATask task, String text) {
+        String domain = meta(task, "domain");
+        if (domain == null) domain = extractDomain(text);
+        if (domain == null) {
+            return askForInput(task, "Please provide the domain to price hosting for, in metadata: domain.");
+        }
+        try {
+            var bundle = catalogBackendClient.getHostingBundle(domain);
+            return completeWithResult(task, "hosting-bundle", bundle, true, "Hosting options retrieved.");
+        } catch (Exception e) {
+            LOG.errorf(e, "hosting bundle failed for %s", domain);
+            return failWithError(task, "Could not get hosting options for " + domain + " right now.");
+        }
+    }
+
     private AgentCard buildAgentCard() {
         AgentCard card = new AgentCard();
         card.setName("OSIR Billing Agent");
@@ -145,7 +171,12 @@ public class BillingSpecialistAgent extends BaseSpecialistAgent {
                         List.of("What fees would I pay on a 75 EUR payment?")),
                 new Skill("get_domain_pricing", "Get Domain Pricing", "Get pricing for domain extensions",
                         List.of("billing", "pricing", "domains"),
-                        List.of("How much does a .io domain cost?", "What is the price for .com registrations?"))
+                        List.of("How much does a .io domain cost?", "What is the price for .com registrations?")),
+                new Skill("get_hosting_bundle", "Get Hosting Bundle",
+                        "Hosting options and exact prices for one domain: recommended VPS, mail plan and totals",
+                        List.of("billing", "pricing", "hosting", "bundle"),
+                        List.of("What would it cost to host cedarloop.com with email?",
+                                "Give me the hosting options for brahaj.al"))
         ));
         return card;
     }

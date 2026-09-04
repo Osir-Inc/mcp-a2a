@@ -26,7 +26,8 @@ public class MailSpecialistAgent extends BaseSpecialistAgent {
 
     private static final Set<String> SKILL_IDS = Set.of(
             "list_mail_plans", "enable_mail_domain", "list_mail_domains",
-            "get_mail_dns_records", "verify_mail_dns", "list_mailboxes", "get_mailbox_quote"
+            "get_mail_dns_records", "verify_mail_dns", "list_mailboxes", "get_mailbox_quote",
+            "get_mailbox_usage"
     );
 
     @Inject MailService mailService;
@@ -60,7 +61,11 @@ public class MailSpecialistAgent extends BaseSpecialistAgent {
             String text = getLatestUserMessage(task);
             String lower = text.toLowerCase();
 
-            if ("list_mail_plans".equals(skill) || lower.contains("plan")) {
+            if ("get_mailbox_usage".equals(skill) || lower.contains("usage") || lower.contains("quota")) {
+                var usage = mailService.getUsage();
+                return completeWithResult(task, "mailbox-usage", usage, usage.isSuccess(),
+                        usage.isSuccess() ? "Mailbox usage retrieved." : usage.getMessage());
+            } else if ("list_mail_plans".equals(skill) || lower.contains("plan")) {
                 return handleListPlans(task);
             } else if ("get_mailbox_quote".equals(skill) || lower.contains("quote") || lower.contains("price")) {
                 return handleGetQuote(task);
@@ -189,7 +194,12 @@ public class MailSpecialistAgent extends BaseSpecialistAgent {
                 new Skill("get_mailbox_quote", "Get Mailbox Quote",
                         "Get a price quote for a mailbox plan",
                         List.of("email", "mailbox", "quote", "pricing"),
-                        List.of("How much does a mailbox cost per year?"))
+                        List.of("How much does a mailbox cost per year?")),
+                new Skill("get_mailbox_usage", "Get Mailbox Usage",
+                        "Storage used by each mailbox on the account",
+                        List.of("email", "mailbox", "usage", "quota"),
+                        List.of("How much space are my mailboxes using?",
+                                "Is any mailbox close to its quota?"))
         ));
         return card;
     }

@@ -5,6 +5,7 @@ import com.osir.mcp.models.*;
 import com.osir.mcp.services.DomainService;
 import com.osir.mcp.services.DomainSuggestionService;
 import com.osir.mcp.services.TransferService;
+import com.osir.mcp.services.CatalogService;
 import com.osir.mcp.services.HostService;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -40,13 +41,20 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
             "check_availability", "register_domain", "get_domain_info", "list_domains",
             "suggest_domains", "transfer_domain",
             "renew_domain", "lock_domain", "unlock_domain",
-            "enable_privacy", "disable_privacy", "enable_autorenew", "disable_autorenew"
+            "enable_privacy", "disable_privacy", "enable_autorenew", "disable_autorenew",
+            // Read-only lookups and the free, non-billable writes (§ closed the A2A/MCP drift 2026-09-04)
+            "validate_domain_name", "get_domain_extensions", "bulk_suggest_domains",
+            "add_prefix", "add_suffix", "spin_domain_words", "check_keyword_availability",
+            "update_nameservers",
+            "get_transfer_quote", "get_transfer_status", "list_pending_transfers",
+            "check_host_availability", "get_hosts_for_domain"
     );
 
     @Inject DomainService domainService;
     @Inject DomainSuggestionService suggestionService;
     @Inject TransferService transferService;
     @Inject HostService hostService;
+    @Inject CatalogService catalogService;
 
     @Override
     protected Set<String> getKeywords() { return PRIMARY_KEYWORDS; }
@@ -134,6 +142,19 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
             case "disable_privacy" -> handleDomainAction(task, text, true, false);
             case "enable_autorenew" -> handleDomainAction(task, text, false, true);
             case "disable_autorenew" -> handleDomainAction(task, text, false, false);
+            case "validate_domain_name" -> handleValidateName(task, text);
+            case "get_domain_extensions" -> handleDomainExtensions(task);
+            case "bulk_suggest_domains" -> handleBulkSuggest(task);
+            case "add_prefix" -> handleAffix(task, true);
+            case "add_suffix" -> handleAffix(task, false);
+            case "spin_domain_words" -> handleSpinWord(task);
+            case "check_keyword_availability" -> handleKeywordAvailability(task);
+            case "update_nameservers" -> handleUpdateNameservers(task, text);
+            case "get_transfer_quote" -> handleTransferQuote(task, text);
+            case "get_transfer_status" -> handleTransferStatus(task, text);
+            case "list_pending_transfers" -> handleListPendingTransfers(task);
+            case "check_host_availability" -> handleCheckHost(task);
+            case "get_hosts_for_domain" -> handleHostsForDomain(task, text);
             default -> {
                 task.transitionTo(TaskState.FAILED);
                 task.addMessage(new Message("agent", "Unknown skill: " + skill));
@@ -341,6 +362,154 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
         return task;
     }
 
+    // ---- Lookups and free operations that the MCP has always had (drift closed 2026-09-04) ----
+
+    private A2ATask handleValidateName(A2ATask task, String text) {
+        String domain = meta(task, "domain");
+        if (domain == null) domain = extractDomain(text);
+        if (domain == null) return askForDomain(task, "validate");
+
+        var result = domainService.validateDomainName(domain);
+        return completeWithResult(task, "domain-validation", result, result.isValid(),
+                result.isValid() ? domain + " is a valid domain name." : result.getMessage());
+    }
+
+    private A2ATask handleDomainExtensions(A2ATask task) {
+        var result = catalogService.getDomainExtensions();
+        return completeWithResult(task, "domain-extensions", result, result.isSuccess(),
+                result.isSuccess() ? "TLD catalog retrieved." : result.getMessage());
+    }
+
+    private A2ATask handleBulkSuggest(A2ATask task) {
+        List<String> keywords = csv(meta(task, "keywords"));
+        if (keywords == null) {
+            return askForInput(task, "To suggest names in bulk, please provide in metadata: keywords "
+                    + "(comma-separated). Optional: tlds (comma-separated), lang, maxResults.");
+        }
+        var result = suggestionService.bulkSuggestions(keywords, csv(meta(task, "tlds")),
+                meta(task, "lang"), metaInt(task, "maxResults"));
+        return completeWithResult(task, "domain-suggestions", result, result.isSuccess(),
+                result.isSuccess() ? "Suggestions generated." : result.getMessage());
+    }
+
+    /** add_prefix and add_suffix differ only in which end the word goes on. */
+    private A2ATask handleAffix(A2ATask task, boolean prefix) {
+        String name = meta(task, "name");
+        if (name == null) {
+            return askForInput(task, "To build name variants, please provide in metadata: name. "
+                    + "Optional: vocabulary, tlds (comma-separated), lang, maxResults.");
+        }
+        String vocabulary = meta(task, "vocabulary");
+        String tlds = meta(task, "tlds");
+        String lang = meta(task, "lang");
+        Integer max = metaInt(task, "maxResults");
+        var result = prefix
+                ? suggestionService.addPrefix(name, vocabulary, tlds, lang, max)
+                : suggestionService.addSuffix(name, vocabulary, tlds, lang, max);
+        return completeWithResult(task, "domain-suggestions", result, result.isSuccess(),
+                result.isSuccess() ? "Suggestions generated." : result.getMessage());
+    }
+
+    private A2ATask handleSpinWord(A2ATask task) {
+        String name = meta(task, "name");
+        if (name == null) {
+            return askForInput(task, "To spin variants of a name, please provide in metadata: name. "
+                    + "Optional: position, similarity (0-1), tlds (comma-separated), lang, maxResults.");
+        }
+        var result = suggestionService.spinWord(name, metaInt(task, "position"),
+                metaDouble(task, "similarity"), meta(task, "tlds"), meta(task, "lang"),
+                metaInt(task, "maxResults"));
+        return completeWithResult(task, "domain-suggestions", result, result.isSuccess(),
+                result.isSuccess() ? "Suggestions generated." : result.getMessage());
+    }
+
+    private A2ATask handleKeywordAvailability(A2ATask task) {
+        String keyword = meta(task, "keyword");
+        if (keyword == null) {
+            return askForInput(task, "To check a keyword, please provide in metadata: keyword. "
+                    + "Optional: registries, tlds, summary (true for counts only).");
+        }
+        String registries = meta(task, "registries");
+        String tlds = meta(task, "tlds");
+        boolean summary = Boolean.parseBoolean(meta(task, "summary"));
+        var result = summary
+                ? suggestionService.checkKeywordAvailabilitySummary(keyword, registries, tlds)
+                : suggestionService.checkKeywordAvailability(keyword, registries, tlds);
+        // The backend returns the payload straight through; there is no success flag on it.
+        return completeWithResult(task, "keyword-availability", result, result != null,
+                result != null ? "Keyword availability retrieved." : "Keyword availability is unavailable right now.");
+    }
+
+    private A2ATask handleUpdateNameservers(A2ATask task, String text) {
+        String domain = meta(task, "domain");
+        if (domain == null) domain = extractDomain(text);
+        List<String> nameservers = csv(meta(task, "nameservers"));
+        if (domain == null || nameservers == null) {
+            return askForInput(task, "To change nameservers, please provide in metadata: domain and "
+                    + "nameservers (comma-separated, e.g. ns1.osir.com,ns3.osir.com).");
+        }
+        var result = domainService.updateNameservers(domain, nameservers);
+        return completeWithResult(task, "nameservers", result, result.isSuccess(),
+                result.isSuccess() ? "Nameservers updated for " + domain + "." : result.getMessage());
+    }
+
+    private A2ATask handleTransferQuote(A2ATask task, String text) {
+        String domain = meta(task, "domain");
+        if (domain == null) domain = extractDomain(text);
+        if (domain == null) return askForDomain(task, "quote a transfer for");
+
+        var result = transferService.getQuote(domain);
+        return completeWithResult(task, "transfer-quote", result, result.isSuccess(),
+                result.isSuccess() ? "Transfer quote retrieved." : result.getMessage());
+    }
+
+    private A2ATask handleTransferStatus(A2ATask task, String text) {
+        String domain = meta(task, "domain");
+        if (domain == null) domain = extractDomain(text);
+        if (domain == null) return askForDomain(task, "check the transfer status of");
+
+        var result = transferService.getStatus(domain);
+        return completeWithResult(task, "transfer-status", result, result.isSuccess(),
+                result.isSuccess() ? "Transfer status retrieved." : result.getMessage());
+    }
+
+    private A2ATask handleListPendingTransfers(A2ATask task) {
+        var result = transferService.listPending();
+        return completeWithResult(task, "pending-transfers", result, result.isSuccess(),
+                result.isSuccess() ? "Pending transfers retrieved." : result.getMessage());
+    }
+
+    private A2ATask handleCheckHost(A2ATask task) {
+        String hostname = meta(task, "hostname");
+        if (hostname == null) {
+            return askForInput(task, "Please provide the host name to check in metadata: hostname "
+                    + "(e.g. ns1.cedarloop.com).");
+        }
+        var result = hostService.checkAvailability(hostname);
+        return completeWithResult(task, "host-check", result, result.isSuccess(),
+                result.isSuccess() ? "Host availability checked." : result.getMessage());
+    }
+
+    private A2ATask handleHostsForDomain(A2ATask task, String text) {
+        String domain = meta(task, "domain");
+        if (domain == null) domain = extractDomain(text);
+        if (domain == null) return askForDomain(task, "list host records for");
+
+        var result = hostService.getHostsForDomain(domain);
+        return completeWithResult(task, "hosts", result, result.isSuccess(),
+                result.isSuccess() ? "Host records retrieved." : result.getMessage());
+    }
+
+    /** Comma-separated metadata value to a list; null (not an empty list) when absent or blank. */
+    private static List<String> csv(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        List<String> parts = java.util.Arrays.stream(value.split(","))
+                .map(String::trim).filter(p -> !p.isEmpty()).toList();
+        return parts.isEmpty() ? null : parts;
+    }
+
     private AgentCard buildAgentCard() {
         AgentCard card = new AgentCard();
         card.setName("OSIR Domain Agent");
@@ -403,7 +572,66 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
                 new Skill("disable_autorenew", "Disable Auto-Renew",
                         "Disable automatic domain renewal",
                         List.of("domains", "autorenew", "renewal"),
-                        List.of("Turn off auto-renew for silvergate.net, I am letting it expire"))
+                        List.of("Turn off auto-renew for silvergate.net, I am letting it expire")),
+                new Skill("validate_domain_name", "Validate Domain Name",
+                        "Check whether a name is syntactically registrable, before spending a lookup on it",
+                        List.of("domains", "validate", "syntax"),
+                        List.of("Is 'my--shop.com' a valid domain name?",
+                                "Can a domain start with a hyphen?")),
+                new Skill("get_domain_extensions", "Get Domain Extensions",
+                        "The TLDs OSIR sells, with registration and renewal prices",
+                        List.of("domains", "tld", "extensions", "catalog"),
+                        List.of("Which TLDs do you support?", "Do you sell .dev domains?")),
+                new Skill("bulk_suggest_domains", "Bulk Domain Suggestions",
+                        "Name ideas for several keywords at once across chosen TLDs",
+                        List.of("domains", "suggestions", "bulk", "naming"),
+                        List.of("Suggest names for 'cedar', 'loop' and 'harbor' on .com and .io",
+                                "Give me domain ideas for a coffee roastery")),
+                new Skill("add_prefix", "Add Prefix To Domain",
+                        "Name variants built by putting a word in front of the keyword",
+                        List.of("domains", "suggestions", "naming"),
+                        List.of("Show me prefixed variants of 'harbor'", "Names like get-harbor or try-harbor")),
+                new Skill("add_suffix", "Add Suffix To Domain",
+                        "Name variants built by appending a word to the keyword",
+                        List.of("domains", "suggestions", "naming"),
+                        List.of("Suffix variants of 'cedar'", "Names like cedarhq or cedarlabs")),
+                new Skill("spin_domain_words", "Spin Domain Words",
+                        "Near-miss variants of a name, tuned by similarity",
+                        List.of("domains", "suggestions", "naming"),
+                        List.of("Spin variants of 'brightharbor'", "Names close to 'cedarloop' but available")),
+                new Skill("check_keyword_availability", "Check Keyword Availability",
+                        "Which TLDs a keyword is still free on (pass summary=true for counts only)",
+                        List.of("domains", "availability", "keyword"),
+                        List.of("Where is 'cedarloop' still available?",
+                                "Is the word 'harbor' free on any good TLD?")),
+                new Skill("update_nameservers", "Update Nameservers",
+                        "Point a domain at a different set of nameservers",
+                        List.of("domains", "nameservers", "dns"),
+                        List.of("Point cedarloop.com at ns1.osir.com and ns3.osir.com",
+                                "Move brahaj.al to Cloudflare's nameservers")),
+                new Skill("get_transfer_quote", "Get Transfer Quote",
+                        "What transferring a domain in would cost, and whether it is eligible",
+                        List.of("domains", "transfer", "pricing"),
+                        List.of("What would it cost to transfer cedarloop.com to you?",
+                                "Can I move silvergate.net here yet?")),
+                new Skill("get_transfer_status", "Get Transfer Status",
+                        "Where an in-flight transfer has got to",
+                        List.of("domains", "transfer", "status"),
+                        List.of("How is the transfer of cedarloop.com going?",
+                                "Has my domain moved yet?")),
+                new Skill("list_pending_transfers", "List Pending Transfers",
+                        "Every transfer currently in flight on the account",
+                        List.of("domains", "transfer", "list"),
+                        List.of("Which of my transfers are still pending?", "Show me transfers in progress")),
+                new Skill("check_host_availability", "Check Host Availability",
+                        "Whether a glue/host record name is free to create",
+                        List.of("domains", "host", "glue", "nameserver"),
+                        List.of("Is ns1.cedarloop.com free as a host record?")),
+                new Skill("get_hosts_for_domain", "Get Hosts For Domain",
+                        "The glue/host records registered under a domain",
+                        List.of("domains", "host", "glue", "nameserver"),
+                        List.of("Which glue records exist on cedarloop.com?",
+                                "Show me the host records for brahaj.al"))
         ));
         return card;
     }

@@ -9,7 +9,7 @@ Two servers, one shared backend client library:
 | Server | Port | Protocol | What it gives an AI |
 |--------|------|----------|---------------------|
 | **MCP Server** | 8081 | [Model Context Protocol](https://modelcontextprotocol.io) (SSE + Streamable HTTP) | 103 fine-grained tools (`checkDomainAvailability`, `registerDomain`, `createDnsRecord`, `createMailbox`, `osirSitePublish`, …) + 11 guided prompts |
-| **A2A Server** | 8082 | [Google Agent-to-Agent](https://google.github.io/A2A/) (JSON-RPC 2.0) | 9 specialist agents with 64 skills and an orchestrator for multi-step workflows |
+| **A2A Server** | 8082 | [Google Agent-to-Agent](https://google.github.io/A2A/) (JSON-RPC 2.0) | 9 specialist agents with 84 skills and an orchestrator for multi-step workflows |
 
 Use **MCP** when one assistant should call individual operations. Use **A2A** when you want to hand
 a whole task ("set up example.com with DNS and check my balance") to agents that coordinate the work.

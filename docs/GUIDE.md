@@ -298,25 +298,31 @@ curl -X POST http://localhost:8082/a2a \
   -d '{"jsonrpc":"2.0","id":"5","method":"tasks/cancel","params":{"id":"task-001"}}'
 ```
 
-### Available Agents & Skills (64 skills across 9 agents)
+### Available Agents & Skills (84 skills across 9 agents)
 
 **Domain Agent** (`agent: "domain-agent"`)
-`check_availability`, `register_domain`, `get_domain_info`, `list_domains`, `renew_domain`, `lock_domain`, `unlock_domain`, `suggest_domains`, `transfer_domain`, `enable_privacy`, `disable_privacy`, `enable_autorenew`, `disable_autorenew`
+`check_availability`, `register_domain`, `get_domain_info`, `list_domains`, `renew_domain`, `lock_domain`, `unlock_domain`, `suggest_domains`, `transfer_domain`, `enable_privacy`, `disable_privacy`, `enable_autorenew`, `disable_autorenew`, `validate_domain_name`, `get_domain_extensions`, `bulk_suggest_domains`, `add_prefix`, `add_suffix`, `spin_domain_words`, `check_keyword_availability`, `update_nameservers`, `get_transfer_quote`, `get_transfer_status`, `list_pending_transfers`, `check_host_availability`, `get_hosts_for_domain`
 
 **DNS Agent** (`agent: "dns-agent"`)
-`list_dns_records`, `create_dns_record`, `update_dns_record`, `delete_dns_record`, `get_dns_record`
+`list_dns_records`, `create_dns_record`, `update_dns_record`, `delete_dns_record`, `get_dns_record`, `initialize_dns_zone`
 
 **VPS Agent** (`agent: "vps-agent"`)
-`list_vps_packages`, `list_vps_locations`, `order_vps`, `list_vps_instances`, `get_vps_details`, `delete_vps`, `vps_panel_login`, `get_catalog`, `list_os_templates`, `build_vps`, `list_ssh_keys`, `add_ssh_key`
+`list_vps_packages`, `list_vps_locations`, `order_vps`, `list_vps_instances`, `get_vps_details`, `delete_vps`, `vps_panel_login`, `get_catalog`, `list_os_templates`, `build_vps`, `list_ssh_keys`, `add_ssh_key`, `get_vps_package_details`, `count_vps_instances`, `get_dedicated_catalog`
 
 **Billing Agent** (`agent: "billing-agent"`)
-`get_balance`, `list_invoices`, `get_invoice`, `pay_invoice`, `invoice_statistics`, `create_payment`, `get_transactions`, `preview_fees`, `get_domain_pricing`
+`get_balance`, `list_invoices`, `get_invoice`, `pay_invoice`, `invoice_statistics`, `create_payment`, `get_transactions`, `preview_fees`, `get_domain_pricing`, `get_hosting_bundle`
 
 **Contact Agent** (`agent: "contact-agent"`)
 `list_contacts`, `get_contact`, `create_contact`, `update_contact`, `delete_contact`, `get_domain_contacts`
 
 **Account Agent** (`agent: "account-agent"`)
 `get_profile`, `get_account_summary`, `get_auth_status`, `get_audit_logs`, `get_domain_audit`, `get_recent_activity`
+
+**Mail Agent** (`agent: "mail-agent"`)
+`list_mail_plans`, `get_mailbox_quote`, `enable_mail_domain`, `list_mail_domains`, `get_mail_dns_records`, `verify_mail_dns`, `list_mailboxes`, `get_mailbox_usage`
+
+**Deploy Agent** (`agent: "deploy-agent"`)
+`list_apps`, `get_app_status`, `get_app_logs`, `deploy_app`, `get_app_source`
 
 **Orchestrator** (`agent: "orchestrator"`)
 `orchestrate`, `plan_workflow` — decomposes complex tasks across multiple agents (max 15 steps)
@@ -501,7 +507,7 @@ docker-compose logs -f
      └────────────────┘
 ```
 
-Both servers share the `common` module — same services, same REST clients, same models. The MCP server exposes them as 105 individual tools. The A2A server wraps them in 9 specialist agents with 64 skills, coordinated by an orchestrator that handles multi-step workflows.
+Both servers share the `common` module — same services, same REST clients, same models. The MCP server exposes them as 105 individual tools. The A2A server wraps them in 9 specialist agents with 84 skills, coordinated by an orchestrator that handles multi-step workflows.
 
 ### Security & Operations
 - **CORS:** restricted to configured origins (permissive in dev mode)

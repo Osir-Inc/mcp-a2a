@@ -181,7 +181,9 @@ class DeploySpecialistAgentTest {
         assertSame(agent.getAgentCard(), agent.getAgentCard());
         AgentCard card = agent.getAgentCard();
         assertEquals("OSIR Deploy Agent", card.getName());
-        assertEquals(4, card.getSkills().size());
+        assertEquals(5, card.getSkills().size());
+        // The deploy agent stays read-plus-deploy: nothing destructive or billable until A2A has a
+        // confirmation gate (docs/A2A-CONFIRMATION-GATE-SPEC.md).
         assertTrue(card.getSkills().stream().noneMatch(s -> s.getId().contains("delete")));
     }
 }

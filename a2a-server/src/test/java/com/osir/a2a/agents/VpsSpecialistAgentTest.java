@@ -158,6 +158,19 @@ class VpsSpecialistAgentTest {
     }
 
     @Test
+    void handle_countInstances_doesNotFallIntoTheListBranch() {
+        var count = new com.osir.mcp.models.vps.VpsCountResult(true, "OK");
+        when(vpsService.countMyInstances()).thenReturn(count);
+
+        A2ATask task = new A2ATask("t1", new Message("user", "how many servers do I have?"));
+        task.setMetadata(Map.of("skill", "count_vps_instances"));
+
+        assertEquals(TaskState.COMPLETED, agent.handle(task).getStatus());
+        verify(vpsService).countMyInstances();
+        verify(vpsService, never()).listMyInstances();
+    }
+
+    @Test
     void getAgentCard_cached() {
         assertSame(agent.getAgentCard(), agent.getAgentCard());
         assertTrue(agent.getAgentCard().getSkills().size() >= 7);

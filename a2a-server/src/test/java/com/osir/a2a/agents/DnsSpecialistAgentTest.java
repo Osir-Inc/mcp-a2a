@@ -61,6 +61,20 @@ class DnsSpecialistAgentTest {
     }
 
     @Test
+    void handle_initializeZone_callsService() {
+        when(dnsService.initializeZone("example.com")).thenReturn(new DnsActionResult(true, "created"));
+
+        A2ATask task = new A2ATask("t1", new Message("user", "set up dns for example.com"));
+        task.setMetadata(Map.of("skill", "initialize_dns_zone"));
+
+        A2ATask out = agent.handle(task);
+        assertEquals(TaskState.COMPLETED, out.getStatus());
+        verify(dnsService).initializeZone("example.com");
+        // "set up" contains no list/create keyword, but the skill id is what routes it.
+        verify(dnsService, never()).listRecords(anyString());
+    }
+
+    @Test
     void handle_noDomain_asksForInput() {
         A2ATask task = new A2ATask("t1", new Message("user", "list dns records"));
         task.setMetadata(Map.of("skill", "list_dns_records"));

@@ -34,7 +34,8 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
     protected Set<String> getSkillIds() {
         return Set.of("list_vps_packages", "list_vps_locations", "order_vps",
                 "list_vps_instances", "get_vps_details", "delete_vps", "vps_panel_login", "get_catalog",
-                "list_os_templates", "build_vps", "list_ssh_keys", "add_ssh_key");
+                "list_os_templates", "build_vps", "list_ssh_keys", "add_ssh_key",
+                "get_vps_package_details", "count_vps_instances", "get_dedicated_catalog");
     }
 
     @Override
@@ -56,6 +57,17 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
             // otherwise skill=delete_vps with "terminate it, I lost the ssh key" would hit the bare
             // contains("ssh") branch and list keys instead of terminating.
             String lower = skill != null ? "" : text.toLowerCase();
+
+            // Read-only lookups, explicit-skill only: their words ("details", "how many", "catalog")
+            // overlap the branches below, and a wrong guess there costs a server.
+            if (skill != null) {
+                switch (skill) {
+                    case "get_vps_package_details": return handlePackageDetails(task);
+                    case "count_vps_instances": return handleCountInstances(task);
+                    case "get_dedicated_catalog": return handleDedicatedCatalog(task);
+                    default: break;
+                }
+            }
 
             // These branches come first on purpose: the generic ones below match on bare "list" and
             // "create", so an OS/SSH request would otherwise be swallowed by list_vps_instances or
@@ -184,6 +196,30 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
         }
     }
 
+    private A2ATask handlePackageDetails(A2ATask task) {
+        String packageId = meta(task, "packageId");
+        if (packageId == null) {
+            return askForInput(task,
+                    "To get package details, please provide in metadata: packageId "
+                    + "(use the list_vps_packages skill to see the ids).");
+        }
+        var result = vpsService.getPackageDetails(packageId);
+        return completeWithResult(task, "vps-package", result, result.isSuccess(),
+                result.isSuccess() ? "VPS package details retrieved." : result.getMessage());
+    }
+
+    private A2ATask handleCountInstances(A2ATask task) {
+        var result = vpsService.countMyInstances();
+        return completeWithResult(task, "vps-count", result, result.isSuccess(),
+                result.isSuccess() ? "VPS instance count retrieved." : result.getMessage());
+    }
+
+    private A2ATask handleDedicatedCatalog(A2ATask task) {
+        var result = catalogService.getDedicatedServerCatalog();
+        return completeWithResult(task, "dedicated-catalog", result, result.isSuccess(),
+                result.isSuccess() ? "Dedicated server catalog retrieved." : result.getMessage());
+    }
+
     private AgentCard buildAgentCard() {
         AgentCard card = new AgentCard();
         card.setName("OSIR VPS & Infrastructure Agent");
@@ -235,7 +271,21 @@ public class VpsSpecialistAgent extends BaseSpecialistAgent {
                 new Skill("add_ssh_key", "Add SSH Key", "Store an SSH public key for use in VPS installs",
                         List.of("vps", "ssh", "add-key"),
                         List.of("Add my laptop's SSH key: ssh-ed25519 AAAAC3Nz... armand@laptop",
-                                "Store a new SSH public key on my account"))
+                                "Store a new SSH public key on my account")),
+                new Skill("get_vps_package_details", "Get VPS Package Details",
+                        "Full specs and price for one VPS package",
+                        List.of("vps", "packages", "details"),
+                        List.of("What exactly do I get with OSIR-S-US?",
+                                "How much RAM and disk does that package have?")),
+                new Skill("count_vps_instances", "Count VPS Instances",
+                        "How many servers the account currently has",
+                        List.of("vps", "instances", "count"),
+                        List.of("How many servers do I have?", "Am I close to my server limit?")),
+                new Skill("get_dedicated_catalog", "Get Dedicated Server Catalog",
+                        "Dedicated (bare metal) server configurations and prices",
+                        List.of("dedicated", "bare-metal", "catalog"),
+                        List.of("Do you offer dedicated servers?",
+                                "What bare metal configurations can I buy?"))
         ));
         return card;
     }

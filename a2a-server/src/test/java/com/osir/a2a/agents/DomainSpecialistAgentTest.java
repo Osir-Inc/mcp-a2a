@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.Spy;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -23,6 +24,7 @@ class DomainSpecialistAgentTest {
     @Mock DomainSuggestionService suggestionService;
     @Mock TransferService transferService;
     @Mock HostService hostService;
+    @Mock com.osir.mcp.services.CatalogService catalogService;
     @Spy ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
@@ -186,6 +188,57 @@ class DomainSpecialistAgentTest {
         assertEquals(TaskState.INPUT_REQUIRED, result.getStatus());
         assertTrue(result.getHistory().stream()
                 .anyMatch(m -> m.getTextContent().contains("EPP code")));
+    }
+
+    // ---- Skills that existed as MCP tools long before they reached A2A (drift closed 2026-09-04) ----
+
+    @Test
+    void handle_transferQuote_routesToTransferService() {
+        var quote = new com.osir.mcp.models.transfer.TransferQuoteResult(true, "OK");
+        when(transferService.getQuote("example.com")).thenReturn(quote);
+
+        A2ATask task = new A2ATask("t1", new Message("user", "what would it cost to move example.com here"));
+        task.setMetadata(Map.of("skill", "get_transfer_quote"));
+
+        A2ATask out = agent.handle(task);
+        assertEquals(TaskState.COMPLETED, out.getStatus());
+        verify(transferService).getQuote("example.com");
+        // The word "move" must not reach the transfer-initiate path, which spends money.
+        verify(transferService, never()).initiateTransfer(anyString(), anyString());
+    }
+
+    @Test
+    void handle_hostsForDomain_routesToHostService() {
+        var hosts = new com.osir.mcp.models.host.HostListResult(true, "OK");
+        when(hostService.getHostsForDomain("example.com")).thenReturn(hosts);
+
+        A2ATask task = new A2ATask("t1", new Message("user", "glue records on example.com"));
+        task.setMetadata(Map.of("skill", "get_hosts_for_domain"));
+
+        assertEquals(TaskState.COMPLETED, agent.handle(task).getStatus());
+        verify(hostService).getHostsForDomain("example.com");
+    }
+
+    @Test
+    void handle_updateNameservers_needsTheListInMetadata() {
+        A2ATask task = new A2ATask("t1", new Message("user", "repoint example.com"));
+        task.setMetadata(Map.of("skill", "update_nameservers"));
+
+        assertEquals(TaskState.INPUT_REQUIRED, agent.handle(task).getStatus());
+        verify(domainService, never()).updateNameservers(anyString(), anyList());
+    }
+
+    @Test
+    void handle_updateNameservers_splitsTheCsv() {
+        var result = new com.osir.mcp.models.NameserverUpdateResult("example.com", true, "updated");
+        when(domainService.updateNameservers(eq("example.com"), anyList())).thenReturn(result);
+
+        A2ATask task = new A2ATask("t1", new Message("user", "repoint it"));
+        task.setMetadata(Map.of("skill", "update_nameservers", "domain", "example.com",
+                "nameservers", "ns1.osir.com, ns3.osir.com"));
+
+        assertEquals(TaskState.COMPLETED, agent.handle(task).getStatus());
+        verify(domainService).updateNameservers("example.com", List.of("ns1.osir.com", "ns3.osir.com"));
     }
 
     // --- Agent card ---

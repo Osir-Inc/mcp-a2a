@@ -233,6 +233,19 @@ Returns an array of all specialist agent cards:
 | `disable_privacy` | Disable WHOIS privacy protection |
 | `enable_autorenew` | Enable automatic renewal |
 | `disable_autorenew` | Disable automatic renewal |
+| `validate_domain_name` | Check a name is syntactically registrable |
+| `get_domain_extensions` | TLDs OSIR sells, with registration and renewal prices |
+| `bulk_suggest_domains` | Name ideas for several keywords at once (metadata: `keywords`) |
+| `add_prefix` | Variants with a word in front (metadata: `name`) |
+| `add_suffix` | Variants with a word appended (metadata: `name`) |
+| `spin_domain_words` | Near-miss variants, tuned by `similarity` |
+| `check_keyword_availability` | TLDs a keyword is free on (`summary=true` for counts) |
+| `update_nameservers` | Point a domain at other nameservers (metadata: `nameservers`) |
+| `get_transfer_quote` | Cost and eligibility of transferring a domain in |
+| `get_transfer_status` | Progress of an in-flight transfer |
+| `list_pending_transfers` | Every transfer currently in flight |
+| `check_host_availability` | Is a glue/host record name free (metadata: `hostname`) |
+| `get_hosts_for_domain` | Glue/host records registered under a domain |
 
 ### DNS Agent (`dns-agent`)
 
@@ -243,6 +256,7 @@ Returns an array of all specialist agent cards:
 | `update_dns_record` | Update an existing record |
 | `delete_dns_record` | Delete a record by ID |
 | `get_dns_record` | Get details of a specific record |
+| `initialize_dns_zone` | Create the zone itself (idempotent, free) |
 
 ### VPS Agent (`vps-agent`)
 
@@ -256,6 +270,9 @@ Returns an array of all specialist agent cards:
 | `delete_vps` | Terminate a VPS instance |
 | `vps_panel_login` | Get control panel login URL |
 | `get_catalog` | Get the full product catalog |
+| `get_vps_package_details` | Full specs and price for one package (metadata: `packageId`) |
+| `count_vps_instances` | How many servers the account has |
+| `get_dedicated_catalog` | Dedicated (bare metal) configurations and prices |
 
 ### Billing Agent (`billing-agent`)
 
@@ -270,6 +287,7 @@ Returns an array of all specialist agent cards:
 | `get_transactions` | View payment history |
 | `preview_fees` | Preview fees for a payment amount |
 | `get_domain_pricing` | Get pricing for domain extensions |
+| `get_hosting_bundle` | Hosting options and exact prices for one domain |
 
 ### Contact Agent (`contact-agent`)
 
@@ -292,6 +310,34 @@ Returns an array of all specialist agent cards:
 | `get_audit_logs` | View audit logs |
 | `get_domain_audit` | View audit trail for a specific domain |
 | `get_recent_activity` | View recent activity across services |
+
+### Mail Agent (`mail-agent`)
+
+| Skill ID | Description |
+|----------|-------------|
+| `list_mail_plans` | List mailbox plans |
+| `get_mailbox_quote` | Price a mailbox plan (metadata: `packageId`, `term`) |
+| `enable_mail_domain` | Enable email hosting on a domain |
+| `list_mail_domains` | Domains with email hosting enabled |
+| `get_mail_dns_records` | The MX/SPF/DKIM records a domain needs |
+| `verify_mail_dns` | Check those records are live |
+| `list_mailboxes` | List mailboxes on the account |
+| `get_mailbox_usage` | Storage used per mailbox |
+
+Creating, deleting and re-passwording mailboxes are deliberately absent: they cost money or destroy
+data, and A2A has no confirmation gate yet (`A2A-CONFIRMATION-GATE-SPEC.md`).
+
+### Deploy Agent (`deploy-agent`)
+
+| Skill ID | Description |
+|----------|-------------|
+| `list_apps` | List deployed apps with live URLs |
+| `get_app_status` | Status, health and QA verdict for one app |
+| `get_app_logs` | Recent logs from an app |
+| `deploy_app` | Deploy or redeploy an app (free tier) |
+| `get_app_source` | Signed download URL for the app's current source zip |
+
+App deletion, secrets, databases and the move-to-owned flow are absent for the same reason.
 
 ### Orchestrator (`orchestrator`)
 
