@@ -92,7 +92,12 @@ Directory scorecard feedback (score 41) worked in full:
 - **`server.json`** (repo root) + **`SUBMISSION-CHECKLIST.md`** (this dir): MCP Registry / Claude directory / ChatGPT connectors, with the version-bump republish rule and a pre-submission gate.
 - **`scripts/agent-e2e/04-discovery.sh`**: asserts OAuth metadata, agent card shape, public availability/bundle/openapi, MCP initialize instructions, and (warn-only) the apex files. First prod run: 8 pass / 2 fail - both fails are the not-yet-deployed 2.x serverInfo+instructions and card securitySchemes. **Apex discovery files are LIVE** (osir.com agent.json, llms.txt, robots.txt) - marketing shipped C.2; audit F8/F9 resolved.
 
-**OPEN RISK (brief non-negotiable violated on the A2A side)**: `docs/A2A-CONFIRMATION-GATE-SPEC.md` is proposed-but-NOT-implemented - A2A `register_domain` (Domain Agent) and the VPS order path call billable services directly with no staged confirmation, unlike every MCP tool. The new Email/Deploy agents deliberately expose nothing billable, but the existing gap remains. Decide: implement the gate spec, or strip billable skills from the A2A cards until it exists.
+**~~OPEN RISK~~ CLOSED 2026-09-04 (Layer A)**: the staged-confirmation gap on A2A is fixed - all ten
+billable/destructive skills across five agents now stage and require a confirmation on the same task
+(`A2A-CONFIRMATION-GATE-SPEC.md` §6). Read §2 before recording this as "A2A is now safe for unattended
+callers": a confirmation round-trip does not stop an agent that holds the actionId. The controls that
+do - per-tool `osir:*` scopes (blocked on B.2), a backend spend cap, and out-of-band approval - are
+tracked as Layers B/C/D in `docs/TODO.md`.
 
 ## Sequencing (matches the brief's cross-project steps)
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-OSIR MCP Server provides 71 AI-powered tools for managing domains, DNS, VPS hosting, billing, contacts, transfers, hosts, audit logs, and account management for the OSIR domain registrar platform.
+OSIR MCP Server provides 105 AI-powered tools for managing domains, DNS, VPS hosting, email, websites, billing, contacts, transfers, hosts, audit logs, and account management for the OSIR domain registrar platform. The canonical, always-current tool list is `MCP-TOOL-EXAMPLES.md`; the sections below are a curated subset.
 
 ## Connection
 

@@ -6,8 +6,8 @@ the design decisions worth knowing before you change something.
 ## Project Overview
 
 OSIR domain registrar AI platform with two servers:
-- **MCP Server** (Quarkus, port 8081) — 103 tools + 11 prompts via Model Context Protocol
-- **A2A Server** (Quarkus, port 8082) — 7 specialist agents via Google Agent-to-Agent protocol
+- **MCP Server** (Quarkus, port 8081) — 105 tools + 11 prompts via Model Context Protocol
+- **A2A Server** (Quarkus, port 8082) — 9 agents / 89 skills via Google Agent-to-Agent protocol
 
 **Note:** CLI tools moved to `../com.osir.cli`.
 
@@ -16,10 +16,12 @@ OSIR domain registrar AI platform with two servers:
 ```
 com.osir.agent/
 ├── common/          # Java library: 12 services, 9 REST clients, ~174 models
+│   └── security/    # DestructiveOpRateLimiter — shared by BOTH transports' confirmation gates
 ├── mcp-server/      # Quarkus: 15 *MCPServer classes (tools + prompts), chat UI, health
-├── a2a-server/      # Quarkus: A2A protocol, 7 agents, audit logging
+├── a2a-server/      # Quarkus: A2A protocol, 9 agents, audit logging
 │   ├── protocol/    # AgentCard, A2ATask, Message/Part, Artifact, JSON-RPC, TaskStore
-│   ├── agents/      # BaseSpecialistAgent + 6 specialists + OrchestratorAgent
+│   ├── agents/      # BaseSpecialistAgent + 8 specialists + OrchestratorAgent
+│   ├── security/    # ConfirmationGate (staged confirmations for billable/destructive skills)
 │   └── resources/   # A2AResource, A2ASseResource, AgentCardResource, AuditLogger, RateLimitFilter
 ├── settings.gradle  # include 'common', 'mcp-server', 'a2a-server'
 └── build.gradle     # Parent-only config
@@ -28,7 +30,7 @@ com.osir.agent/
 ## Commands
 
 ```bash
-./gradlew build                    # Build all modules (351 tests)
+./gradlew build                    # Build all modules (544 tests)
 ./gradlew quarkusDev               # MCP server dev mode (port 8081)
 ./gradlew :a2a-server:quarkusDev   # A2A server dev mode (port 8082)
 ./gradlew test                     # Run all tests
@@ -46,13 +48,21 @@ docker-compose logs -f             # View logs
 
 ### MCP Server
 - 15 `*MCPServer.java` classes with `@Tool` and `@Prompt` annotations at `/mcp` (SSE)
-- 103 tools: domain+suggestions (25), VPS (20), mail (11), deployment (10), billing (9), DNS (7), contacts (6), transfer (5), catalog (5), host (4), audit (3), account (2), website design (2), confirmation (1) — canonical list in `MCP-TOOL-EXAMPLES.md`
+- 105 tools: domain+suggestions (25), VPS (20), mail (11), deployment (12), billing (9), DNS (7), contacts (6), transfer (5), catalog (5), host (4), audit (3), account (2), website design (2), confirmation (1) — canonical list in `MCP-TOOL-EXAMPLES.md`
 - 11 prompts: getting_started, vps_setup_guide, dns_setup_guide, billing_overview, domain_management_guide, hosting_comparison, troubleshooting, security_best_practices (PromptsMCPServer); domain_registration_guide, domain_transfer_checklist (DomainRegistrarMCPServer); website_designer (WebsiteDesignMCPServer)
 - Website design: the calling LLM designs; `osirSiteDesignBrief` returns the prompt, `osirSitePublish` gates + zips + deploys. Open items in [TODO.md](TODO.md)
 - Caching: CatalogService + domain pricing (15min TTL via `@CacheResult`)
 
 ### A2A Server
-- 7 agents: Domain (13 skills), DNS (5), VPS (12), Billing (9), Contact (6), Account (6), Orchestrator (2)
+- 9 agents, 89 skills: Domain (27), VPS (16), Billing (11), Mail (8), DNS (7), Contact (7), Account (6),
+  Deploy (5), Orchestrator (2)
+- **Confirmation gate** (`security/ConfirmationGate`): billable and destructive skills are STAGED, not
+  run — the agent answers `input-required` with a summary and an actionId, and the caller confirms by
+  echoing that id on the SAME task. Parameters are frozen at stage time (as data on the task, so a
+  restart does not forget them), single-use, 5-minute expiry, caller matched on the JWT subject, rate
+  limited via the shared `DestructiveOpRateLimiter`. A task with a live staged action is pinned to the
+  agent that staged it, because a continuation is otherwise re-scored from scratch.
+  **It is not an authorization control** — see `A2A-CONFIRMATION-GATE-SPEC.md` §2 and §6.
 - All extend `BaseSpecialistAgent` (shared scoring via `DomainUtils`, error handling)
 - Scoring-based routing via `AgentRegistry` (single-pass, explicit `skill`/`agent` params get 1.0)
 - `OrchestratorAgent`: rule-based task decomposition, max 15 steps, 15s per-step timeout
@@ -106,13 +116,18 @@ docker-compose logs -f             # View logs
   DEPLOY flow. **Read before touching the VPS tools** — VirtFusion orders and builds separately, so
   `orderVps` without `operatingSystemId` yields a server with no OS. Needs backend v2.9.1+.
 - `A2A-ARCHITECTURE.md` — A2A architecture design document
-- `A2A-CONFIRMATION-GATE-SPEC.md` — staging destructive ops behind `executeConfirmedAction`
+- `A2A-CONFIRMATION-GATE-SPEC.md` — the staged-confirmation design, what it does NOT protect, and the
+  three layers still missing (scopes, spend cap, out-of-band approval)
 - `SKILL.md` — OpenClaw compatibility manifest
 
 ## Remaining Work
 
-All critical items are complete. Nice-to-haves:
-- Unit tests for DNS/Billing/Contact/Account agents (Domain and VPS agents have them)
-- Unit tests for PromptsMCPServer
+Tracked in [TODO.md](TODO.md). The two that shape the design:
+
+- **A2A gate Layers B–D** — token scopes, a backend spend cap, and out-of-band approval. Layer A (the
+  staged confirmation) is in, and it does not stop an unattended caller by itself.
+- **Per-tool `osir:*` scopes** — blocked on Keycloak scope definitions.
+
+Nice-to-haves:
 - `AuthContext.refreshedToken` is wired but nothing sets it yet (needs token refresh flow)
 - Docker compose health check directives

@@ -1,7 +1,7 @@
 {
   "identifier": "osir-inc-mcp-a2a",
   "name": "OSIR Domain Name MCP Server",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Domain registrar MCP server from OSIR (ICANN-accredited): 105 tools and 11 prompts to search, register, renew, transfer, and manage domains, DNS, VPS, email, and websites from Claude, ChatGPT, Cursor, or any MCP client. Remote Streamable HTTP, no local install.",
   "author": "OSIR",
   "authorUrl": "https://github.com/Osir-Inc",
