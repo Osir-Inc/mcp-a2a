@@ -3,15 +3,18 @@ package com.osir.mcp.services;
 import com.osir.mcp.models.deploy.DeployDtos.AppDto;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
 import com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedResult;
+import com.osir.mcp.models.dns.DnsActionResult;
 import com.osir.mcp.models.dns.DnsRecord;
 import com.osir.mcp.models.dns.DnsRecordListResult;
 import com.osir.mcp.models.dns.DnsRecordResult;
 import com.osir.mcp.models.vps.VpsInstanceDetailResult;
+import com.osir.mcp.models.vps.VpsInstanceListResult;
 import com.osir.mcp.models.vps.VpsInstanceSummary;
 import com.osir.mcp.models.vps.VpsOrderResult;
 import com.osir.mcp.models.vps.VpsOsTemplate;
 import com.osir.mcp.models.vps.VpsOsTemplateListResult;
 import com.osir.mcp.models.vps.VpsSshKey;
+import com.osir.mcp.models.vps.VpsSshKeyListResult;
 import com.osir.mcp.models.vps.VpsSshKeyResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,7 +58,39 @@ class MoveToOwnedServiceTest {
     private void appRunning(String name) {
         AppDto app = new AppDto(name, name, "us", "shared", null, "node", "READY", "https://" + name + ".osir.app", "v1");
         when(deploymentService.getStatus(name)).thenReturn(
-                new AppStatusResult(true, "OK", app, null, null, List.of(), null));
+                new AppStatusResult(true, "OK", app, null, null, List.of(), null, null, null));
+    }
+
+    /** The app already has a box recorded on C2 — the durable "don't order again" signal. */
+    private void appBoundToBox(String name, String instanceId, String ip) {
+        AppDto app = new AppDto(name, name, "us", "shared", null, "node", "READY", "https://" + name + ".osir.app", "v1");
+        when(deploymentService.getStatus(name)).thenReturn(
+                new AppStatusResult(true, "OK", app, null, null, List.of(), null, instanceId, ip));
+    }
+
+    private void myInstances(VpsInstanceSummary... instances) {
+        VpsInstanceListResult r = new VpsInstanceListResult(true, "ok");
+        r.setInstances(List.of(instances));
+        when(vpsService.listMyInstances()).thenReturn(r);
+    }
+
+    private VpsInstanceSummary instance(String id, String hostname) {
+        VpsInstanceSummary s = new VpsInstanceSummary();
+        s.setId(id);
+        s.setHostname(hostname);
+        return s;
+    }
+
+    private void accountKeys(int... ids) {
+        VpsSshKeyListResult r = new VpsSshKeyListResult(true, "ok");
+        List<VpsSshKey> keys = new java.util.ArrayList<>();
+        for (int id : ids) {
+            VpsSshKey k = new VpsSshKey();
+            k.setId(id);
+            keys.add(k);
+        }
+        r.setKeys(keys);
+        when(vpsService.listSshKeys()).thenReturn(r);
     }
 
     private void ubuntuTemplate(int id) {
@@ -119,15 +154,27 @@ class MoveToOwnedServiceTest {
     }
 
     @Test
-    void prepareResolvesTemplateAndKey() {
+    void prepareResolvesTemplateAndInjectsPlatformPlusAccountKeys() {
         appRunning("app1");
         ubuntuTemplate(42);
         platformKey(20);
+        accountKeys(7, 20);   // 20 is the platform key already in the list — must not double up
 
         MoveToOwnedService.Prepared prep = service.prepare("app1", "OSIR-S");
 
         assertEquals(42, prep.osTemplateId());
-        assertEquals(20, prep.sshKeyId());
+        // The customer's own key goes on the box too, or a failed move locks them out of a paid server.
+        assertEquals(List.of(20, 7), prep.sshKeyIds());
+    }
+
+    @Test
+    void prepareStillWorksWhenTheKeyListCannotBeRead() {
+        appRunning("app1");
+        ubuntuTemplate(42);
+        platformKey(20);
+        when(vpsService.listSshKeys()).thenReturn(new VpsSshKeyListResult(false, "backend down"));
+
+        assertEquals(List.of(20), service.prepare("app1", "OSIR-S").sshKeyIds());
     }
 
     // ---- money rule ----
@@ -139,18 +186,21 @@ class MoveToOwnedServiceTest {
                 .thenReturn(orderOk("vps-9"));
         instanceState("vps-9", "BUILDING", null);
 
-        MoveToOwnedService.Prepared prep = new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", 20);
+        MoveToOwnedService.Prepared prep = new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", List.of(20));
         MoveToOwnedResult first = service.orderAndMove("app1", "OSIR-S", prep, null);
         assertEquals("BUILDING", first.status());
         assertTrue(service.hasOrderedInstance("app1"));
 
         // Resume completes the move without a second order.
         instanceState("vps-9", "COMPLETE", "1.2.3.4");
-        when(deploymentService.moveToOwned("app1", "vps-9", "1.2.3.4", null)).thenReturn(true);
+        when(deploymentService.moveToOwned("app1", "vps-9", "1.2.3.4", null)).thenReturn(null);
         MoveToOwnedResult second = service.resume("app1", null);
 
         assertTrue(second.success());
         assertEquals("MOVING", second.status());
+        // No domain asked for: that is FALSE with a reason, not an unexplained null.
+        assertEquals(Boolean.FALSE, second.dnsBound());
+        assertTrue(second.nextStep().contains("No domain was given"));
         verify(vpsService, times(1)).orderVps(anyString(), anyString(), anyString(), anyInt(), anyList());
         assertFalse(service.hasOrderedInstance("app1"));
     }
@@ -163,7 +213,7 @@ class MoveToOwnedServiceTest {
         instanceState("vps-9", "FAILED", "1.2.3.4");
 
         MoveToOwnedResult result = service.orderAndMove("app1", "OSIR-S",
-                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", 20), null);
+                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", List.of(20)), null);
 
         assertFalse(result.success());
         assertEquals("BUILD_FAILED", result.status());
@@ -174,17 +224,48 @@ class MoveToOwnedServiceTest {
     }
 
     @Test
-    void shipFailureKeepsInstanceForRetry() {
+    void shipFailureKeepsInstanceForRetryAndReportsTheCause() {
         when(vpsService.orderVps(anyString(), anyString(), anyString(), anyInt(), anyList()))
                 .thenReturn(orderOk("vps-9"));
         instanceState("vps-9", "COMPLETE", "1.2.3.4");
-        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any())).thenReturn(false);
+        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any()))
+                .thenReturn("that box is already bound to another app");
 
         MoveToOwnedResult result = service.orderAndMove("app1", "OSIR-S",
-                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", 20), null);
+                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", List.of(20)), null);
 
         assertFalse(result.success());
         assertTrue(service.hasOrderedInstance("app1"));
+        // The customer gets C2's actual reason — swallowing it is what made three retries silent.
+        assertTrue(result.message().contains("already bound to another app"), result.message());
+    }
+
+    @Test
+    void thirdIdenticalRefusalStopsTheRetryLoop() {
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any()))
+                .thenReturn("this app has no built running version to move yet");
+
+        assertTrue(service.attach("app1", "vps-own", null).nextStep().contains("retry the ship step"));
+        assertTrue(service.attach("app1", "vps-own", null).nextStep().contains("retry the ship step"));
+        MoveToOwnedResult third = service.attach("app1", "vps-own", null);
+
+        assertTrue(third.nextStep().startsWith("STOP retrying"), third.nextStep());
+        assertTrue(third.nextStep().contains("support"));
+    }
+
+    @Test
+    void aMoveAlreadyRunningIsPolled_notEscalatedToSupport() {
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any()))
+                .thenReturn("a move to a different box is already in progress for this app");
+
+        for (int i = 0; i < 3; i++) {
+            MoveToOwnedResult r = service.attach("app1", "vps-own", null);
+            assertEquals("MOVING", r.status());
+            assertFalse(r.nextStep().startsWith("STOP retrying"), r.nextStep());
+            assertTrue(r.nextStep().contains("WITHOUT instanceId"), r.nextStep());
+        }
     }
 
     // ---- DNS ----
@@ -194,7 +275,7 @@ class MoveToOwnedServiceTest {
         when(vpsService.orderVps(anyString(), anyString(), anyString(), anyInt(), anyList()))
                 .thenReturn(orderOk("vps-9"));
         instanceState("vps-9", "COMPLETE", "1.2.3.4");
-        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any())).thenReturn(true);
+        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any())).thenReturn(null);
 
         DnsRecord apex = new DnsRecord();
         apex.setId("rec-current");
@@ -209,7 +290,7 @@ class MoveToOwnedServiceTest {
                 .thenReturn(new DnsRecordResult(true, "updated"));
 
         MoveToOwnedResult result = service.orderAndMove("app1", "OSIR-S",
-                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", 20), "adb.al");
+                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", List.of(20)), "adb.al");
 
         assertTrue(result.success());
         assertEquals(Boolean.TRUE, result.dnsBound());
@@ -222,11 +303,12 @@ class MoveToOwnedServiceTest {
         when(vpsService.orderVps(anyString(), anyString(), anyString(), anyInt(), anyList()))
                 .thenReturn(orderOk("vps-9"));
         instanceState("vps-9", "COMPLETE", "1.2.3.4");
-        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any())).thenReturn(true);
+        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any())).thenReturn(null);
         when(dnsService.listRecords("external.com")).thenReturn(new DnsRecordListResult(false, "zone not found"));
+        when(dnsService.initializeZone("external.com")).thenReturn(new DnsActionResult(false, "not hosted here"));
 
         MoveToOwnedResult result = service.orderAndMove("app1", "OSIR-S",
-                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", 20), "external.com");
+                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", List.of(20)), "external.com");
 
         assertTrue(result.success());
         assertEquals(Boolean.FALSE, result.dnsBound());
@@ -241,7 +323,7 @@ class MoveToOwnedServiceTest {
         instanceState("vps-9", "COMPLETE", null); // built, IP not yet populated
 
         MoveToOwnedResult result = service.orderAndMove("app1", "OSIR-S",
-                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", 20), null);
+                new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", List.of(20)), null);
 
         assertFalse(result.success());
         assertEquals("BUILDING", result.status());
@@ -263,7 +345,7 @@ class MoveToOwnedServiceTest {
         when(vpsService.orderVps(anyString(), anyString(), anyString(), anyInt(), anyList()))
                 .thenReturn(orderOk("vps-9"));
         instanceState("vps-9", "BUILDING", null);
-        MoveToOwnedService.Prepared prep = new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", 20);
+        MoveToOwnedService.Prepared prep = new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", List.of(20));
 
         // A model retry staged two confirmations; the user executed both.
         MoveToOwnedResult first = service.orderAndMove("app1", "OSIR-S", prep, null);
@@ -277,7 +359,7 @@ class MoveToOwnedServiceTest {
 
     @Test
     void orderFailureReleasesReservationSoRetryCanOrder() {
-        MoveToOwnedService.Prepared prep = new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", 20);
+        MoveToOwnedService.Prepared prep = new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", List.of(20));
         when(vpsService.orderVps(anyString(), anyString(), anyString(), anyInt(), anyList()))
                 .thenReturn(new VpsOrderResult(false, "insufficient balance"))
                 .thenReturn(orderOk("vps-9"));
@@ -299,11 +381,97 @@ class MoveToOwnedServiceTest {
         when(vpsService.orderVps(anyString(), anyString(), anyString(), anyInt(), anyList()))
                 .thenReturn(orderOk("vps-9"));
         instanceState("vps-9", "BUILDING", null);
-        service.orderAndMove("app1", "OSIR-S", new MoveToOwnedService.Prepared(42, "u", 20), null);
+        service.orderAndMove("app1", "OSIR-S", new MoveToOwnedService.Prepared(42, "u", List.of(20)), null);
         assertTrue(service.hasOrderedInstance("app1"));
 
         identity("user-2");
         assertFalse(service.hasOrderedInstance("app1"), "another user's move must be invisible");
+    }
+
+    // ---- C1: a box the customer ALREADY owns is attached, never re-bought ----
+
+    @Test
+    void attachShipsToAnOwnedBoxWithoutOrdering() {
+        instanceState("vps-own", "COMPLETE", "173.208.224.36");
+        when(deploymentService.moveToOwned("app1", "vps-own", "173.208.224.36", null)).thenReturn(null);
+
+        MoveToOwnedResult result = service.attach("app1", "vps-own", null);
+
+        assertTrue(result.success());
+        assertEquals("MOVING", result.status());
+        assertEquals("vps-own", result.instanceId());
+        verify(vpsService, never()).orderVps(anyString(), anyString(), anyString(), anyInt(), anyList());
+    }
+
+    @Test
+    void attachRefusesAnInstanceThatIsNotOnTheAccount() {
+        // Ownership proof: details are read under the CUSTOMER's session, so a foreign box cannot be read.
+        when(vpsService.getInstanceDetails("someone-elses"))
+                .thenReturn(new VpsInstanceDetailResult(false, "not found"));
+
+        MoveToOwnedResult result = service.attach("app1", "someone-elses", null);
+
+        assertFalse(result.success());
+        assertTrue(result.message().contains("listMyVpsInstances"));
+        verify(deploymentService, never()).moveToOwned(any(), any(), any(), any());
+    }
+
+    @Test
+    void attachWillNotHijackAMoveAlreadyRunningOnAnotherBox() {
+        when(vpsService.orderVps(anyString(), anyString(), anyString(), anyInt(), anyList()))
+                .thenReturn(orderOk("vps-9"));
+        instanceState("vps-9", "BUILDING", null);
+        service.orderAndMove("app1", "OSIR-S", new MoveToOwnedService.Prepared(42, "u", List.of(20)), null);
+
+        MoveToOwnedResult result = service.attach("app1", "vps-other", null);
+
+        assertFalse(result.success());
+        assertTrue(result.message().contains("vps-9"));
+    }
+
+    @Test
+    void findExistingBoxPrefersC2Binding() {
+        appBoundToBox("app1", "vps-bound", "1.2.3.4");
+
+        assertEquals("vps-bound", service.findExistingBox("app1"));
+        verify(vpsService, never()).listMyInstances();   // C2's binding is authoritative
+    }
+
+    @Test
+    void findExistingBoxFallsBackToTheCustomersOwnVpsList() {
+        appRunning("app1");                                       // C2 knows of no box
+        myInstances(instance("vps-7", "unrelated.example"), instance("vps-own", "app1-owned.osir.app"));
+
+        assertEquals("vps-own", service.findExistingBox("app1"));
+    }
+
+    @Test
+    void findExistingBoxIsNullWhenTheCustomerOwnsNothingForThisApp() {
+        appRunning("app1");
+        myInstances(instance("vps-7", "something-else-owned.osir.app"));
+
+        assertNull(service.findExistingBox("app1"));
+    }
+
+    // ---- DNS zone init (the "Zone not found in PowerDNS" the customer hit) ----
+
+    @Test
+    void missingZoneIsInitializedThenBound() {
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any())).thenReturn(null);
+        DnsRecordListResult empty = new DnsRecordListResult(true, "ok");
+        empty.setRecords(List.of());
+        when(dnsService.listRecords("fresh.com"))
+                .thenReturn(new DnsRecordListResult(false, "zone not found"))   // first look: no zone
+                .thenReturn(empty);                                             // after init: empty zone
+        when(dnsService.initializeZone("fresh.com")).thenReturn(new DnsActionResult(true, "created"));
+        when(dnsService.createRecord("fresh.com", "@", "A", "1.2.3.4", 3600, null))
+                .thenReturn(new DnsRecordResult(true, "created"));
+
+        MoveToOwnedResult result = service.attach("app1", "vps-own", "fresh.com");
+
+        assertEquals(Boolean.TRUE, result.dnsBound());
+        verify(dnsService).initializeZone("fresh.com");
     }
 
     @Test

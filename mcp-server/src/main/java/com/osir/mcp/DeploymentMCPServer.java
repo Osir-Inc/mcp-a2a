@@ -228,12 +228,17 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppMoveToOwned",
-            description = "osirAppMoveToOwned: Move a deployed Osir app from the shared free tier onto a paid VPS owned by the user. "
-                    + "First call stages a VPS order (COSTS MONEY): returns an actionId; present the price/summary "
-                    + "to the user and call executeConfirmedAction only if they approve. After confirmation the "
-                    + "platform installs Ubuntu and ships the app onto the box server-side. If the result status is "
-                    + "BUILDING or BUILD_FAILED, follow its nextStep; calling this tool again with the same arguments "
-                    + "RESUMES the move and never orders a second server. Requires authentication.",
+            description = "osirAppMoveToOwned: Move a deployed Osir app from the shared free tier onto a VPS owned by the user. "
+                    + "TWO WAYS IN. (1) The user already owns a VPS: pass instanceId (from listMyVpsInstances) and NO "
+                    + "packageId - this ATTACHES the app to that server, SPENDS NOTHING and needs no confirmation. "
+                    + "(2) No server yet: pass packageId (from listVpsPackages) and the call stages a VPS order "
+                    + "(COSTS MONEY): returns an actionId; present the price/summary to the user and call "
+                    + "executeConfirmedAction only if they approve. Before staging any order this tool checks whether "
+                    + "the user ALREADY has a box for this app (its C2 binding, then their own VPS list) and attaches "
+                    + "that instead - a retry after a failed move never buys a second server. After the move starts "
+                    + "the platform ships the app onto the box server-side. If the result status is BUILDING or "
+                    + "BUILD_FAILED, follow its nextStep; calling again with the same arguments RESUMES. Requires "
+                    + "authentication.",
             annotations = @Tool.Annotations(
                     title = "Move app to owned VPS",
                     readOnlyHint = false,
@@ -242,14 +247,30 @@ public class DeploymentMCPServer {
                     openWorldHint = false))
     public Object osirAppMoveToOwned(
                                      @ToolArg(description = "The deployed app's name, as shown by osirAppList.") String appName,
-                                     @ToolArg(description = "VPS package id from listVpsPackages.") String packageId,
+                                     @ToolArg(required = false, description = "VPS package id from listVpsPackages. Required ONLY when a server has to be ordered; omit it when passing instanceId.") String packageId,
+                                     @ToolArg(required = false, description = "Id of a VPS the user ALREADY owns, from listMyVpsInstances. Given this, the app is attached to that server and nothing is ordered or charged. Never invent one.") String instanceId,
                                      @ToolArg(required = false, description = "Custom domain to serve the app on; DNS is bound automatically if the domain is hosted on osir.app nameservers, otherwise the result returns the IP and manual DNS instructions.") String domain,
                                      @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
                                      McpConnection connection) {
         try {
+            // The user named a box they own: attach it. Spends nothing, so no gate — and it comes
+            // FIRST, before the resume shortcut, so an explicit instanceId is never overridden.
+            if (instanceId != null && !instanceId.isBlank()) {
+                return moveToOwnedService.attach(appName, instanceId, domain);
+            }
             // A VPS was already ordered for this app, resume (poll/ship/DNS), no new spend, no gate.
             if (moveToOwnedService.hasOrderedInstance(appName)) {
                 return moveToOwnedService.resume(appName, domain);
+            }
+            // Durable check BEFORE any order: a box they already own is attached, never re-bought.
+            String existing = moveToOwnedService.findExistingBox(appName);
+            if (existing != null) {
+                return moveToOwnedService.attach(appName, existing, domain);
+            }
+            if (packageId == null || packageId.isBlank()) {
+                return MoveToOwnedResult.fail("There is no server to move '" + appName + "' onto yet. Either pass "
+                        + "instanceId of a VPS the user already owns (listMyVpsInstances), or pass packageId to order "
+                        + "one (listVpsPackages) - ordering costs money and will need the user's confirmation.");
             }
             MoveToOwnedService.Prepared prep = moveToOwnedService.prepare(appName, packageId);
             return pendingActionStore.stage(

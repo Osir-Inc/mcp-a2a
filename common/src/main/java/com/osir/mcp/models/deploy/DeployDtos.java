@@ -36,8 +36,12 @@ public final class DeployDtos {
     public record QaDto(String status, int httpStatus, List<String> findings, String checkedAt) {
     }
 
+    /** C2's status payload. {@code ownedInstanceId}/{@code boxIp} are set once a move onto a
+     *  customer-owned VPS has started — the DURABLE answer to "does this app already have a box?",
+     *  which is what keeps a retry from ordering a second one. */
     public record StatusEnvelope(AppDto app, DeploymentDto deployment, HealthDto health,
-                                 List<RecentErrorDto> recentErrors, QaDto qa) {
+                                 List<RecentErrorDto> recentErrors, QaDto qa,
+                                 String ownedInstanceId, String boxIp) {
     }
 
     public record ConfirmationEnvelope(String confirmationId, String summary) {
@@ -89,10 +93,12 @@ public final class DeployDtos {
         }
     }
 
+    /** {@code ownedInstanceId}/{@code boxIp}: the customer-owned VPS this app is bound to, if any. */
     public record AppStatusResult(boolean success, String message, AppDto app, HealthDto health,
-                                  String deploymentState, List<RecentErrorDto> recentErrors, QaDto qa) {
+                                  String deploymentState, List<RecentErrorDto> recentErrors, QaDto qa,
+                                  String ownedInstanceId, String boxIp) {
         public static AppStatusResult fail(String msg) {
-            return new AppStatusResult(false, msg, null, null, null, List.of(), null);
+            return new AppStatusResult(false, msg, null, null, null, List.of(), null, null, null);
         }
     }
 

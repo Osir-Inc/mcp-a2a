@@ -34,6 +34,23 @@ public class DnsService {
             result.setDomain(domain);
             result.setRecords(records);
             return result;
+        } catch (WebApplicationException wae) {
+            // A domain with no zone here answers 404 - and PowerDNS's own "Zone not found" surfaces
+            // as a 500 - both of which used to reach the caller as a raw HTTP code. Say which it is:
+            // "initialize the zone" and "manage the records at your own provider" are different fixes.
+            int status = wae.getResponse() == null ? 0 : wae.getResponse().getStatus();
+            String detail = DeploymentService.readErrorMessage(wae.getResponse());
+            LOG.errorf("Error listing DNS records for %s: HTTP %d %s", domain, status, detail);
+            if (status == 404 || detail.toLowerCase().contains("not found")) {
+                return new DnsRecordListResult(false, "No DNS zone for '" + domain + "' on osir.app nameservers. "
+                        + "If the domain is on your account, call initializeDnsZone('" + domain + "') first; "
+                        + "if it uses external nameservers, manage its records at that provider.");
+            }
+            if (status >= 500) {
+                return new DnsRecordListResult(false, "Could not read the DNS records for '" + domain
+                        + "' right now. Please try again.");
+            }
+            return new DnsRecordListResult(false, "Failed to list DNS records: " + detail);
         } catch (Exception e) {
             LOG.errorf(e, "Error listing DNS records for %s: %s", domain, e.getMessage());
             return new DnsRecordListResult(false, "Failed to list DNS records: " + e.getMessage());

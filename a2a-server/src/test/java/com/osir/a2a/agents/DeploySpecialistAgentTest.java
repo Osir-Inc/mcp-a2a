@@ -79,7 +79,7 @@ class DeploySpecialistAgentTest {
         task.setMetadata(Map.of("skill", "get_app_status", "appId", "app-123"));
 
         when(deploymentService.getStatus("app-123"))
-                .thenReturn(new AppStatusResult(true, "OK", null, null, "READY", List.of(), null));
+                .thenReturn(new AppStatusResult(true, "OK", null, null, "READY", List.of(), null, null, null));
 
         A2ATask result = agent.handle(task);
 

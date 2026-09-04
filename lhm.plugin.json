@@ -1690,7 +1690,7 @@
     },
     {
       "name": "osirAppMoveToOwned",
-      "description": "Move a deployed Osir app from the shared free tier onto a paid VPS owned by the user. First call stages a VPS order (COSTS MONEY - returns an actionId; present the price/summary to the user and call executeConfirmedAction only if they approve). After confirmation the platform installs Ubuntu, ships the app onto the box server-side, and binds the domain's DNS if it is hosted on osir.app nameservers (otherwise returns the IP and manual DNS instructions). If the result status is BUILDING or BUILD_FAILED, follow its nextStep - calling this tool again with the same arguments RESUMES the move and never orders a second server. Required: appName, packageId (from listVpsPackages). Optional: domain (custom domain to serve the app on). Requires authentication.",
+      "description": "Move a deployed Osir app from the shared free tier onto a VPS owned by the user. Two ways in: (1) the user already owns a VPS - pass instanceId (from listMyVpsInstances) and no packageId, which ATTACHES the app to that server, spends nothing and needs no confirmation; (2) no server yet - pass packageId (from listVpsPackages) and the call stages a VPS order (COSTS MONEY - returns an actionId; present the price/summary to the user and call executeConfirmedAction only if they approve). Before staging any order the tool checks whether the user already has a box for this app and attaches that instead, so a retry after a failed move never buys a second server. The platform then ships the app onto the box server-side and binds the domain's DNS if it is hosted on osir.app nameservers (otherwise returns the IP and manual DNS instructions). If the result status is BUILDING or BUILD_FAILED, follow its nextStep - calling this tool again with the same arguments RESUMES the move. Required: appName. Optional: instanceId (a VPS the user already owns), packageId (only when a server has to be ordered), domain. Requires authentication.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1698,7 +1698,12 @@
             "type": "string"
           },
           "packageId": {
-            "type": "string"
+            "type": "string",
+            "description": "VPS package id from listVpsPackages. Required ONLY when a server has to be ordered; omit it when passing instanceId."
+          },
+          "instanceId": {
+            "type": "string",
+            "description": "Id of a VPS the user ALREADY owns, from listMyVpsInstances. Given this, the app is attached to that server and nothing is ordered or charged. Never invent one."
           },
           "domain": {
             "type": "string"
@@ -1709,8 +1714,7 @@
           }
         },
         "required": [
-          "appName",
-          "packageId"
+          "appName"
         ]
       }
     },

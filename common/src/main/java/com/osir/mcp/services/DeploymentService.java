@@ -165,7 +165,8 @@ public class DeploymentService {
             StatusEnvelope e = client.status(appId, bearer(), tenant());
             String depState = e.deployment() == null ? null : e.deployment().state();
             var errors = e.recentErrors() == null ? java.util.List.<RecentErrorDto>of() : e.recentErrors();
-            return new AppStatusResult(true, "OK", e.app(), e.health(), depState, errors, e.qa());
+            return new AppStatusResult(true, "OK", e.app(), e.health(), depState, errors, e.qa(),
+                    e.ownedInstanceId(), e.boxIp());
         } catch (Exception ex) {
             LOG.errorf(ex, "getStatus failed for %s", appId);
             return AppStatusResult.fail("Could not get the app status right now. Please try again.");
@@ -249,18 +250,29 @@ public class DeploymentService {
     }
 
     /**
-     * Hand C2 a ready VPS to move the app onto. Returns false on failure (retry-safe: the
-     * endpoint is idempotent per instanceId, so the orchestrator may call again).
+     * Hand C2 a ready VPS to move the app onto. Returns null when C2 accepted the move, else the
+     * REASON it refused. Retry-safe: the endpoint is idempotent per instanceId.
+     *
+     * <p>C2's 4xx bodies are written FOR the caller ("that box is already bound to another app",
+     * "this app has no built running version to move yet") and are the only explanation the
+     * customer gets — swallowing them is why three failed retries in a row said nothing. 5xx stays
+     * generic (CONTRACTS §8: never forward a raw client exception, it leaks the backend host).
      */
-    public boolean moveToOwned(String appId, String instanceId, String ip, String domain) {
+    public String moveToOwned(String appId, String instanceId, String ip, String domain) {
         try {
             client.moveToOwned(appId,
                     new com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedBody(instanceId, ip, domain),
                     bearer(), tenant());
-            return true;
+            return null;
+        } catch (jakarta.ws.rs.WebApplicationException ex) {
+            int status = ex.getResponse() == null ? 0 : ex.getResponse().getStatus();
+            String detail = readErrorMessage(ex.getResponse());
+            LOG.errorf("moveToOwned refused for app=%s instance=%s: HTTP %d %s", appId, instanceId, status, detail);
+            return status >= 400 && status < 500 ? detail
+                    : "the platform could not ship the app onto the box (HTTP " + status + ")";
         } catch (Exception ex) {
             LOG.errorf(ex, "moveToOwned failed for app=%s instance=%s", appId, instanceId);
-            return false;
+            return "the platform could not reach the deploy backend to ship the app";
         }
     }
 

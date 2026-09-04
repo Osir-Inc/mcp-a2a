@@ -6,16 +6,19 @@ import com.osir.mcp.models.dns.DnsRecord;
 import com.osir.mcp.models.dns.DnsRecordListResult;
 import com.osir.mcp.models.dns.DnsRecordResult;
 import com.osir.mcp.models.vps.VpsInstanceDetailResult;
+import com.osir.mcp.models.vps.VpsInstanceListResult;
 import com.osir.mcp.models.vps.VpsInstanceSummary;
 import com.osir.mcp.models.vps.VpsOrderResult;
 import com.osir.mcp.models.vps.VpsOsTemplate;
 import com.osir.mcp.models.vps.VpsOsTemplateListResult;
+import com.osir.mcp.models.vps.VpsSshKeyListResult;
 import com.osir.mcp.models.vps.VpsSshKeyResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,8 +33,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * still in progress resumes by polling, a FAILED build is repaired with the free
  * buildVpsInstance, and only a completed move clears the entry.
  *
- * <p>ponytail: tracker is in-memory, a server restart forgets an in-flight move and the user
- * would be told to order again. Persist to the DB task store if that ever bites.
+ * <p>A box the customer ALREADY owns is attached instead of bought: {@link #attach} skips the order
+ * (and with it the confirmation gate, which gates spending, not shipping), and
+ * {@link #findExistingBox} is consulted before any order is staged. That check is what makes the
+ * money rule survive a restart - {@link #orderedInstances} is only the fast in-process guard, never
+ * the last thing between a customer and a second charge.
  */
 @ApplicationScoped
 public class MoveToOwnedService {
@@ -60,13 +66,20 @@ public class MoveToOwnedService {
 
     // "user-sub|appName" -> ordered instanceId (or ORDER_PENDING while the order call is in
     // flight, the reservation that makes a concurrent/second execute unable to order again).
+    // ponytail: in-memory, so a restart forgets an in-flight move - findExistingBox() is the
+    // durable check that keeps that from becoming a second charge.
     private final Map<String, String> orderedInstances = new ConcurrentHashMap<>();
+
+    /** Consecutive identical ship refusals per move - the loop-breaker for "call again to retry". */
+    private final Map<String, Refusal> shipRefusals = new ConcurrentHashMap<>();
+
+    record Refusal(String reason, int count) {}
 
     /** Sentinel tracker value: an order for this key is being placed right now. */
     static final String ORDER_PENDING = "__ordering__";
 
     /** What the confirmation lambda needs; resolved BEFORE staging so failures surface pre-confirm. */
-    public record Prepared(int osTemplateId, String osDisplayName, int sshKeyId) {}
+    public record Prepared(int osTemplateId, String osDisplayName, List<Integer> sshKeyIds) {}
 
     public boolean hasOrderedInstance(String appName) {
         return orderedInstances.containsKey(key(appName));
@@ -111,7 +124,90 @@ public class MoveToOwnedService {
                     + keyResult.getMessage());
         }
 
-        return new Prepared(ubuntu.getId(), ubuntu.getDisplayName(), keyResult.getKey().getId());
+        // The CUSTOMER'S own keys go onto the box alongside the platform key. Without them a move
+        // that fails halfway leaves them locked out of a server they are paying for (panel VNC only).
+        List<Integer> keyIds = new ArrayList<>();
+        keyIds.add(keyResult.getKey().getId());
+        VpsSshKeyListResult mine = vpsService.listSshKeys();
+        if (mine.isSuccess() && mine.getKeys() != null) {
+            mine.getKeys().stream()
+                    .filter(k -> k.getId() != null && !Boolean.FALSE.equals(k.getEnabled()))
+                    .filter(k -> !keyIds.contains(k.getId()))
+                    .forEach(k -> keyIds.add(k.getId()));
+        } else {
+            LOG.warnf("moveToOwned: could not list the account's SSH keys (%s), the box gets the platform key only",
+                    mine.getMessage());
+        }
+
+        return new Prepared(ubuntu.getId(), ubuntu.getDisplayName(), List.copyOf(keyIds));
+    }
+
+    /**
+     * The DURABLE answer to "does this customer already have a box for this app?", asked BEFORE any
+     * order is staged. Sources, in order of authority:
+     * <ol>
+     *   <li>C2's own binding (osirAppStatus -> ownedInstanceId), set the moment a move starts and
+     *       unaffected by an MCP restart.</li>
+     *   <li>The provider's list of the CUSTOMER'S instances: a box named
+     *       {@code <appName>-owned.osir.app} is one this tool ordered for this app.</li>
+     * </ol>
+     * Best-effort - a lookup that errors returns null and the caller falls through to ordering.
+     *
+     * <p>ponytail: the spec's second source, {@code GET /v1/admin/boxes/free}, is admin-gated and
+     * this server holds no admin token (and must not - it would expose every tenant's boxes). Slot
+     * it in here if C2 grows a tenant-scoped free-box route.
+     */
+    public String findExistingBox(String appName) {
+        AppStatusResult status = deploymentService.getStatus(appName);
+        if (status.success() && status.ownedInstanceId() != null && !status.ownedInstanceId().isBlank()) {
+            LOG.infof("moveToOwned: app %s is already bound to owned box %s (per C2)",
+                    appName, status.ownedInstanceId());
+            return status.ownedInstanceId();
+        }
+        VpsInstanceListResult mine = vpsService.listMyInstances();
+        if (mine.isSuccess() && mine.getInstances() != null) {
+            String hostname = appName + "-owned.osir.app";
+            for (VpsInstanceSummary i : mine.getInstances()) {
+                if (i.getId() != null && hostname.equalsIgnoreCase(i.getHostname())) {
+                    LOG.infof("moveToOwned: app %s already has box %s (%s) on the customer's account",
+                            appName, i.getId(), hostname);
+                    return i.getId();
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Attach the app to a VPS the customer ALREADY OWNS: no order, no spend, therefore no
+     * confirmation gate (the gate is on spending).
+     *
+     * <p>Ownership is proved by reading the instance under the CUSTOMER'S OWN session - a box that
+     * is not on their account cannot be read here - so the model cannot point this at an arbitrary
+     * instanceId. C2 re-checks tenancy and its one-app-one-box rules on top of that.
+     */
+    public MoveToOwnedResult attach(String appName, String instanceId, String domain) {
+        String moveKey = key(appName);
+        String tracked = orderedInstances.get(moveKey);
+        if (ORDER_PENDING.equals(tracked)) {
+            return MoveToOwnedResult.fail("An order for '" + appName + "' is being placed right now. "
+                    + "Wait a moment, then call osirAppMoveToOwned again to check progress, do not order again.");
+        }
+        if (tracked != null && !tracked.equals(instanceId)) {
+            return MoveToOwnedResult.fail("A move of '" + appName + "' onto VPS '" + tracked
+                    + "' is already in progress, and an app can have only one owned box at a time. Call "
+                    + "osirAppMoveToOwned without instanceId to resume that one.");
+        }
+        VpsInstanceDetailResult details = vpsService.getInstanceDetails(instanceId);
+        if (!details.isSuccess() || details.getInstance() == null) {
+            return MoveToOwnedResult.fail("VPS '" + instanceId + "' could not be read on your account: "
+                    + details.getMessage() + ". Use listMyVpsInstances to see the servers you own and pass "
+                    + "one of their ids as instanceId. Nothing was ordered.");
+        }
+        orderedInstances.put(moveKey, instanceId);
+        LOG.infof("moveToOwned: attaching app %s to instance %s the customer already owns (no order)",
+                appName, instanceId);
+        return pollAndFinish(appName, moveKey, instanceId, domain);
     }
 
     /**
@@ -139,7 +235,7 @@ public class MoveToOwnedService {
         VpsOrderResult order;
         try {
             order = vpsService.orderVps(packageId, appName + "-owned.osir.app", "MONTHLY",
-                    prep.osTemplateId(), List.of(prep.sshKeyId()));
+                    prep.osTemplateId(), prep.sshKeyIds());
         } catch (RuntimeException e) {
             orderedInstances.remove(moveKey, ORDER_PENDING); // release reservation, retry allowed
             throw e;
@@ -216,16 +312,37 @@ public class MoveToOwnedService {
                     instanceId, null, domain, null,
                     "Call osirAppMoveToOwned again with the same arguments in a minute, it resumes and never orders twice.");
         }
-        if (!deploymentService.moveToOwned(appName, instanceId, ip, domain)) {
+        String refusal = deploymentService.moveToOwned(appName, instanceId, ip, domain);
+        if (refusal != null) {
             // Tracker entry kept; C2's endpoint is idempotent per instanceId, so resuming is safe.
+            // "A move is already in progress" is a state to wait out, not a failure to escalate -
+            // re-POSTing the SAME instance is a 2xx poll, so this only appears when a different box
+            // was named, and support cannot help with it (spec_mcp_attach_existing_vps.md §5).
+            if (refusal.toLowerCase().contains("already in progress")) {
+                return new MoveToOwnedResult(false, "MOVING",
+                        "A move of '" + appName + "' is already running: " + refusal
+                                + ". Nothing more will be charged.",
+                        instanceId, ip, domain, false,
+                        "Call osirAppMoveToOwned again for '" + appName + "' WITHOUT instanceId in a minute - "
+                                + "that polls the move already running instead of starting another one.");
+            }
+            // "call again to retry" cannot be the answer forever: the same refusal three times
+            // over means retrying is not the fix, so say that instead of looping the customer.
+            Refusal seen = countRefusal(moveKey, refusal);
+            String retryStep = seen.count() >= 3
+                    ? "STOP retrying with the same arguments - this exact refusal has come back "
+                            + seen.count() + " times, so another call will not change it. Tell the user what it "
+                            + "says; if it is not something they can fix, ask them to contact Osir support "
+                            + "quoting app '" + appName + "', VPS '" + instanceId + "' (" + ip + ")."
+                    : "Address what the refusal says if you can, then call osirAppMoveToOwned again with the "
+                            + "same arguments to retry the ship step (attempt " + (seen.count() + 1) + " of 3).";
             return new MoveToOwnedResult(false, "FAILED",
-                    "The server is ready but the platform could not ship the app onto it. "
-                            + "Nothing more will be charged.",
-                    instanceId, ip, domain, null,
-                    "Call osirAppMoveToOwned again with the same arguments to retry the ship step.");
+                    "The server is ready but the platform could not ship the app onto it: " + refusal
+                            + ". Nothing more will be charged.",
+                    instanceId, ip, domain, false, retryStep);
         }
 
-        Boolean dnsBound = null;
+        boolean dnsBound = false;
         // C2 accepted the move but ships asynchronously (~3-5 min), the honest instruction is
         // "poll osirAppStatus until tier reads owned", not "it's done".
         String nextStep = "Check osirAppStatus for '" + appName
@@ -233,19 +350,25 @@ public class MoveToOwnedService {
         if (domain != null && !domain.isBlank()) {
             dnsBound = bindDomain(domain, ip);
             if (!dnsBound) {
-                nextStep = "The domain '" + domain + "' is not hosted on osir.app nameservers. Point an A record "
-                        + "for it to " + ip + " at your DNS provider (add an AAAA record too if you use IPv6). "
+                nextStep = "The domain '" + domain + "' could not be pointed at the box automatically (there is no "
+                        + "DNS zone for it here, so it is probably on external nameservers). Point an A record for "
+                        + "it to " + ip + " at your DNS provider (add an AAAA record too if you use IPv6). "
                         + nextStep;
             }
+        } else {
+            nextStep = "No domain was given, so no DNS record was touched - the app stays reachable at its "
+                    + "*.osir.app URL. " + nextStep;
         }
 
         // Same key the operation started with, never re-derive identity mid-flight.
         orderedInstances.remove(moveKey);
+        shipRefusals.remove(moveKey);
         LOG.infof("moveToOwned: app %s handed to C2 for instance %s (%s)", appName, instanceId, ip);
         return new MoveToOwnedResult(true, "MOVING",
                 "The platform is now moving app '" + appName + "' onto your VPS '" + instanceId + "' (" + ip
                         + "). This takes a few minutes; the move is complete when osirAppStatus shows tier 'owned'. "
-                        + "The shared-tier copy keeps running until you remove it.",
+                        + "The shared-tier copy keeps running until you remove it. Nothing further was ordered "
+                        + "or charged for this step.",
                 instanceId, ip, domain, dnsBound, nextStep);
     }
 
@@ -256,7 +379,16 @@ public class MoveToOwnedService {
     private boolean bindDomain(String domain, String ip) {
         DnsRecordListResult zone = dnsService.listRecords(domain);
         if (!zone.isSuccess() || zone.getRecords() == null) {
-            return false; // external NS (or zone unreadable), caller returns manual instructions
+            // "No zone" is indistinguishable from "external nameservers" from here, and a domain of
+            // ours can simply never have had its zone created - that is the "Zone not found in
+            // PowerDNS" the customer hit. Initialize once and re-list before giving up.
+            if (!dnsService.initializeZone(domain).isSuccess()) {
+                return false; // external NS (or zone unreadable), caller returns manual instructions
+            }
+            zone = dnsService.listRecords(domain);
+            if (!zone.isSuccess() || zone.getRecords() == null) {
+                return false;
+            }
         }
         DnsRecord apexA = zone.getRecords().stream()
                 .filter(r -> "A".equalsIgnoreCase(r.getType()))
@@ -271,6 +403,16 @@ public class MoveToOwnedService {
             LOG.warnf("moveToOwned: DNS bind failed for %s -> %s: %s", domain, ip, result.getMessage());
         }
         return result.isSuccess();
+    }
+
+    /** Tally consecutive identical refusals for one move; a different reason restarts the count. */
+    private Refusal countRefusal(String moveKey, String reason) {
+        Refusal prev = shipRefusals.get(moveKey);
+        Refusal now = prev != null && reason.equals(prev.reason())
+                ? new Refusal(reason, prev.count() + 1)
+                : new Refusal(reason, 1);
+        shipRefusals.put(moveKey, now);
+        return now;
     }
 
     /**

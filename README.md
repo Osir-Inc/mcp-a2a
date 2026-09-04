@@ -227,7 +227,7 @@ Full tool/skill catalog, example conversations, and end-to-end walkthroughs are 
 - **osirAppGetSource** - Get a short-lived signed download URL for an Osir app's current source zip - use this to make edits to a deployed app without the user re-attaching the project: download, patch the files, then osirAppCreateUpload (PUT the new zip) and osirAppDeploy under the SAME name; the platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box.
 - **osirAppList** - List the authenticated user's deployed Osir apps with their live URLs and status.
 - **osirAppLogs** - Get recent logs from an Osir app's microVM ('why is my app broken?').
-- **osirAppMoveToOwned** - Move a deployed Osir app from the shared free tier onto a paid VPS owned by the user.
+- **osirAppMoveToOwned** - Move a deployed Osir app from the shared free tier onto a VPS the user owns: attach one they already have (instanceId, spends nothing) or order one (packageId, gated).
 - **osirAppProvisionDatabase** - Provision a managed Postgres database for an Osir app.
 - **osirAppSetSecret** - Set an environment secret for an Osir app (e.g.
 - **osirAppStatus** - Get an Osir app's current status, live URL, and health ('is my app working?').
