@@ -5,7 +5,10 @@ subprojects {
     apply plugin: 'java'
 
     group 'com.osir.mcp'
-    version '2.1.0'
+    // One place to bump: the root version. A per-module literal here silently kept the module jars
+    // on an old number, and every bump left the previously-named jar behind in build/quarkus-app/app,
+    // which the Dockerfile copies wholesale into the image.
+    version rootProject.version
 
     repositories {
         mavenCentral()
