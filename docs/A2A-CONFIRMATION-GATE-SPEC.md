@@ -177,7 +177,7 @@ that the stage→confirm round trip holds, which a stubbed store fakes.
 
 ## 4. Out of scope, still open
 
-- `changeVpsPaymentTerm` is a billing change that doesn't stage, on either transport.
+- ~~`changeVpsPaymentTerm` is a billing change that doesn't stage, on either transport.~~ MCP side staged FINANCIAL on 2026-09-14 (with `deleteSshKey` staged DESTRUCTIVE); A2A side still open.
 - Whether the A2A agent card should advertise destructive skills at all (§2).
 
 ## 6. What was actually built (2026-09-04)

@@ -52,6 +52,15 @@ docker-compose logs -f             # View logs
 - 11 prompts: getting_started, vps_setup_guide, dns_setup_guide, billing_overview, domain_management_guide, hosting_comparison, troubleshooting, security_best_practices (PromptsMCPServer); domain_registration_guide, domain_transfer_checklist (DomainRegistrarMCPServer); website_designer (WebsiteDesignMCPServer)
 - Website design: the calling LLM designs; `osirSiteDesignBrief` returns the prompt, `osirSitePublish` gates + zips + deploys. Open items in [TODO.md](TODO.md)
 - Caching: CatalogService + domain pricing (15min TTL via `@CacheResult`)
+- **Confirmation gate** (`security/PendingActionStore`): 20 tools that spend money or destroy data
+  return an `actionId` + summary instead of running; `executeConfirmedAction` runs the frozen callable
+  once, for the same principal, within 5 minutes, rate limited per `DestructiveOpRateLimiter` bucket.
+  `security/ConfirmationGateInvariantTest` fails the build if a tool with `destructiveHint = true`
+  does not stage, or if the staged set drifts from its `GATED` list — add new billable tools there.
+- **Audit trail**: every tool call and every confirmed action logs on `com.osir.mcp.audit`, which also
+  goes to its own rotating file (`AUDIT_LOG_PATH`, default `data/audit.log`; mount it in production).
+  The Quarkus handler is named `audit-trail` on purpose — a handler literally named `audit` fails to
+  attach on Quarkus 3.34 with "linked to a category but not configured".
 
 ### A2A Server
 - 9 agents, 89 skills: Domain (27), VPS (16), Billing (11), Mail (8), DNS (7), Contact (7), Account (6),

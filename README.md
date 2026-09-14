@@ -151,7 +151,7 @@ Full tool/skill catalog, example conversations, and end-to-end walkthroughs are 
 - **buildVpsInstance** - Stage an operating system install on a VPS instance.
 - **bulkDomainSuggestions** - Generate domain name suggestions for one or more keywords across a chosen set of TLDs.
 - **cancelTransfer** - Stage cancellation of a pending domain transfer.
-- **changeVpsPaymentTerm** - Change the payment term (billing cycle) for a VPS instance.
+- **changeVpsPaymentTerm** - Stage a change of the payment term (billing cycle) for a VPS instance; confirm with `executeConfirmedAction`.
 - **checkDeviceLoginStatus** - Poll for device login completion.
 - **checkDomainAvailability** - Check if a domain name is available for registration, with price.
 - **checkHostAvailability** - Check if a host/glue record name is available for creation.
@@ -168,7 +168,7 @@ Full tool/skill catalog, example conversations, and end-to-end walkthroughs are 
 - **deleteDnsRecord** - Stage deletion of a DNS record.
 - **deleteHost** - Stage deletion of a host/glue record.
 - **deleteMailbox** - Stage deletion of a mailbox.
-- **deleteSshKey** - Remove an SSH key from your account.
+- **deleteSshKey** - Stage removal of an SSH key from your account; confirm with `executeConfirmedAction`.
 - **deleteVpsInstance** - Stage deletion/cancellation of a VPS instance.
 - **enableMailDomain** - Enable email hosting on a domain you own.
 - **executeConfirmedAction** - Execute a previously staged destructive or financial action after user approval.

@@ -193,24 +193,29 @@ class VpsHostingMCPServerTest {
     // ===== changeVpsPaymentTerm =====
 
     @Test
-    void changeVpsPaymentTerm_delegatesToService() {
-        VpsActionResult expected = new VpsActionResult(true, "Changed");
-        when(vpsService.changePaymentTerm("vps-1", "ANNUAL")).thenReturn(expected);
+    void changeVpsPaymentTerm_stagesAsFinancial() {
+        ConfirmationRequiredResult staged = new ConfirmationRequiredResult("test-id", "changeVpsPaymentTerm", "summary");
+        when(pendingActionStore.stage(eq("changeVpsPaymentTerm"), any(), eq("test-conn-id"),
+                eq(DestructiveOpRateLimiter.Bucket.FINANCIAL), any())).thenReturn(staged);
 
-        VpsActionResult result = mcpServer.changeVpsPaymentTerm("vps-1", "ANNUAL", null, mockConnection);
+        ConfirmationRequiredResult result = mcpServer.changeVpsPaymentTerm("vps-1", "ANNUAL", null, mockConnection);
 
-        assertSame(expected, result);
-        verify(vpsService).changePaymentTerm("vps-1", "ANNUAL");
+        assertSame(staged, result);
+        verify(vpsService, never()).changePaymentTerm(any(), any());
     }
 
+    // ===== deleteSshKey =====
+
     @Test
-    void changeVpsPaymentTerm_handlesException() {
-        when(vpsService.changePaymentTerm("vps-1", "ANNUAL")).thenThrow(new RuntimeException("Fail"));
+    void deleteSshKey_stagesAsDestructive() {
+        ConfirmationRequiredResult staged = new ConfirmationRequiredResult("test-id", "deleteSshKey", "summary");
+        when(pendingActionStore.stage(eq("deleteSshKey"), any(), eq("test-conn-id"),
+                eq(DestructiveOpRateLimiter.Bucket.DESTRUCTIVE), any())).thenReturn(staged);
 
-        VpsActionResult result = mcpServer.changeVpsPaymentTerm("vps-1", "ANNUAL", null, mockConnection);
+        ConfirmationRequiredResult result = mcpServer.deleteSshKey(7, null, mockConnection);
 
-        assertFalse(result.isSuccess());
-        assertTrue(result.getMessage().contains("Fail"));
+        assertSame(staged, result);
+        verify(vpsService, never()).deleteSshKey(anyInt());
     }
 
     // ===== loginToVpsPanel =====
@@ -416,27 +421,6 @@ class VpsHostingMCPServerTest {
         when(vpsService.listSshKeys()).thenThrow(new RuntimeException("Fail"));
 
         VpsSshKeyListResult result = mcpServer.listMySshKeys(null, mockConnection);
-
-        assertFalse(result.isSuccess());
-        assertTrue(result.getMessage().contains("Fail"));
-    }
-
-    @Test
-    void deleteSshKey_delegatesToService() {
-        VpsActionResult expected = new VpsActionResult(true, "SSH key 3 deleted.");
-        when(vpsService.deleteSshKey(3)).thenReturn(expected);
-
-        VpsActionResult result = mcpServer.deleteSshKey(3, null, mockConnection);
-
-        assertSame(expected, result);
-        verify(vpsService).deleteSshKey(3);
-    }
-
-    @Test
-    void deleteSshKey_handlesException() {
-        when(vpsService.deleteSshKey(anyInt())).thenThrow(new RuntimeException("Fail"));
-
-        VpsActionResult result = mcpServer.deleteSshKey(3, null, mockConnection);
 
         assertFalse(result.isSuccess());
         assertTrue(result.getMessage().contains("Fail"));

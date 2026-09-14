@@ -34,7 +34,7 @@ All under the VPS MCP server. All require authentication (`loginWithDevice`) exc
 | `listVpsOsTemplates` | Installable OS templates — **by package (before ordering) or by instance (reinstall)**. |
 | `addSshKey` | Store an OpenSSH public key on the account. **Idempotent.** Returns a key id. |
 | `listMySshKeys` | Stored keys with ids and SHA256 fingerprints. |
-| `deleteSshKey` | Remove a key. Does not affect servers already built with it. |
+| `deleteSshKey` | Stage removal of a key (confirm with `executeConfirmedAction`). Does not affect servers already built with it. |
 | `orderVps` | Order a server, optionally **with** an OS and SSH keys. Costs money. Staged. |
 | `buildVpsInstance` | Install an OS on an existing server. Free. **Destructive.** Staged. |
 | `getVpsInstanceDetails` | Includes `buildState` — poll this to follow a build. |

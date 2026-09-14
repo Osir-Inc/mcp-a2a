@@ -203,22 +203,23 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "deleteSshKey: Remove an SSH key from your account. This does not affect servers already built with it, and the key can simply be added again. Requires authentication.",
+    @Tool(description = "deleteSshKey: Stage removal of an SSH key from your account. This does not affect servers already built with it, and the key can simply be added again. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Delete SSH key",
                     readOnlyHint = false,
                     destructiveHint = true,
                     idempotentHint = true,
                     openWorldHint = false))
-    public VpsActionResult deleteSshKey(
+    public ConfirmationRequiredResult deleteSshKey(
             @ToolArg(description = "Integer key id from listMySshKeys.") int keyId,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
-        try {
-            return vpsService.deleteSshKey(keyId);
-        } catch (Exception e) {
-            Log.errorf(e, "Error deleting SSH key: %s", e.getMessage());
-            return new VpsActionResult(false, "Failed to delete SSH key: " + e.getMessage());
-        }
+        return pendingActionStore.stage(
+                "deleteSshKey",
+                "Delete SSH key " + keyId + " from your account (servers already built with it are unaffected)",
+                connection.id(),
+                DestructiveOpRateLimiter.Bucket.DESTRUCTIVE,
+                () -> vpsService.deleteSshKey(keyId)
+        );
     }
 
     @RequiresAuth
@@ -278,23 +279,24 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "changeVpsPaymentTerm: Change the payment term (billing cycle) for a VPS instance. Requires authentication.",
+    @Tool(description = "changeVpsPaymentTerm: Stage a change of the payment term (billing cycle) for a VPS instance. Affects what you are billed. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Change VPS payment term",
                     readOnlyHint = false,
                     destructiveHint = false,
                     idempotentHint = false,
                     openWorldHint = false))
-    public VpsActionResult changeVpsPaymentTerm(
+    public ConfirmationRequiredResult changeVpsPaymentTerm(
             @ToolArg(description = "VPS instance id from listMyVpsInstances.") String instanceId,
             @ToolArg(description = "New billing cycle: 'MONTHLY', 'SEMI_ANNUAL', 'ANNUAL', 'BIENNIAL', or 'TRIENNIAL'.") String paymentTerm,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
-        try {
-            return vpsService.changePaymentTerm(instanceId, paymentTerm);
-        } catch (Exception e) {
-            Log.errorf(e, "Error changing VPS payment term: %s", e.getMessage());
-            return new VpsActionResult(false, "Payment term change failed: " + e.getMessage());
-        }
+        return pendingActionStore.stage(
+                "changeVpsPaymentTerm",
+                "Change billing cycle of VPS '" + instanceId + "' to " + paymentTerm + ", changes what you are billed",
+                connection.id(),
+                DestructiveOpRateLimiter.Bucket.FINANCIAL,
+                () -> vpsService.changePaymentTerm(instanceId, paymentTerm)
+        );
     }
 
     @RequiresAuth

@@ -1,7 +1,7 @@
 {
   "identifier": "osir-inc-mcp-a2a",
   "name": "OSIR Domain Name MCP Server",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Domain registrar MCP server from OSIR (ICANN-accredited): 105 tools and 11 prompts to search, register, renew, transfer, and manage domains, DNS, VPS, email, and websites from Claude, ChatGPT, Cursor, or any MCP client. Remote Streamable HTTP, no local install.",
   "author": "OSIR",
   "authorUrl": "https://github.com/Osir-Inc",
@@ -186,7 +186,7 @@
     },
     {
       "name": "changeVpsPaymentTerm",
-      "description": "Change the payment term (billing cycle) for a VPS instance. Requires authentication. Required: instanceId (string), paymentTerm ('MONTHLY', 'SEMI_ANNUAL', 'ANNUAL', 'BIENNIAL', 'TRIENNIAL')",
+      "description": "Stage a change of the payment term (billing cycle) for a VPS instance. Affects what you are billed. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve. Required: instanceId (string), paymentTerm ('MONTHLY', 'SEMI_ANNUAL', 'ANNUAL', 'BIENNIAL', 'TRIENNIAL')",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -647,7 +647,7 @@
     },
     {
       "name": "deleteSshKey",
-      "description": "Remove an SSH key from your account. This does not affect servers already built with it, and the key can simply be added again. Requires authentication. Required: keyId (integer key id from listMySshKeys).",
+      "description": "Stage removal of an SSH key from your account. This does not affect servers already built with it, and the key can simply be added again. Requires authentication. Returns an actionId; present the summary to the user, then call executeConfirmedAction with the actionId if they approve. Required: keyId (integer key id from listMySshKeys).",
       "inputSchema": {
         "type": "object",
         "properties": {

@@ -70,6 +70,10 @@ OLLAMA_URL=http://localhost:11434
 # CORS — add your frontend domains
 CORS_ORIGINS=https://osir.com,https://agent.osir.com
 
+# MCP audit trail — one line per tool call and per confirmed action, append-only.
+# Must sit on the mounted ./data volume or it is lost with the container.
+AUDIT_LOG_PATH=/app/data/audit.log
+
 # A2A agent card — public HTTPS base URL (behind a TLS-terminating proxy).
 # Sets the card's absolute `url`. Omit to derive from the request.
 A2A_PUBLIC_URL=https://be.osir.com
@@ -328,6 +332,10 @@ docker-compose logs -f com-osir-a2a
 
 # Search for errors
 docker-compose logs --since 1h | grep -i error
+
+# Audit trail (MCP): every tool call, and every confirmed destructive/financial action
+tail -f data/audit.log
+grep 'confirmed action_id' data/audit.log
 ```
 
 ### Container health
