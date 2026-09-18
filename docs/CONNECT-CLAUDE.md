@@ -15,9 +15,9 @@ We recommend **No sign-in** for most people. Your chat never holds access to you
 | Authentication setting | No sign-in | Sign in now |
 | OAuth client setting | Not shown | Use your own OAuth client, Client ID `mcp-client` |
 | When you log in | In the chat, the first time a task needs your account | Once, when you add the connector |
-| How long access lasts | One conversation: ends after 30 min idle, 8 h at most, or when you say "log me out" | Until you disconnect the connector or the sign-in expires |
+| How long access lasts | One conversation: ends after 30 min idle, 8 h at most, or when you say "log me out" | Ends after 30 min idle or 8 h at most; Claude then asks you to sign in again |
 | Works without an OSIR account | Yes: searches, prices and the catalog | No: you sign in before any tool works |
-| Best for | Occasional use, shared computers, least standing access | Daily use, no login step in each chat |
+| Best for | Occasional use, shared computers, least standing access | Working across several chats, with no login step in each one |
 
 ## Option A: No sign-in
 
@@ -43,7 +43,7 @@ The login applies to that conversation only. A new chat asks you to log in again
 
 ## Option B: OAuth
 
-You sign in once in your browser, and the connector stays signed in. The URL is different from Option A: it ends in `/mcp/oauth`.
+You sign in once in your browser, and the connector stays signed in for up to 8 hours, or until you've been idle for 30 minutes. The URL is different from Option A: it ends in `/mcp/oauth`.
 
 1. In Claude, open **Settings → Connectors** and click **Add custom connector**.
 2. For **Name**, enter `OSIR`.
@@ -77,7 +77,7 @@ Anything that costs money or deletes something happens in two steps. Claude firs
 ## Signing out and security
 
 - **No sign-in:** say "log me out" in the chat and access ends at once. It also ends by itself after 30 minutes idle, or 8 hours at most.
-- **OAuth:** go to **Settings → Connectors**, open OSIR and click **Disconnect**. Do this on any computer other people can use: until you disconnect, anyone with your Claude account can reach your OSIR account.
+- **OAuth:** go to **Settings → Connectors**, open OSIR and click **Disconnect**. Do this on any computer other people can use. Until you disconnect, or the sign-in expires after 30 minutes idle or 8 hours, anyone using your Claude account can reach your OSIR account.
 - Your OSIR password always goes to `auth.osir.com`, never to Claude. Before you approve a login, check the address bar shows `auth.osir.com`.
 - OSIR never asks you for an API key, password or card number in the chat.
 
@@ -91,5 +91,19 @@ Anything that costs money or deletes something happens in two steps. Claude firs
 | Every tool returns 401 on the **No sign-in** option | The URL is wrong. Option A uses `/mcp/http`, not `/mcp/oauth`. |
 | Tools return "Forbidden" (403) after an OAuth sign-in | The connector may be using an old registration. Remove it, add it again with `mcp-client`, and sign in again. |
 | Claude doesn't use OSIR at all | In the chat, check that the OSIR connector is turned on in the tools menu. |
+
+## FAQ
+
+**Claude says "OSIR is set up as not requiring sign-in, but the server asked for sign-in when checked (status 401)". What do I do?**
+
+Remove the OSIR connector completely, then add it again. Editing the existing one isn't enough, because Claude keeps the result of its first check. Go to **Settings → Connectors**, open OSIR, click **Remove**, then follow [Option A](#option-a-no-sign-in) again with `https://be.osir.com/mcp/http` and **No sign-in**. Also check that the URL ends in `/mcp/http`: `/mcp/oauth` always asks for sign-in.
+
+**Can I switch from one option to the other?**
+
+Yes. Remove the connector, then add it again with the other URL and settings. The two options use different URLs, so changing only the Authentication setting doesn't work.
+
+**Something that used to work stopped working after a change on our side. Why?**
+
+Claude remembers a connector's settings from when you added it. Removing the connector and adding it again makes Claude check the server afresh, and fixes most connection errors.
 
 Still stuck? Contact OSIR support with the time of the error and the option you chose.
