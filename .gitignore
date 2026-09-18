@@ -49,3 +49,6 @@ nb-configuration.xml
 
 # MCP audit trail (local dev)
 **/data/audit.log*
+
+# Keycloak admin backups (realm/component ids), keep out of the public repo
+kc-registration-policies-*.json
