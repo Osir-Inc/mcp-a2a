@@ -47,4 +47,17 @@ public class OAuthProtectedResourceResource {
                 "scopes_supported", List.of("openid", "profile", "email")
         );
     }
+
+    /** RFC 9728 path-suffixed metadata for the always-OAuth URL; resource must equal that URL. */
+    @GET
+    @Path("/oauth-protected-resource/mcp/oauth")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Map<String, Object> oauthPathResource() {
+        return Map.of(
+                "resource", authorizationServerUrl + "/mcp/oauth",
+                "authorization_servers", List.of(authorizationServerUrl),
+                "bearer_methods_supported", List.of("header"),
+                "scopes_supported", List.of("openid", "profile", "email")
+        );
+    }
 }

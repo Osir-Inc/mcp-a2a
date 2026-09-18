@@ -242,9 +242,12 @@ Open in browser: `http://your-server:8082/q/swagger-ui`
 Full nginx config for `be.osir.com` (`/etc/nginx/sites-available/be.osir.com` or equivalent):
 
 ```nginx
-# OAuth protected-resource metadata (step 1 in Claude connector discovery)
-location = /.well-known/oauth-protected-resource {
-    proxy_pass         http://127.0.0.1:8081/.well-known/oauth-protected-resource;
+# OAuth protected-resource metadata (step 1 in Claude connector discovery).
+# Prefix match (^~), not exact: it must also cover the path-suffixed document for the
+# always-OAuth URL, /.well-known/oauth-protected-resource/mcp/oauth. Without it, the request
+# falls through to the backend, which answers 401 and breaks OAuth discovery.
+location ^~ /.well-known/oauth-protected-resource {
+    proxy_pass         http://127.0.0.1:8081;
     proxy_set_header   Host              $host;
     proxy_set_header   X-Forwarded-Proto $scheme;
     add_header         Cache-Control     "public, max-age=3600";
@@ -389,9 +392,10 @@ docker-compose up -d
 | Rate limit 429 errors | Too many concurrent requests | Increase `A2A_RATE_LIMIT_*` in `.env` |
 | Startup log shows UNREACHABLE | Backend/KeyCloak DNS not resolving | Check DNS, add to `/etc/hosts` if needed |
 | Claude connector OAuth popup fails | `Standard Flow` not enabled on `osir-cli` | Enable in KeyCloak → Clients → osir-cli → Settings |
-| OAuth redirect_uri mismatch | Claude's redirect URI not whitelisted | Add `https://claude.ai/*` to Valid Redirect URIs in KeyCloak |
-| `/.well-known/oauth-protected-resource` returns 404 | nginx location missing or not reloaded | Add exact-match location block; run `nginx -s reload` |
+| OAuth redirect_uri mismatch | Claude's redirect URI not whitelisted | Add `https://claude.ai/*` and `https://claude.com/*` to Valid Redirect URIs on client `mcp-client` |
+| `/.well-known/oauth-protected-resource` returns 404 | nginx location missing or not reloaded | Add the location block; run `nginx -s reload` |
+| `/.well-known/oauth-protected-resource/mcp/oauth` returns 401 (empty body, `www-authenticate: Bearer`) | nginx uses the exact-match `=` location, so the backend answers | Switch to the `^~` prefix location above; run `nginx -s reload` |
 | `/.well-known/oauth-authorization-server` returns 404 | nginx location missing or not reloaded | Add the exact-match location block; run `nginx -s reload` |
-| DCR (Dynamic Client Registration) returns 401 | Anonymous access not enabled in KeyCloak | KeyCloak → Realm Settings → Client Registration → Anonymous Access Policies → enable `Allowed Client Scopes` for openid-connect |
+| Claude's "Register automatically" / "published identity" fails | Not supported: DCR clients get no roles, so their tokens are rejected with 403. The metadata doesn't advertise DCR | Users choose "Use your own OAuth client" with `mcp-client` |
 | MCP tools return "not authenticated" with valid token | Token failed local validation (expired/wrong issuer) | Check token `iss` matches `${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}` |
 | MCP endpoint still returns 200 without token | `@RouteFilter` not firing (quarkus-vertx-web missing) | Verify `quarkus-vertx-web` is in `mcp-server/build.gradle` and image was rebuilt |

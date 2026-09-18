@@ -26,23 +26,19 @@ registrar rather than a traditional one with a chat box bolted on.
 
 ## Connect OSIR to Claude
 
-Add OSIR as a custom connector from your Claude settings — just the URL, no OAuth fields, no
-config file, no install:
+In Claude, open **Settings → Connectors → Add custom connector**, then pick one of two setups:
 
-1. In Claude, open **Settings → Connectors**.
-2. Click **Add custom connector**.
-3. Set **Name** to `OSIR`.
-4. Set the **Remote MCP server URL** to `https://be.osir.com/mcp/http`.
-5. Save. Leave the Advanced settings (OAuth Client ID / Secret) empty.
+| | Option A: No sign-in (recommended) | Option B: OAuth |
+|---|---|---|
+| Server URL | `https://be.osir.com/mcp/http` | `https://be.osir.com/mcp/oauth` |
+| Authentication | **No sign-in** | **Sign in now** |
+| OAuth client | — | **Use your own OAuth client**, Client ID `mcp-client`, secret blank |
+| Login | In the chat, one conversation at a time (below) | Browser login when you add the connector; the connector stays signed in |
 
-```
-Claude · Add custom connector
+For Option B, don't pick "Use Claude's published identity" or "Register automatically". OSIR
+doesn't support either one.
 
-Name:                OSIR
-Remote MCP server:   https://be.osir.com/mcp/http
-```
-
-**Signing in happens inside the conversation.** The first time your assistant needs an
+**Option A: signing in happens inside the conversation.** The first time your assistant needs an
 authenticated tool, it starts a device login: you get a link to `auth.osir.com` and a short code,
 you approve in your browser, and the assistant continues with a session scoped to that
 conversation. Sessions are deliberately short-lived (they expire after ~30 minutes of inactivity,
@@ -52,10 +48,9 @@ standing access to your domains, servers, and billing.
 The same URL works in any MCP client that supports a remote (streamable HTTP) server and can
 drive the in-chat device login.
 
-> **Self-hosting note:** URL-only connectors require `MCP_OAUTH_CHALLENGE_ENABLED=false` on the
-> MCP server. Leaving the challenge enabled (the default) switches the server to OAuth mode
-> instead: it answers unauthenticated requests with a `401` + RFC 9728 challenge and clients
-> authenticate against your identity provider with a pre-registered client id. Session lifetimes
+> **Self-hosting note:** `/mcp/oauth` always requires OAuth: it returns `401` with an RFC 9728
+> challenge. The URL-only `/mcp/http` needs `MCP_OAUTH_CHALLENGE_ENABLED=false`. If you leave
+> that at its default (`true`), every MCP path requires OAuth. Session lifetimes
 > are tunable via `MCP_SESSION_IDLE_MINUTES` and `MCP_SESSION_MAX_HOURS`.
 
 ### What your assistant can do

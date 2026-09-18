@@ -37,14 +37,13 @@ public class OAuthMetadataResource {
         String oidcBase = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect";
         // issuer must match the iss claim in tokens; KeyCloak sets iss = realm URL
         String issuer = keycloakUrl + "/realms/" + realm;
-        // KeyCloak Dynamic Client Registration endpoint (RFC 7591 / OIDC DCR)
-        String registrationEndpoint = keycloakUrl + "/realms/" + realm + "/clients-registrations/openid-connect";
-
+        // ponytail: no registration_endpoint. Keycloak DCR clients get no roles scope, so their tokens
+        // 403 at the backend; connectors use the pre-registered public client mcp-client instead.
+        // Advertise DCR/CIMD again only once Keycloak issues role-bearing tokens for those clients.
         return Map.of(
                 "issuer", issuer,
                 "authorization_endpoint", oidcBase + "/auth",
                 "token_endpoint", oidcBase + "/token",
-                "registration_endpoint", registrationEndpoint,
                 "token_endpoint_auth_methods_supported", List.of("none"),
                 "response_types_supported", List.of("code"),
                 "grant_types_supported", List.of(
