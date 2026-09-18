@@ -62,7 +62,9 @@ An empty host list makes Keycloak answer every anonymous registration with **403
 - 2026-07-18: anonymous DCR opened to `claude.ai`/`claude.com` for Claude.ai URL-only OAuth. Abandoned: DCR clients get no `roles` scope, so their tokens got 403.
 - 2026-07-30: Trusted Hosts emptied again (closed).
 - 2026-09-15: found open again (an external audit). Cause, found 2026-09-18: the anonymous Trusted Hosts policy had been **deleted**, not just edited. Keycloak then accepts anonymous registrations.
-- 2026-09-18 14:44 UTC: policy recreated with an empty host list via `scripts/keycloak-close-anonymous-dcr.sh`; `scripts/smoke-prod.sh` confirms 403. Backup of the policies before the change: `kc-registration-policies-20260918-144440.json` (kept outside the repo in the admin's home folder, `C:\Users\mandi\kc-registration-policies-20260918-144440.json`; the script now writes backups to `$HOME`, and `.gitignore` excludes `kc-registration-policies-*.json`).
+- 2026-09-18 14:44 UTC: policy recreated with an empty host list via `scripts/keycloak-close-anonymous-dcr.sh`; `scripts/smoke-prod.sh` confirms 403. Backup of the policies before the change: `kc-registration-policies-20260918-144440.json` (kept outside the repo in the admin's home folder, `C:\Users\mandi\kc-registration-policies-20260918-144440.json`; the script now writes backups to `$HOME`, and `.gitignore` excludes `kc-registration-policies-*.json`). That backup was briefly committed to the public repo by mistake. It held no secrets, only the realm and component ids, and the GitHub history was rewritten the same day to remove it.
+
+**Keycloak admin backups never go into git.** They contain realm and component ids, and this repo is public. Keep them in the admin's home folder.
 
 **Check it:** `scripts/smoke-prod.sh`, check "anonymous client registration refused". If registration succeeds, the script deletes its own test client right away (RFC 7592, using the client's registration token) and reports FAIL.
 
