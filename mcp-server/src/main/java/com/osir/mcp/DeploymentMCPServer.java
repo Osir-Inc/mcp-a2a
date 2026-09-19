@@ -119,8 +119,8 @@ public class DeploymentMCPServer {
                     + "unchanged while it runs: state MOVING (in progress, stage says where, ~2 minutes "
                     + "in total), MOVED (done - tier reads 'owned'), FAILED or REFUSED (follow this "
                     + "result's message: usually call osirAppMoveToOwned again to retry, which never orders a "
-                    + "second server; but when the VPS refused the Osir deploy key the user must fix the VPS "
-                    + "first, and the message says how). "
+                    + "second server; but when the VPS refused the Osir deploy key or its web ports are "
+                    + "taken, the user must fix the VPS first, and the message says how). "
                     + "Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get app status",
@@ -246,8 +246,8 @@ public class DeploymentMCPServer {
                     + "the platform ships the app onto the box server-side, which takes about two minutes; watch it "
                     + "with osirAppStatus ('ownedMove'). Calling this tool again while a move is still running just "
                     + "reports its progress, and calling it after one FAILED retries the ship - unless osirAppStatus "
-                    + "says the VPS refused the Osir deploy key: then retry only after the user has made the "
-                    + "changes that message lists. If the result status "
+                    + "says the VPS refused the Osir deploy key or its web ports are taken: then retry only after "
+                    + "the user has made the changes that message lists. If the result status "
                     + "is BUILDING or BUILD_FAILED, follow its nextStep. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Move app to owned VPS",

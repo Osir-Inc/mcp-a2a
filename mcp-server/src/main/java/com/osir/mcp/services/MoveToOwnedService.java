@@ -1,6 +1,8 @@
 package com.osir.mcp.services;
 
+import com.osir.mcp.models.deploy.C2Reason;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
+import com.osir.mcp.models.deploy.DeployDtos.C2Error;
 import com.osir.mcp.models.deploy.DeployDtos.OwnedMoveDto;
 import com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedResult;
 import com.osir.mcp.models.DomainInfoResult;
@@ -370,32 +372,44 @@ public class MoveToOwnedService {
                     instanceId, ip, domain, dnsBound, pollAdvice(appName));
         }
 
-        String refusal = deploymentService.moveToOwned(appName, instanceId, ip, domain);
+        C2Error refusal = deploymentService.moveToOwned(appName, instanceId, ip, domain);
         if (refusal != null) {
+            String why = DeploymentService.asClause(refusal.message(), "unknown");
             // Tracker entry kept; C2's endpoint is idempotent per instanceId, so resuming is safe.
-            // "A move is already in progress" is a state to wait out, not a failure to escalate -
-            // re-POSTing the SAME instance is a 2xx poll, so this only appears when a different box
-            // was named, and support cannot help with it (spec_mcp_attach_existing_vps.md §5).
-            if (refusal.toLowerCase().contains("already in progress")) {
+            // A move already running is a state to wait out, not a failure to escalate - re-POSTing
+            // the SAME instance is a 2xx poll, so this only appears when a different box was named,
+            // and support cannot help with it (spec_mcp_attach_existing_vps.md §5).
+            if (C2Reason.MOVE_IN_PROGRESS.equals(refusal.reason())) {
+                String running = refusal.params() == null ? null : refusal.params().get("instanceId");
                 return new MoveToOwnedResult(false, "MOVING",
-                        "A move of '" + appName + "' is already running: " + refusal
+                        "A move of '" + appName + "' is already running"
+                                + (running == null ? "" : " onto VPS '" + running + "'") + ": " + why
                                 + ". Nothing more will be charged.",
                         instanceId, ip, domain, false,
                         "Call osirAppMoveToOwned again for '" + appName + "' WITHOUT instanceId in a minute - "
                                 + "that polls the move already running instead of starting another one.");
             }
-            // "call again to retry" cannot be the answer forever: the same refusal three times
-            // over means retrying is not the fix, so say that instead of looping the customer.
-            Refusal seen = countRefusal(moveKey, refusal);
-            String retryStep = seen.count() >= 3
-                    ? "STOP retrying with the same arguments - this exact refusal has come back "
-                            + seen.count() + " times, so another call will not change it. Tell the user what it "
-                            + "says; if it is not something they can fix, ask them to contact Osir support "
-                            + "quoting app '" + appName + "', VPS '" + instanceId + "' (" + ip + ")."
-                    : "Address what the refusal says if you can, then call osirAppMoveToOwned again with the "
-                            + "same arguments to retry the ship step (attempt " + (seen.count() + 1) + " of 3).";
+            String support = "if it is not something they can fix, ask them to contact Osir support quoting app '"
+                    + appName + "', VPS '" + instanceId + "' (" + ip + ")"
+                    + (refusal.reason() == null ? "" : " and reason " + refusal.reason()) + ".";
+            String retryStep;
+            if (Boolean.FALSE.equals(refusal.retryable())) {
+                // C2 says the same request cannot succeed as things stand: no attempt counting.
+                retryStep = "Do NOT retry with the same arguments - the platform says this cannot succeed as "
+                        + "things stand. Tell the user what it says; " + support;
+            } else {
+                // "call again to retry" cannot be the answer forever: the same refusal three times
+                // over means retrying is not the fix, so say that instead of looping the customer.
+                Refusal seen = countRefusal(moveKey, refusal.reason() != null ? refusal.reason() : why);
+                retryStep = seen.count() >= 3
+                        ? "STOP retrying with the same arguments - this exact refusal has come back "
+                                + seen.count() + " times, so another call will not change it. Tell the user what "
+                                + "it says; " + support
+                        : "Address what the refusal says if you can, then call osirAppMoveToOwned again with the "
+                                + "same arguments to retry the ship step (attempt " + (seen.count() + 1) + " of 3).";
+            }
             return new MoveToOwnedResult(false, "FAILED",
-                    "The server is ready but the platform could not ship the app onto it: " + refusal
+                    "The server is ready but the platform could not ship the app onto it: " + why
                             + ". Nothing more will be charged.",
                     instanceId, ip, domain, false, retryStep);
         }
@@ -407,10 +421,10 @@ public class MoveToOwnedService {
         // Still dispatched: the user may have fixed the box since. But if they have not, C2 fails the
         // same way within seconds, so the fix has to travel with this result too, not only with status
         // (spec §9.1; the customer of 2026-09-19 retried three times without ever seeing it).
-        if (move != null && move.keyRefused()) {
-            nextStep = "The previous attempt failed because the VPS refused the Osir deploy key. If "
-                    + "osirAppStatus reports that again: " + DeploymentService.keyRefusedSteps(move, platformSshPubkey)
-                    + " " + nextStep;
+        String userFix = DeploymentService.userFixSteps(move, platformSshPubkey);
+        if (userFix != null) {
+            nextStep = "The previous attempt failed on something the user must change on the VPS. If "
+                    + "osirAppStatus reports it again: " + userFix + " " + nextStep;
         }
         if (domain != null && !domain.isBlank()) {
             dnsBound = bindDomain(domain, ip);
@@ -481,7 +495,8 @@ public class MoveToOwnedService {
                 + "- about two minutes in total (box prep ~60s, image ship ~40s). ownedMove.stage in that "
                 + "response shows where it is; ownedMove.state FAILED means call osirAppMoveToOwned again, "
                 + "which retries the ship and never orders a second server - unless osirAppStatus says the box "
-                + "refused the Osir deploy key: then the user must fix the VPS first, as that response explains.";
+                + "refused the Osir deploy key or its web ports are taken: then the user must fix the VPS first, as "
+                + "that response explains.";
     }
 
     /**

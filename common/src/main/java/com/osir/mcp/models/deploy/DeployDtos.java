@@ -46,19 +46,18 @@ public final class DeployDtos {
      * alone": a repeat call on a FAILED move is how a transient ship failure recovers.
      * {@code stage} is the audit stage (OWNED_PREPPING_BOX, OWNED_SHIPPING_IMAGE, ...).
      *
-     * <p>{@code reason} is C2's stable machine code for a FAILED/REFUSED move (e.g.
-     * {@link #REASON_BOX_KEY_REFUSED}), {@code retryable} whether the same call can succeed with
-     * nothing changed, and {@code params} the structured facts. All three are null from a C2 that
-     * predates them. Branch on {@code reason}, never on {@code detail}, which is prose for humans and
-     * may change. Contract: app.osir.deploy docs/spec_c2_reason_codes.md.
+     * <p>{@code reason} is C2's stable machine code for a FAILED/REFUSED move ({@link C2Reason}),
+     * {@code retryable} whether the same call can succeed with nothing changed, and {@code params}
+     * the structured facts. All three are null on rows C2 wrote before 2026-09-19. Branch on
+     * {@code reason}, never on {@code detail}, which is prose for humans and may change.
+     * Contract: app.osir.deploy docs/spec_c2_reason_codes.md.
      */
     public record OwnedMoveDto(String state, String stage, String detail, String since,
                                String reason, Boolean retryable, Map<String, String> params) {
 
-        public static final String REASON_BOX_KEY_REFUSED = "BOX_KEY_REFUSED";
-
-        /** C2's detail text before it sent reason codes (ScriptOwnedNodeAgent.waitForSsh).
-         *  ponytail: fallback only, delete once C2 ships reason codes (spec_c2_reason_codes.md §6). */
+        /** What C2 stored for a key refusal before reason codes (2026-09-19, pre-fb9a8c4). Stored
+         *  rows are frozen, so unlike live prose this cannot be reworded under us. Only consulted
+         *  when a row has no reason; such a row is replaced by the next move attempt. */
         private static final String LEGACY_KEY_REFUSED_TEXT = "refused the osir deploy key";
 
         public OwnedMoveDto(String state, String stage, String detail, String since) {
@@ -68,9 +67,14 @@ public final class DeployDtos {
         /** The box rejects the platform SSH key: no retry can pass until the user changes the box. */
         public boolean keyRefused() {
             if (reason != null) {
-                return REASON_BOX_KEY_REFUSED.equals(reason);
+                return C2Reason.BOX_KEY_REFUSED.equals(reason);
             }
             return detail != null && detail.toLowerCase().contains(LEGACY_KEY_REFUSED_TEXT);
+        }
+
+        /** Another program holds the web ports on the box: the user must free them first. */
+        public boolean portsInUse() {
+            return C2Reason.BOX_PORTS_IN_USE.equals(reason);
         }
 
         public String param(String key) {
@@ -85,6 +89,19 @@ public final class DeployDtos {
     public record StatusEnvelope(AppDto app, DeploymentDto deployment, HealthDto health,
                                  List<RecentErrorDto> recentErrors, QaDto qa,
                                  String ownedInstanceId, String boxIp, OwnedMoveDto ownedMove) {
+    }
+
+    /**
+     * C2's error body (CONTRACTS §8): {@code {"error": {code, reason, message, retryable, params, ref}}}.
+     * {@code code} is the coarse class, {@code reason} the specific one ({@link C2Reason}); branch on
+     * those and {@code retryable}, show {@code message}. Also stands for a failure with no C2 body
+     * (5xx, transport), then with only {@code message} and {@code retryable} set.
+     */
+    public record C2Error(String code, String reason, String message, Boolean retryable,
+                          Map<String, String> params, String ref) {
+        public static C2Error of(String message, Boolean retryable) {
+            return new C2Error(null, null, message, retryable, null, null);
+        }
     }
 
     public record ConfirmationEnvelope(String confirmationId, String summary) {

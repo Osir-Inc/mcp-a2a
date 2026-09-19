@@ -2,6 +2,8 @@ package com.osir.mcp.services;
 
 import com.osir.mcp.models.deploy.DeployDtos.AppDto;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
+import com.osir.mcp.models.deploy.C2Reason;
+import com.osir.mcp.models.deploy.DeployDtos.C2Error;
 import com.osir.mcp.models.deploy.DeployDtos.OwnedMoveDto;
 import com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedResult;
 import com.osir.mcp.models.DomainInfoResult;
@@ -251,7 +253,8 @@ class MoveToOwnedServiceTest {
                 .thenReturn(orderOk("vps-9"));
         instanceState("vps-9", "COMPLETE", "1.2.3.4");
         when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any()))
-                .thenReturn("that box is already bound to another app");
+                .thenReturn(new C2Error("CONFLICT", "BOX_BOUND_TO_OTHER_APP",
+                        "that box is already bound to another app", false, null, "err_1"));
 
         MoveToOwnedResult result = service.orderAndMove("app1", "OSIR-S",
                 new MoveToOwnedService.Prepared(42, "Ubuntu Server 24.04", List.of(20)), null);
@@ -266,7 +269,8 @@ class MoveToOwnedServiceTest {
     void thirdIdenticalRefusalStopsTheRetryLoop() {
         instanceState("vps-own", "COMPLETE", "1.2.3.4");
         when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any()))
-                .thenReturn("this app has no built running version to move yet");
+                .thenReturn(new C2Error("CONFLICT", "APP_NOT_DEPLOYED",
+                        "this app has no built running version to move yet", true, null, "err_2"));
 
         assertTrue(service.attach("app1", "vps-own", null).nextStep().contains("retry the ship step"));
         assertTrue(service.attach("app1", "vps-own", null).nextStep().contains("retry the ship step"));
@@ -277,10 +281,43 @@ class MoveToOwnedServiceTest {
     }
 
     @Test
+    void aNonRetryableRefusalStopsAtOnce_withoutCountingToThree() {
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any()))
+                .thenReturn(new C2Error("CONFLICT", "BOX_OTHER_ACCOUNT",
+                        "that box belongs to a different account", false, null, "err_4"));
+
+        MoveToOwnedResult first = service.attach("app1", "vps-own", null);
+
+        assertEquals("FAILED", first.status());
+        assertTrue(first.message().contains("belongs to a different account"), first.message());
+        assertTrue(first.nextStep().startsWith("Do NOT retry"), first.nextStep());
+        assertTrue(first.nextStep().contains("BOX_OTHER_ACCOUNT"), first.nextStep());
+    }
+
+    @Test
+    void aMoveInProgressIsRecognisedByItsReason_notItsWording() {
+        // C2 may reword freely; the reason code is the contract.
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any()))
+                .thenReturn(new C2Error("CONFLICT", C2Reason.MOVE_IN_PROGRESS,
+                        "Another box is being set up for this app.", true,
+                        java.util.Map.of("instanceId", "vps-running"), "err_5"));
+
+        MoveToOwnedResult r = service.attach("app1", "vps-own", null);
+
+        assertEquals("MOVING", r.status());
+        assertTrue(r.nextStep().contains("WITHOUT instanceId"), r.nextStep());
+        assertTrue(r.message().contains("onto VPS 'vps-running'"), r.message());
+        assertFalse(r.message().contains(".."), r.message());
+    }
+
+    @Test
     void aMoveAlreadyRunningIsPolled_notEscalatedToSupport() {
         instanceState("vps-own", "COMPLETE", "1.2.3.4");
         when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any()))
-                .thenReturn("a move to a different box is already in progress for this app");
+                .thenReturn(new C2Error("CONFLICT", C2Reason.MOVE_IN_PROGRESS,
+                        "a move to a different box is already in progress for this app", true, null, "err_3"));
 
         for (int i = 0; i < 3; i++) {
             MoveToOwnedResult r = service.attach("app1", "vps-own", null);
@@ -326,7 +363,7 @@ class MoveToOwnedServiceTest {
         instanceState("vps-own", "COMPLETE", "1.2.3.4");
         when(deploymentService.getStatus("app1")).thenReturn(statusOf("app1", "vps-own",
                 new OwnedMoveDto("FAILED", "MOVE_TO_OWNED_FAILED", null, null,
-                        OwnedMoveDto.REASON_BOX_KEY_REFUSED, false, null)));
+                        C2Reason.BOX_KEY_REFUSED, false, null)));
         when(deploymentService.moveToOwned("app1", "vps-own", "1.2.3.4", null)).thenReturn(null);
 
         MoveToOwnedResult result = service.attach("app1", "vps-own", null);
@@ -335,6 +372,21 @@ class MoveToOwnedServiceTest {
         assertTrue(result.nextStep().contains("refused the Osir deploy key"), result.nextStep());
         assertTrue(result.nextStep().contains("ssh-ed25519 AAAA osir-deploy"), result.nextStep());
         assertTrue(result.nextStep().contains("80/443"), result.nextStep());
+    }
+
+    @Test
+    void aRetryAfterBusyWebPortsCarriesThatFix() {
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        when(deploymentService.getStatus("app1")).thenReturn(statusOf("app1", "vps-own",
+                new OwnedMoveDto("FAILED", "MOVE_TO_OWNED_FAILED", null, null,
+                        C2Reason.BOX_PORTS_IN_USE, false, java.util.Map.of("ports", "80,443"))));
+        when(deploymentService.moveToOwned("app1", "vps-own", "1.2.3.4", null)).thenReturn(null);
+
+        MoveToOwnedResult result = service.attach("app1", "vps-own", null);
+
+        verify(deploymentService).moveToOwned("app1", "vps-own", "1.2.3.4", null);
+        assertTrue(result.nextStep().contains("port(s) 80/443"), result.nextStep());
+        assertTrue(result.nextStep().contains("replaced by this app"), result.nextStep());
     }
 
     @Test

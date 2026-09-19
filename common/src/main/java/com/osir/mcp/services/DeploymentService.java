@@ -6,6 +6,7 @@ import com.osir.mcp.models.deploy.DeployDtos.AppListResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppSourceResult;
 import com.osir.mcp.models.deploy.DeployDtos.SourceEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
+import com.osir.mcp.models.deploy.DeployDtos.C2Error;
 import com.osir.mcp.models.deploy.DeployDtos.AppsEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.ConfirmationEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.DeployAppBody;
@@ -96,26 +97,53 @@ public class DeploymentService {
         }
     }
 
-    /** Pulls the backend's {"error"|"message": "..."} out of a failed response, else the status line. */
+    /** The human-readable message of a failed response (see {@link #readError}). */
     static String readErrorMessage(jakarta.ws.rs.core.Response response) {
+        return readError(response).message();
+    }
+
+    /**
+     * Parses a failed response into its parts. C2 nests them ({"error": {code, reason, message,
+     * retryable, params, ref}}); other backends send a flat {"error"|"message"|"detail": "..."}.
+     * Before 2026-09-19 this read "error" with asText(), which is "" for an object, so every C2
+     * refusal reached the model as an empty string. Unparseable: the truncated body, else the
+     * status line.
+     */
+    static C2Error readError(jakarta.ws.rs.core.Response response) {
         if (response == null) {
-            return "unknown error";
+            return C2Error.of("unknown error", null);
         }
         try {
             String body = response.readEntity(String.class);
             if (body != null && !body.isBlank()) {
                 var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+                var error = node.get("error");
+                if (error != null && error.isObject()) {
+                    Map<String, String> params = new java.util.LinkedHashMap<>();
+                    var p = error.get("params");
+                    if (p != null && p.isObject()) {
+                        p.properties().forEach(f -> params.put(f.getKey(), f.getValue().asText()));
+                    }
+                    return new C2Error(text(error, "code"), text(error, "reason"),
+                            text(error, "message") == null ? "HTTP " + response.getStatus() : text(error, "message"),
+                            error.hasNonNull("retryable") ? error.get("retryable").asBoolean() : null,
+                            params.isEmpty() ? null : params, text(error, "ref"));
+                }
                 for (String key : new String[]{"error", "message", "detail"}) {
                     if (node.hasNonNull(key)) {
-                        return node.get(key).asText();
+                        return C2Error.of(node.get(key).asText(), null);
                     }
                 }
-                return body.length() > 300 ? body.substring(0, 300) : body;   // non-JSON body, truncated
+                return C2Error.of(body.length() > 300 ? body.substring(0, 300) : body, null); // non-JSON, truncated
             }
         } catch (Exception ignored) {
             // Fall through to the status line.
         }
-        return "HTTP " + response.getStatus();
+        return C2Error.of("HTTP " + response.getStatus(), null);
+    }
+
+    private static String text(com.fasterxml.jackson.databind.JsonNode node, String field) {
+        return node.hasNonNull(field) ? node.get(field).asText() : null;
     }
 
     /**
@@ -192,19 +220,20 @@ public class DeploymentService {
         // Every field but state is nullable on the wire; an unfilled one must not reach the model as
         // the word "null".
         String stage = move.stage() == null || move.stage().isBlank() ? "in progress" : move.stage();
-        String detail = move.detail() == null || move.detail().isBlank() ? "no reason recorded" : move.detail();
+        String detail = asClause(move.detail(), "no reason recorded");
+        String userFix = userFixSteps(move, platformSshPubkey);
         return switch (move.state().toUpperCase()) {
             case "MOVING" -> "OK. A move onto the user's own VPS is in progress (stage " + stage
                     + "). It takes about two minutes end to end; poll this tool until tier reads 'owned'.";
             case "MOVED" -> "OK. This app runs on the user's own VPS.";
-            case "FAILED", "REFUSED" -> move.keyRefused()
-                    ? "OK. The last move onto the user's own VPS did not complete: the VPS refused the Osir "
-                            + "deploy key. " + keyRefusedSteps(move, platformSshPubkey)
-                    // Only an explicit false stops the retry advice: null is a C2 that predates the flag.
+            case "FAILED", "REFUSED" -> userFix != null
+                    ? "OK. The last move onto the user's own VPS did not complete. " + userFix
+                    // Only an explicit false stops the retry advice: null is a row from before the flag.
                     : Boolean.FALSE.equals(move.retryable())
                     ? "OK. The last move onto the user's own VPS did not complete: " + detail + ". Retrying "
                             + "unchanged will not help: tell the user what it says, and if it is not something "
-                            + "they can fix, to contact Osir support quoting reason " + move.reason() + "."
+                            + "they can fix, to contact Osir support"
+                            + (move.reason() == null ? "" : " quoting reason " + move.reason()) + "."
                     : "OK. The last move onto the user's own VPS did not complete: "
                             + detail + ". Calling osirAppMoveToOwned again retries it - it does not order "
                             + "a second server.";
@@ -213,26 +242,60 @@ public class DeploymentService {
     }
 
     /**
-     * What the user must change on their VPS before a move can pass a key refusal (spec §9.1). Static
-     * and pure so the move tool (mcp-server) says exactly the same thing. The key comes from C2's
-     * {@code params.publicKey} when sent (C2 holds the private half, so it is the source of truth),
-     * else from config.
+     * For a move that failed on something only the USER can change on their VPS (spec §9.1): what
+     * happened and what they must do, else null. Static and pure so the move tool (mcp-server) says
+     * exactly the same thing. The key comes from C2's {@code params.publicKey} when sent (C2 holds
+     * the private half, so it is the source of truth), else from config.
      */
-    public static String keyRefusedSteps(OwnedMoveDto move, String configuredKey) {
-        String key = displayKey(move == null ? null : move.param("publicKey"));
-        if (key == null) {
-            key = displayKey(configuredKey);
+    public static String userFixSteps(OwnedMoveDto move, String configuredKey) {
+        if (move == null) {
+            return null;
         }
-        String keyStep = key == null
-                ? "add the Osir platform deploy key (Osir support has it)"
-                : "add this public key (safe to share) as one line: " + key;
-        return "Retrying without changing the VPS fails the same way, so do NOT call osirAppMoveToOwned yet. "
-                + "Tell the user to, on that VPS: (1) " + keyStep + " to /root/.ssh/authorized_keys, and make "
-                + "sure root may log in with a key (sshd_config PermitRootLogin prohibit-password or yes); "
-                + "(2) stop any web server holding ports 80/443 (e.g. 'systemctl disable --now nginx', or "
-                + "apache2) - Osir serves the app there with its own TLS. WARN them first: whatever that VPS "
-                + "serves today is replaced by this app. Only after they confirm both, call "
-                + "osirAppMoveToOwned again with the same instanceId.";
+        String retryLast = "Retrying without changing the VPS fails the same way, so do NOT call "
+                + "osirAppMoveToOwned yet. ";
+        String replaceWarning = "WARN them first: whatever that VPS serves today is replaced by this app. ";
+        String thenRetry = "Only after they confirm, call osirAppMoveToOwned again with the same instanceId.";
+        if (move.keyRefused()) {
+            String key = displayKey(move.param("publicKey"));
+            if (key == null) {
+                key = displayKey(configuredKey);
+            }
+            String keyStep = key == null
+                    ? "add the Osir platform deploy key (Osir support has it)"
+                    : "add this public key (safe to share) as one line: " + key;
+            // Step 2 pre-empts the next refusal: C2 checks the web ports right after SSH gets in.
+            return "The VPS refused the Osir deploy key. " + retryLast + "Tell the user to, on that VPS: (1) "
+                    + keyStep + " to /root/.ssh/authorized_keys, and make sure root may log in with a key "
+                    + "(sshd_config PermitRootLogin prohibit-password or yes); (2) stop any web server holding "
+                    + "ports 80/443 (e.g. 'systemctl disable --now nginx', or apache2) - Osir serves the app "
+                    + "there with its own TLS. " + replaceWarning + thenRetry;
+        }
+        if (move.portsInUse()) {
+            String ports = move.param("ports");
+            // C2 promises digits and commas; anything else must not be echoed into the model's context.
+            ports = ports != null && ports.matches("[0-9,]{1,20}") ? ports.replace(",", "/") : "80/443";
+            return "Another program holds port(s) " + ports + " on the VPS, which Osir needs to serve the app "
+                    + "with its own TLS. " + retryLast + "Tell the user to stop and disable it on that VPS "
+                    + "(usually a web server: e.g. 'systemctl disable --now nginx', or apache2). "
+                    + replaceWarning + thenRetry;
+        }
+        return null;
+    }
+
+    /**
+     * A backend sentence ready to embed mid-sentence: trimmed and without its closing full stop. C2's
+     * reason sentences end in "." and every caller appends ". …", which read "VPS.. Retrying"
+     * (spec_c2_reason_codes.md §9.3). Blank or null gives {@code fallback}.
+     */
+    public static String asClause(String sentence, String fallback) {
+        if (sentence == null || sentence.isBlank()) {
+            return fallback;
+        }
+        String s = sentence.strip();
+        while (s.endsWith(".")) {
+            s = s.substring(0, s.length() - 1).stripTrailing();
+        }
+        return s.isEmpty() ? fallback : s;
     }
 
     /** "type base64" plus a neutral comment: the configured line's own comment names an internal
@@ -322,15 +385,16 @@ public class DeploymentService {
     }
 
     /**
-     * Hand C2 a ready VPS to move the app onto. Returns null when C2 accepted the move, else the
-     * REASON it refused. Retry-safe: the endpoint is idempotent per instanceId.
+     * Hand C2 a ready VPS to move the app onto. Returns null when C2 accepted the move, else why
+     * it refused: branch on {@code reason}/{@code retryable}, show {@code message}. Retry-safe: the
+     * endpoint is idempotent per instanceId.
      *
-     * <p>C2's 4xx bodies are written FOR the caller ("that box is already bound to another app",
-     * "this app has no built running version to move yet") and are the only explanation the
-     * customer gets — swallowing them is why three failed retries in a row said nothing. 5xx stays
-     * generic (CONTRACTS §8: never forward a raw client exception, it leaks the backend host).
+     * <p>C2's 4xx messages are written FOR the caller and are the only explanation the customer
+     * gets — swallowing them is why three failed retries in a row said nothing. 5xx stays generic
+     * (CONTRACTS §8: never forward a raw client exception, it leaks the backend host), with
+     * retryable unknown so the caller's loop-breaker still applies.
      */
-    public String moveToOwned(String appId, String instanceId, String ip, String domain) {
+    public C2Error moveToOwned(String appId, String instanceId, String ip, String domain) {
         try {
             client.moveToOwned(appId,
                     new com.osir.mcp.models.deploy.MoveToOwnedDtos.MoveToOwnedBody(instanceId, ip, domain),
@@ -338,13 +402,14 @@ public class DeploymentService {
             return null;
         } catch (jakarta.ws.rs.WebApplicationException ex) {
             int status = ex.getResponse() == null ? 0 : ex.getResponse().getStatus();
-            String detail = readErrorMessage(ex.getResponse());
-            LOG.errorf("moveToOwned refused for app=%s instance=%s: HTTP %d %s", appId, instanceId, status, detail);
-            return status >= 400 && status < 500 ? detail
-                    : "the platform could not ship the app onto the box (HTTP " + status + ")";
+            C2Error error = readError(ex.getResponse());
+            LOG.errorf("moveToOwned refused for app=%s instance=%s: HTTP %d reason=%s ref=%s %s",
+                    appId, instanceId, status, error.reason(), error.ref(), error.message());
+            return status >= 400 && status < 500 ? error
+                    : C2Error.of("the platform could not ship the app onto the box (HTTP " + status + ")", null);
         } catch (Exception ex) {
             LOG.errorf(ex, "moveToOwned failed for app=%s instance=%s", appId, instanceId);
-            return "the platform could not reach the deploy backend to ship the app";
+            return C2Error.of("the platform could not reach the deploy backend to ship the app", null);
         }
     }
 
