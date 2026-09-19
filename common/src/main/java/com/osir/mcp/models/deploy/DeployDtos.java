@@ -42,8 +42,9 @@ public final class DeployDtos {
      * writes, so it survives a C2 restart (its in-memory tracker does not, and must not be the
      * source of this answer). Null when no move was ever attempted for the app.
      *
-     * <p>{@code state} is MOVING | MOVED | FAILED | REFUSED — and only MOVING means "leave it
-     * alone": a repeat call on a FAILED move is how a transient ship failure recovers.
+     * <p>{@code state} is MOVING | MOVED | FAILED — and only MOVING means "leave it alone": a repeat
+     * call on a FAILED move is how a transient ship failure recovers. (C2 before cb00c75 also sent
+     * REFUSED, repainted by a refused request; it is still handled like FAILED.)
      * {@code stage} is the audit stage (OWNED_PREPPING_BOX, OWNED_SHIPPING_IMAGE, ...).
      *
      * <p>{@code reason} is C2's stable machine code for a FAILED/REFUSED move ({@link C2Reason}),

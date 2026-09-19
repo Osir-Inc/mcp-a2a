@@ -296,6 +296,25 @@ class MoveToOwnedServiceTest {
     }
 
     @Test
+    void aSecondBoxWhileBoundPointsAtTheBoundOne_andFreesTheResumePath() {
+        // C2 cb00c75: while the move onto vps-a runs (or after it), a request for vps-b is refused with
+        // APP_BOUND_TO_OTHER_BOX. Not a support case, and "call again without instanceId" must then
+        // reach vps-a through C2's binding, not resume vps-b forever.
+        instanceState("vps-b", "COMPLETE", "5.6.7.8");
+        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any()))
+                .thenReturn(new C2Error("CONFLICT", C2Reason.APP_BOUND_TO_OTHER_BOX,
+                        "This app is already bound to a different owned box.", false,
+                        java.util.Map.of("instanceId", "vps-a"), "err_6"));
+
+        MoveToOwnedResult r = service.attach("app1", "vps-b", null);
+
+        assertTrue(r.message().contains("already bound to VPS 'vps-a'"), r.message());
+        assertTrue(r.nextStep().contains("WITHOUT instanceId"), r.nextStep());
+        assertFalse(r.nextStep().contains("support"), r.nextStep());
+        assertFalse(service.hasOrderedInstance("app1"), "the refused box must not stay the resume target");
+    }
+
+    @Test
     void aMoveInProgressIsRecognisedByItsReason_notItsWording() {
         // C2 may reword freely; the reason code is the contract.
         instanceState("vps-own", "COMPLETE", "1.2.3.4");

@@ -389,6 +389,25 @@ public class MoveToOwnedService {
                         "Call osirAppMoveToOwned again for '" + appName + "' WITHOUT instanceId in a minute - "
                                 + "that polls the move already running instead of starting another one.");
             }
+            // The app already has its one owned box. Not a failure to escalate: point at that box. The
+            // tracker must drop the refused box, or "call again without instanceId" resumes it and is
+            // refused forever; without it that call finds the bound box through C2 (findExistingBox),
+            // which is also what keeps a later call from ordering a second server.
+            if (C2Reason.APP_BOUND_TO_OTHER_BOX.equals(refusal.reason())) {
+                orderedInstances.remove(moveKey, instanceId);
+                shipRefusals.remove(moveKey);
+                String bound = refusal.params() == null ? null : refusal.params().get("instanceId");
+                String boundBox = bound == null ? "another VPS" : "VPS '" + bound + "'";
+                return new MoveToOwnedResult(false, "FAILED",
+                        "App '" + appName + "' is already bound to " + boundBox + " - an app can have only one "
+                                + "owned server, so VPS '" + instanceId + "' was not used. Nothing more will be "
+                                + "charged.",
+                        instanceId, ip, domain, false,
+                        "Do not retry with instanceId '" + instanceId + "'. Check osirAppStatus for '" + appName
+                                + "' ('ownedMove') to see how the move onto " + boundBox + " is going, and call "
+                                + "osirAppMoveToOwned for '" + appName + "' WITHOUT instanceId to resume or re-check "
+                                + "that move.");
+            }
             String support = "if it is not something they can fix, ask them to contact Osir support quoting app '"
                     + appName + "', VPS '" + instanceId + "' (" + ip + ")"
                     + (refusal.reason() == null ? "" : " and reason " + refusal.reason()) + ".";
