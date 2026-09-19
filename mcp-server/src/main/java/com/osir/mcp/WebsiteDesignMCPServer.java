@@ -102,7 +102,9 @@ public class WebsiteDesignMCPServer {
                     + "HTML document works: the user's own site, a page designed in this chat, or one from the "
                     + "osirSiteDesignBrief flow. Calling again with the same name redeploys the new version. For "
                     + "MULTI-FILE sites (separate CSS/JS/images) use osirAppCreateUpload + osirAppDeploy with a "
-                    + "zip instead. Then poll osirAppStatus until READY. Requires authentication.",
+                    + "zip instead. Then poll osirAppStatus until READY. If the app was moved to the user's own "
+                    + "VPS, redeploying under the same name updates it there and keeps its domain. "
+                    + "Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Publish a website",
                     readOnlyHint = false,

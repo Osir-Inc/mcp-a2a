@@ -68,7 +68,8 @@ public class DeploymentMCPServer {
                     + "microVM. Deploying an existing app name redeploys it (new version) and applies any secrets set "
                     + "via osirAppSetSecret. A plain static website (HTML/CSS/JS with no framework or build step) is "
                     + "also supported: it is auto-detected and served directly; pass language 'node' for it. "
-                    + "Requires authentication.",
+                    + "If the app was moved to the user's own VPS, redeploying under the same name updates it "
+                    + "there and keeps its domain. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Deploy an app",
                     readOnlyHint = false,
@@ -116,8 +117,10 @@ public class DeploymentMCPServer {
                     + "actually work, and qa.findings lists the problems so you can fix and redeploy. "
                     + "'ownedMove' tracks a move onto the user's own VPS, which leaves tier and status "
                     + "unchanged while it runs: state MOVING (in progress, stage says where, ~2 minutes "
-                    + "in total), MOVED (done - tier reads 'owned'), FAILED or REFUSED (call "
-                    + "osirAppMoveToOwned again to retry; it never orders a second server). "
+                    + "in total), MOVED (done - tier reads 'owned'), FAILED or REFUSED (follow this "
+                    + "result's message: usually call osirAppMoveToOwned again to retry, which never orders a "
+                    + "second server; but when the VPS refused the Osir deploy key the user must fix the VPS "
+                    + "first, and the message says how). "
                     + "Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get app status",
@@ -242,7 +245,9 @@ public class DeploymentMCPServer {
                     + "that instead - a retry after a failed move never buys a second server. After the move starts "
                     + "the platform ships the app onto the box server-side, which takes about two minutes; watch it "
                     + "with osirAppStatus ('ownedMove'). Calling this tool again while a move is still running just "
-                    + "reports its progress, and calling it after one FAILED retries the ship. If the result status "
+                    + "reports its progress, and calling it after one FAILED retries the ship - unless osirAppStatus "
+                    + "says the VPS refused the Osir deploy key: then retry only after the user has made the "
+                    + "changes that message lists. If the result status "
                     + "is BUILDING or BUILD_FAILED, follow its nextStep. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Move app to owned VPS",

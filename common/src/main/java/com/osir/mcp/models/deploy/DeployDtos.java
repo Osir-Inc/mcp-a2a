@@ -1,6 +1,7 @@
 package com.osir.mcp.models.deploy;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * DTOs for the deploy backend (C2) seam and the LLM-facing tool results. Backend wire envelopes
@@ -44,8 +45,37 @@ public final class DeployDtos {
      * <p>{@code state} is MOVING | MOVED | FAILED | REFUSED — and only MOVING means "leave it
      * alone": a repeat call on a FAILED move is how a transient ship failure recovers.
      * {@code stage} is the audit stage (OWNED_PREPPING_BOX, OWNED_SHIPPING_IMAGE, ...).
+     *
+     * <p>{@code reason} is C2's stable machine code for a FAILED/REFUSED move (e.g.
+     * {@link #REASON_BOX_KEY_REFUSED}), {@code retryable} whether the same call can succeed with
+     * nothing changed, and {@code params} the structured facts. All three are null from a C2 that
+     * predates them. Branch on {@code reason}, never on {@code detail}, which is prose for humans and
+     * may change. Contract: app.osir.deploy docs/spec_c2_reason_codes.md.
      */
-    public record OwnedMoveDto(String state, String stage, String detail, String since) {
+    public record OwnedMoveDto(String state, String stage, String detail, String since,
+                               String reason, Boolean retryable, Map<String, String> params) {
+
+        public static final String REASON_BOX_KEY_REFUSED = "BOX_KEY_REFUSED";
+
+        /** C2's detail text before it sent reason codes (ScriptOwnedNodeAgent.waitForSsh).
+         *  ponytail: fallback only, delete once C2 ships reason codes (spec_c2_reason_codes.md §6). */
+        private static final String LEGACY_KEY_REFUSED_TEXT = "refused the osir deploy key";
+
+        public OwnedMoveDto(String state, String stage, String detail, String since) {
+            this(state, stage, detail, since, null, null, null);
+        }
+
+        /** The box rejects the platform SSH key: no retry can pass until the user changes the box. */
+        public boolean keyRefused() {
+            if (reason != null) {
+                return REASON_BOX_KEY_REFUSED.equals(reason);
+            }
+            return detail != null && detail.toLowerCase().contains(LEGACY_KEY_REFUSED_TEXT);
+        }
+
+        public String param(String key) {
+            return params == null ? null : params.get(key);
+        }
     }
 
     /** C2's status payload. {@code ownedInstanceId}/{@code boxIp} are set once a move onto a

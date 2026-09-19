@@ -51,6 +51,25 @@ class StatusEnvelopeParsingTest {
     }
 
     @Test
+    void parsesReasonCodeAndParams() throws Exception {
+        // Wire shape agreed in app.osir.deploy docs/spec_c2_reason_codes.md §3.
+        String json = """
+                {"app": {"appId": "a", "name": "a", "tier": "instant", "status": "READY"},
+                 "ownedMove": {"state": "FAILED", "stage": "OWNED_PREPPING_BOX",
+                               "detail": "The VPS refused the Osir deploy key.",
+                               "since": "2026-09-19T10:00:00Z",
+                               "reason": "BOX_KEY_REFUSED", "retryable": false,
+                               "params": {"ip": "1.2.3.4", "publicKey": "ssh-ed25519 AAAAx osir-deploy"}}}
+                """;
+
+        DeployDtos.OwnedMoveDto move = mapper.readValue(json, StatusEnvelope.class).ownedMove();
+
+        assertEquals("BOX_KEY_REFUSED", move.reason());
+        assertEquals("1.2.3.4", move.param("ip"));
+        assertTrue(move.keyRefused());
+    }
+
+    @Test
     void ownedMoveIsNullWhenNoMoveWasEverAttempted() throws Exception {
         String json = """
                 {"app": {"appId": "plain-app", "name": "plain-app", "tier": "instant", "status": "READY"},

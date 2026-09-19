@@ -366,7 +366,7 @@ data, and A2A has no confirmation gate yet (`A2A-CONFIRMATION-GATE-SPEC.md`).
 | `list_apps` | List deployed apps with live URLs |
 | `get_app_status` | Status, health and QA verdict for one app |
 | `get_app_logs` | Recent logs from an app |
-| `deploy_app` | Deploy or redeploy an app (free tier) |
+| `deploy_app` | Deploy or redeploy an app (free tier; a redeploy of an app moved to the user's own VPS updates it there) |
 | `get_app_source` | Signed download URL for the app's current source zip |
 
 App deletion, secrets, databases and the move-to-owned flow are absent for the same reason.

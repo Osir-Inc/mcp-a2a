@@ -320,6 +320,24 @@ class MoveToOwnedServiceTest {
     }
 
     @Test
+    void aRetryAfterAKeyRefusalStillDispatchesButCarriesTheFix() {
+        // Spec §9.1: the user may have fixed the box, so re-send; if not, the model must already
+        // hold the fix steps instead of only "poll status" (2026-09-19: three blind retries).
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        when(deploymentService.getStatus("app1")).thenReturn(statusOf("app1", "vps-own",
+                new OwnedMoveDto("FAILED", "MOVE_TO_OWNED_FAILED", null, null,
+                        OwnedMoveDto.REASON_BOX_KEY_REFUSED, false, null)));
+        when(deploymentService.moveToOwned("app1", "vps-own", "1.2.3.4", null)).thenReturn(null);
+
+        MoveToOwnedResult result = service.attach("app1", "vps-own", null);
+
+        verify(deploymentService).moveToOwned("app1", "vps-own", "1.2.3.4", null);
+        assertTrue(result.nextStep().contains("refused the Osir deploy key"), result.nextStep());
+        assertTrue(result.nextStep().contains("ssh-ed25519 AAAA osir-deploy"), result.nextStep());
+        assertTrue(result.nextStep().contains("80/443"), result.nextStep());
+    }
+
+    @Test
     void anUnreadableStatusDoesNotBlockTheMove() {
         instanceState("vps-own", "COMPLETE", "1.2.3.4");
         when(deploymentService.getStatus("app1")).thenReturn(AppStatusResult.fail("backend down"));

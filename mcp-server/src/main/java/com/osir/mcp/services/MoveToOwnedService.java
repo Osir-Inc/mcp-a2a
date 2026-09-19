@@ -404,6 +404,14 @@ public class MoveToOwnedService {
         // C2 accepted the move but ships asynchronously, the honest instruction is "poll
         // osirAppStatus until tier reads owned", not "it's done".
         String nextStep = pollAdvice(appName);
+        // Still dispatched: the user may have fixed the box since. But if they have not, C2 fails the
+        // same way within seconds, so the fix has to travel with this result too, not only with status
+        // (spec §9.1; the customer of 2026-09-19 retried three times without ever seeing it).
+        if (move != null && move.keyRefused()) {
+            nextStep = "The previous attempt failed because the VPS refused the Osir deploy key. If "
+                    + "osirAppStatus reports that again: " + DeploymentService.keyRefusedSteps(move, platformSshPubkey)
+                    + " " + nextStep;
+        }
         if (domain != null && !domain.isBlank()) {
             dnsBound = bindDomain(domain, ip);
             if (!dnsBound) {
@@ -472,7 +480,8 @@ public class MoveToOwnedService {
         return "Check osirAppStatus for '" + appName + "' every 20-30 seconds until tier reads 'owned' "
                 + "- about two minutes in total (box prep ~60s, image ship ~40s). ownedMove.stage in that "
                 + "response shows where it is; ownedMove.state FAILED means call osirAppMoveToOwned again, "
-                + "which retries the ship and never orders a second server.";
+                + "which retries the ship and never orders a second server - unless osirAppStatus says the box "
+                + "refused the Osir deploy key: then the user must fix the VPS first, as that response explains.";
     }
 
     /**

@@ -218,7 +218,7 @@ Full tool/skill catalog, example conversations, and end-to-end walkthroughs are 
 - **orderVps** - Stage an order for a new VPS instance.
 - **osirAppCreateUpload** - Create an upload ticket for deploying app source code to Osir.
 - **osirAppDelete** - Stage deletion of an Osir app.
-- **osirAppDeploy** - Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a microVM.
+- **osirAppDeploy** - Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a microVM. Redeploying an app that was moved to the user's own VPS updates it there and keeps its domain.
 - **osirAppGetSource** - Get a short-lived signed download URL for an Osir app's current source zip - use this to make edits to a deployed app without the user re-attaching the project: download, patch the files, then osirAppCreateUpload (PUT the new zip) and osirAppDeploy under the SAME name; the platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box.
 - **osirAppList** - List the authenticated user's deployed Osir apps with their live URLs and status.
 - **osirAppLogs** - Get recent logs from an Osir app's microVM ('why is my app broken?').
@@ -227,7 +227,7 @@ Full tool/skill catalog, example conversations, and end-to-end walkthroughs are 
 - **osirAppSetSecret** - Set an environment secret for an Osir app (e.g.
 - **osirAppStatus** - Get an Osir app's current status, live URL, and health ('is my app working?').
 - **osirSiteDesignBrief** - Step 1 of designing a website with OSIR.
-- **osirSitePublish** - Publish a single-page website to a live HTTPS URL on Osir (free tier) - ANY complete HTML document works: the user's own site, a page designed in this chat, or one from the osirSiteDesignBrief flow.
+- **osirSitePublish** - Publish a single-page website to a live HTTPS URL on Osir (free tier) - ANY complete HTML document works: the user's own site, a page designed in this chat, or one from the osirSiteDesignBrief flow. Republishing a site that was moved to the user's own VPS updates it there.
 - **payInvoice** - Stage payment of an outstanding invoice from account balance.
 - **previewPaymentFees** - Preview the fees that would be charged for a given payment amount.
 - **registerDomain** - Stage registration of a new domain name.

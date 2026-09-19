@@ -25,6 +25,7 @@ import com.osir.mcp.models.deploy.DeployDtos.UploadEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.UploadTicketResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jboss.logging.Logger;
 
@@ -50,6 +51,12 @@ public class DeploymentService {
 
     @Inject
     AuthService authService;
+
+    /** Public half of the platform deploy key, shown to the user when their box refuses it. Config,
+     *  not code, so a key rotation needs no release. Both servers set it from OSIR_PLATFORM_SSH_PUBKEY;
+     *  the blank default only keeps a misconfigured server booting (it then names Osir support). */
+    @ConfigProperty(name = "osir.vps.platform-ssh-pubkey", defaultValue = "")
+    String platformSshPubkey;
 
     public UploadTicketResult createUpload() {
         try {
@@ -178,7 +185,7 @@ public class DeploymentService {
      * A move onto an owned box leaves tier=instant and status=READY for its whole run, so a bare
      * "OK" reads as "nothing is happening" — say what is happening instead.
      */
-    private static String moveNote(OwnedMoveDto move) {
+    private String moveNote(OwnedMoveDto move) {
         if (move == null || move.state() == null) {
             return "OK";
         }
@@ -190,11 +197,52 @@ public class DeploymentService {
             case "MOVING" -> "OK. A move onto the user's own VPS is in progress (stage " + stage
                     + "). It takes about two minutes end to end; poll this tool until tier reads 'owned'.";
             case "MOVED" -> "OK. This app runs on the user's own VPS.";
-            case "FAILED", "REFUSED" -> "OK. The last move onto the user's own VPS did not complete: "
-                    + detail + ". Calling osirAppMoveToOwned again retries it - it does not order "
-                    + "a second server.";
+            case "FAILED", "REFUSED" -> move.keyRefused()
+                    ? "OK. The last move onto the user's own VPS did not complete: the VPS refused the Osir "
+                            + "deploy key. " + keyRefusedSteps(move, platformSshPubkey)
+                    // Only an explicit false stops the retry advice: null is a C2 that predates the flag.
+                    : Boolean.FALSE.equals(move.retryable())
+                    ? "OK. The last move onto the user's own VPS did not complete: " + detail + ". Retrying "
+                            + "unchanged will not help: tell the user what it says, and if it is not something "
+                            + "they can fix, to contact Osir support quoting reason " + move.reason() + "."
+                    : "OK. The last move onto the user's own VPS did not complete: "
+                            + detail + ". Calling osirAppMoveToOwned again retries it - it does not order "
+                            + "a second server.";
             default -> "OK";
         };
+    }
+
+    /**
+     * What the user must change on their VPS before a move can pass a key refusal (spec §9.1). Static
+     * and pure so the move tool (mcp-server) says exactly the same thing. The key comes from C2's
+     * {@code params.publicKey} when sent (C2 holds the private half, so it is the source of truth),
+     * else from config.
+     */
+    public static String keyRefusedSteps(OwnedMoveDto move, String configuredKey) {
+        String key = displayKey(move == null ? null : move.param("publicKey"));
+        if (key == null) {
+            key = displayKey(configuredKey);
+        }
+        String keyStep = key == null
+                ? "add the Osir platform deploy key (Osir support has it)"
+                : "add this public key (safe to share) as one line: " + key;
+        return "Retrying without changing the VPS fails the same way, so do NOT call osirAppMoveToOwned yet. "
+                + "Tell the user to, on that VPS: (1) " + keyStep + " to /root/.ssh/authorized_keys, and make "
+                + "sure root may log in with a key (sshd_config PermitRootLogin prohibit-password or yes); "
+                + "(2) stop any web server holding ports 80/443 (e.g. 'systemctl disable --now nginx', or "
+                + "apache2) - Osir serves the app there with its own TLS. WARN them first: whatever that VPS "
+                + "serves today is replaced by this app. Only after they confirm both, call "
+                + "osirAppMoveToOwned again with the same instanceId.";
+    }
+
+    /** "type base64" plus a neutral comment: the configured line's own comment names an internal
+     *  host, and customers must not see it. Null for anything that is not a plausible key line. */
+    static String displayKey(String line) {
+        if (line == null) {
+            return null;
+        }
+        String[] parts = line.trim().split("\\s+");
+        return parts.length >= 2 && parts[0].startsWith("ssh-") ? parts[0] + " " + parts[1] + " osir-deploy" : null;
     }
 
     public SetSecretResult setSecret(String appId, String key, String value) {
