@@ -21,6 +21,7 @@
 11. [Product Catalog (Public)](#11-product-catalog-public)
 12. [Account & Profile](#12-account--profile)
 13. [Audit & Reporting](#13-audit--reporting)
+14. [App Deployment](#14-app-deployment)
 
 ---
 
@@ -1229,6 +1230,107 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
   "params": { "name": "getRecentActivity", "arguments": {} }
 }'
 ```
+
+---
+
+## 14. App Deployment
+
+**Apps are deployed and updated ONLY through these tools — never over SSH, never with a provisioning
+script, never by configuring a VPS by hand.** The platform ships the app to the customer's box itself
+over its own deploy key, so the assistant needs no shell access and no outbound SSH.
+
+### The whole lifecycle
+
+```
+osirAppCreateUpload → PUT the zip to putUrl → osirAppDeploy → https://<name>.<region>.osir.app
+                                                    ↓
+                                        osirAppDeployToVps (the customer's own box)
+                                                    ↓
+              update: osirAppGetSource → patch → osirAppCreateUpload → osirAppDeploy (SAME name)
+```
+
+There is no separate promote step. Once an app is on the customer's VPS, every later `osirAppDeploy`
+under the same name re-ships it to that box automatically and keeps its domain.
+
+### osirAppCreateUpload
+
+```bash
+curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
+  "jsonrpc": "2.0", "id": 130, "method": "tools/call",
+  "params": { "name": "osirAppCreateUpload", "arguments": {} }
+}'
+```
+
+Returns an `uploadTicket` and a `putUrl`. Zip the project and `curl -X PUT --upload-file app.zip "$putUrl"`.
+
+### osirAppDeploy
+
+```bash
+curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
+  "jsonrpc": "2.0", "id": 131, "method": "tools/call",
+  "params": {
+    "name": "osirAppDeploy",
+    "arguments": {
+      "name": "javacar-rentals",
+      "language": "node",
+      "uploadTicket": "upl_..."
+    }
+  }
+}'
+```
+
+`language` is `node`, `python`, `php-laravel` or `go`; use `node` for a plain static site. Deploying an
+existing name redeploys it and applies any secrets set with `osirAppSetSecret`.
+
+### osirAppDeployToVps
+
+Attach to a server the customer already owns — **spends nothing, needs no confirmation**:
+
+```bash
+curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
+  "jsonrpc": "2.0", "id": 132, "method": "tools/call",
+  "params": {
+    "name": "osirAppDeployToVps",
+    "arguments": {
+      "appName": "javacar-rentals",
+      "instanceId": "vps-12345",
+      "domain": "javacar.rentals"
+    }
+  }
+}'
+```
+
+Pass `packageId` (from `listVpsPackages`) **instead of** `instanceId` only when no server exists yet;
+that path COSTS MONEY and returns an `actionId` to confirm via `executeConfirmedAction`. Before staging
+any order the tool checks whether the customer already has a box for this app and attaches that instead,
+so a retry after a failed move never buys a second server.
+
+The move runs server-side in about two minutes. Watch it with `osirAppStatus` until `tier` reads
+`owned`; `ownedMove.stage` shows progress. If `ownedMove.state` is `FAILED` or `REFUSED`, read the
+message: usually call the tool again to retry, but when the VPS refused the Osir deploy key or its web
+ports are taken, the customer must fix the box first and the message says how.
+
+### osirAppStatus
+
+```bash
+curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
+  "jsonrpc": "2.0", "id": 133, "method": "tools/call",
+  "params": {
+    "name": "osirAppStatus",
+    "arguments": { "appId": "app_..." }
+  }
+}'
+```
+
+`qa` is an independent black-box check of the LIVE app after deploy: `PASSED` means it loaded and
+worked, `FAILED` means it deployed but did not, and `qa.findings` lists what to fix. On `BUILD_FAILED`,
+`recentErrors` explains why.
+
+### The rest
+
+`osirAppList`, `osirAppGetSource` (read the deployed source back to patch it), `osirAppSetSecret` (env
+secret, injected on the next deploy, never returned or logged), `osirAppLogs`,
+`osirAppProvisionDatabase`, `osirAppDelete` (gated).
 
 ---
 
