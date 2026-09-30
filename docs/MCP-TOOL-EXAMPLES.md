@@ -1316,7 +1316,7 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 | 78 | `osirAppLogs` | Yes | Deploy |
 | 79 | `osirAppProvisionDatabase` | Yes | Deploy |
 | 80 | `osirAppDelete` | Yes | Deploy |
-| 81 | `osirAppMoveToOwned` | Yes | Deploy |
+| 81 | `osirAppDeployToVps` | Yes | Deploy |
 | 82 | `osirAppGetSource` | Yes | Deploy |
 | 83 | `listMailPlans` | Yes | Mail |
 | 84 | `getMailboxQuote` | Yes | Mail |

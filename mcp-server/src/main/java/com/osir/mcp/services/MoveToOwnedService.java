@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Orchestrates osirAppMoveToOwned: order a VPS on the CUSTOMER's account (staged through the
+ * Orchestrates osirAppDeployToVps: order a VPS on the CUSTOMER's account (staged through the
  * existing confirmation gate), wait for the OS build, then hand C2 the ready box (C2 ships the
  * image server-side, the app's files never pass through the LLM) and bind DNS.
  *
@@ -194,7 +194,7 @@ public class MoveToOwnedService {
         if (mine == null || !mine.isSuccess() || mine.getInstances() == null) {
             throw new IllegalStateException("Could not read the servers on your account, so nothing was "
                     + "ordered (ordering one while an existing server is invisible could buy a second). "
-                    + "Try osirAppMoveToOwned again in a moment.");
+                    + "Try osirAppDeployToVps again in a moment.");
         }
         String hostname = appName + "-owned.osir.app";
         for (VpsInstanceSummary i : mine.getInstances()) {
@@ -228,12 +228,12 @@ public class MoveToOwnedService {
         String tracked = orderedInstances.putIfAbsent(moveKey, instanceId);
         if (ORDER_PENDING.equals(tracked)) {
             return MoveToOwnedResult.fail("An order for '" + appName + "' is being placed right now. "
-                    + "Wait a moment, then call osirAppMoveToOwned again to check progress, do not order again.");
+                    + "Wait a moment, then call osirAppDeployToVps again to check progress, do not order again.");
         }
         if (tracked != null && !tracked.equals(instanceId)) {
             return MoveToOwnedResult.fail("A move of '" + appName + "' onto VPS '" + tracked
                     + "' is already in progress, and an app can have only one owned box at a time. Call "
-                    + "osirAppMoveToOwned without instanceId to resume that one.");
+                    + "osirAppDeployToVps without instanceId to resume that one.");
         }
         LOG.infof("moveToOwned: attaching app %s to instance %s the customer already owns (no order)",
                 appName, instanceId);
@@ -254,7 +254,7 @@ public class MoveToOwnedService {
         String existing = orderedInstances.putIfAbsent(moveKey, ORDER_PENDING);
         if (ORDER_PENDING.equals(existing)) {
             return MoveToOwnedResult.fail("An order for '" + appName + "' is being placed right now. "
-                    + "Wait a moment, then call osirAppMoveToOwned again to check progress, do not order again.");
+                    + "Wait a moment, then call osirAppDeployToVps again to check progress, do not order again.");
         }
         if (existing != null) {
             LOG.infof("moveToOwned: duplicate execute for app %s, resuming instance %s instead of re-ordering",
@@ -285,11 +285,11 @@ public class MoveToOwnedService {
         String instanceId = orderedInstances.get(moveKey);
         if (instanceId == null) {
             return MoveToOwnedResult.fail("No move in progress for '" + appName
-                    + "'. Call osirAppMoveToOwned with a packageId to start one.");
+                    + "'. Call osirAppDeployToVps with a packageId to start one.");
         }
         if (ORDER_PENDING.equals(instanceId)) {
             return MoveToOwnedResult.fail("The order for '" + appName + "' is still being placed. "
-                    + "Wait a moment and call osirAppMoveToOwned again, do not order again.");
+                    + "Wait a moment and call osirAppDeployToVps again, do not order again.");
         }
         return pollAndFinish(appName, moveKey, instanceId, domain);
     }
@@ -312,7 +312,7 @@ public class MoveToOwnedService {
                         instanceId, instance.getIpAddress(), domain, null,
                         "1) listVpsOsTemplates(instanceId=" + instanceId + ") to resolve the current Ubuntu 24.04 "
                                 + "template id. 2) buildVpsInstance with that id (confirm via executeConfirmedAction). "
-                                + "3) Call osirAppMoveToOwned again with the same arguments to resume.");
+                                + "3) Call osirAppDeployToVps again with the same arguments to resume.");
             }
             // UNBUILT is not a phase that passes on its own: the box has no operating system, which
             // is reachable now that a customer can attach a server this tool never built. Waiting it
@@ -324,7 +324,7 @@ public class MoveToOwnedService {
                         instanceId, instance.getIpAddress(), domain, null,
                         "1) listVpsOsTemplates(instanceId=" + instanceId + ") to resolve the current Ubuntu 24.04 "
                                 + "template id. 2) buildVpsInstance with that id (confirm via executeConfirmedAction). "
-                                + "3) Call osirAppMoveToOwned again with the same arguments to resume. Installing an OS "
+                                + "3) Call osirAppDeployToVps again with the same arguments to resume. Installing an OS "
                                 + "ERASES the server, so confirm with the user that it holds nothing they need.");
             }
             if (System.currentTimeMillis() >= deadline) {
@@ -332,14 +332,14 @@ public class MoveToOwnedService {
                         "VPS '" + instanceId + "' is still building (" + (buildState == null ? "status pending" : buildState)
                                 + "). Nothing more will be charged.",
                         instanceId, instance == null ? null : instance.getIpAddress(), domain, null,
-                        "Call osirAppMoveToOwned again with the same arguments in a minute, it resumes and never orders twice.");
+                        "Call osirAppDeployToVps again with the same arguments in a minute, it resumes and never orders twice.");
             }
             try {
                 Thread.sleep(pollIntervalMs);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return MoveToOwnedResult.fail("Interrupted while waiting for the VPS build. "
-                        + "Call osirAppMoveToOwned again with the same arguments to resume.");
+                        + "Call osirAppDeployToVps again with the same arguments to resume.");
             }
         }
     }
@@ -353,7 +353,7 @@ public class MoveToOwnedService {
                     "VPS '" + instanceId + "' is built but has no IP address assigned yet. "
                             + "Nothing more will be charged.",
                     instanceId, null, domain, null,
-                    "Call osirAppMoveToOwned again with the same arguments in a minute, it resumes and never orders twice.");
+                    "Call osirAppDeployToVps again with the same arguments in a minute, it resumes and never orders twice.");
         }
         // C2 is ALREADY shipping this app: re-POSTing would re-dispatch a move that is running.
         // Only MOVING suppresses. FAILED and REFUSED must still re-dispatch — a repeat call is how a
@@ -386,7 +386,7 @@ public class MoveToOwnedService {
                                 + (running == null ? "" : " onto VPS '" + running + "'") + ": " + why
                                 + ". Nothing more will be charged.",
                         instanceId, ip, domain, false,
-                        "Call osirAppMoveToOwned again for '" + appName + "' WITHOUT instanceId in a minute - "
+                        "Call osirAppDeployToVps again for '" + appName + "' WITHOUT instanceId in a minute - "
                                 + "that polls the move already running instead of starting another one.");
             }
             // The app already has its one owned box. Not a failure to escalate: point at that box. The
@@ -405,7 +405,7 @@ public class MoveToOwnedService {
                         instanceId, ip, domain, false,
                         "Do not retry with instanceId '" + instanceId + "'. Check osirAppStatus for '" + appName
                                 + "' ('ownedMove') to see how the move onto " + boundBox + " is going, and call "
-                                + "osirAppMoveToOwned for '" + appName + "' WITHOUT instanceId to resume or re-check "
+                                + "osirAppDeployToVps for '" + appName + "' WITHOUT instanceId to resume or re-check "
                                 + "that move.");
             }
             String support = "if it is not something they can fix, ask them to contact Osir support quoting app '"
@@ -424,7 +424,7 @@ public class MoveToOwnedService {
                         ? "STOP retrying with the same arguments - this exact refusal has come back "
                                 + seen.count() + " times, so another call will not change it. Tell the user what "
                                 + "it says; " + support
-                        : "Address what the refusal says if you can, then call osirAppMoveToOwned again with the "
+                        : "Address what the refusal says if you can, then call osirAppDeployToVps again with the "
                                 + "same arguments to retry the ship step (attempt " + (seen.count() + 1) + " of 3).";
             }
             return new MoveToOwnedResult(false, "FAILED",
@@ -512,10 +512,10 @@ public class MoveToOwnedService {
     private static String pollAdvice(String appName) {
         return "Check osirAppStatus for '" + appName + "' every 20-30 seconds until tier reads 'owned' "
                 + "- about two minutes in total (box prep ~60s, image ship ~40s). ownedMove.stage in that "
-                + "response shows where it is; ownedMove.state FAILED means call osirAppMoveToOwned again, "
+                + "response shows where it is; ownedMove.state FAILED means call osirAppDeployToVps again, "
                 + "which retries the ship and never orders a second server - unless osirAppStatus says the box "
                 + "refused the Osir deploy key or its web ports are taken: then the user must fix the VPS first, as "
-                + "that response explains.";
+                + "that response explains. Once it reads 'owned': " + DeploymentService.OWNED_UPDATE_RULE;
     }
 
     /**

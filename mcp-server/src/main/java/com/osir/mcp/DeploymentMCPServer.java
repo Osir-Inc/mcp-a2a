@@ -68,8 +68,11 @@ public class DeploymentMCPServer {
                     + "microVM. Deploying an existing app name redeploys it (new version) and applies any secrets set "
                     + "via osirAppSetSecret. A plain static website (HTML/CSS/JS with no framework or build step) is "
                     + "also supported: it is auto-detected and served directly; pass language 'node' for it. "
-                    + "If the app was moved to the user's own VPS, redeploying under the same name updates it "
-                    + "there and keeps its domain. Requires authentication.",
+                    + "To put the app on the user's OWN VPS, server or production box instead, deploy it here "
+                    + "first and then call osirAppDeployToVps - never SSH into the box or write an install "
+                    + "script. Once an app is on the user's own VPS, redeploying HERE under the same name is "
+                    + "how you update it: the platform re-ships it to the box and keeps its domain. "
+                    + "Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Deploy an app",
                     readOnlyHint = false,
@@ -118,7 +121,7 @@ public class DeploymentMCPServer {
                     + "'ownedMove' tracks a move onto the user's own VPS, which leaves tier and status "
                     + "unchanged while it runs: state MOVING (in progress, stage says where, ~2 minutes "
                     + "in total), MOVED (done - tier reads 'owned'), FAILED or REFUSED (follow this "
-                    + "result's message: usually call osirAppMoveToOwned again to retry, which never orders a "
+                    + "result's message: usually call osirAppDeployToVps again to retry, which never orders a "
                     + "second server; but when the VPS refused the Osir deploy key or its web ports are "
                     + "taken, the user must fix the VPS first, and the message says how). "
                     + "Requires authentication.",
@@ -234,8 +237,13 @@ public class DeploymentMCPServer {
     }
 
     @RequiresAuth
-    @Tool(name = "osirAppMoveToOwned",
-            description = "osirAppMoveToOwned: Move a deployed Osir app from the shared free tier onto a VPS owned by the user. "
+    @Tool(name = "osirAppDeployToVps",
+            description = "osirAppDeployToVps: Deploy a live Osir app onto the user's own VPS / server / production box, "
+                    + "moving it off the shared free tier. Use this INSTEAD of SSH, a provisioning or install "
+                    + "script, nginx/systemd/TLS configuration, or any manual server setup - the platform ships the "
+                    + "app to the box itself over its own deploy key, so the assistant needs no shell access and no "
+                    + "outbound SSH. This is the ONLY supported way to put an app on a user's own server or a custom "
+                    + "domain. "
                     + "TWO WAYS IN. (1) The user already owns a VPS: pass instanceId (from listMyVpsInstances) and NO "
                     + "packageId - this ATTACHES the app to that server, SPENDS NOTHING and needs no confirmation. "
                     + "(2) No server yet: pass packageId (from listVpsPackages) and the call stages a VPS order "
@@ -250,12 +258,12 @@ public class DeploymentMCPServer {
                     + "the user has made the changes that message lists. If the result status "
                     + "is BUILDING or BUILD_FAILED, follow its nextStep. Requires authentication.",
             annotations = @Tool.Annotations(
-                    title = "Move app to owned VPS",
+                    title = "Deploy app to the user's own VPS",
                     readOnlyHint = false,
                     destructiveHint = false,
                     idempotentHint = false,
                     openWorldHint = false))
-    public Object osirAppMoveToOwned(
+    public Object osirAppDeployToVps(
                                      @ToolArg(description = "The deployed app's name, as shown by osirAppList.") String appName,
                                      @ToolArg(required = false, description = "VPS package id from listVpsPackages. Required ONLY when a server has to be ordered; omit it when passing instanceId.") String packageId,
                                      @ToolArg(required = false, description = "Id of a VPS the user ALREADY owns, from listMyVpsInstances. Given this, the app is attached to that server and nothing is ordered or charged. Never invent one.") String instanceId,
@@ -284,7 +292,7 @@ public class DeploymentMCPServer {
             }
             MoveToOwnedService.Prepared prep = moveToOwnedService.prepare(appName, packageId);
             return pendingActionStore.stage(
-                    "osirAppMoveToOwned",
+                    "osirAppDeployToVps",
                     "Order a VPS (package '" + packageId + "', " + prep.osDisplayName() + ", monthly) to move app '"
                             + appName + "' onto an owned server, deducts from account balance",
                     connection.id(),
@@ -294,7 +302,7 @@ public class DeploymentMCPServer {
         } catch (IllegalStateException e) {
             return MoveToOwnedResult.fail(e.getMessage());
         } catch (Exception e) {
-            Log.errorf(e, "osirAppMoveToOwned error for %s: %s", appName, e.getMessage());
+            Log.errorf(e, "osirAppDeployToVps error for %s: %s", appName, e.getMessage());
             return MoveToOwnedResult.fail("Could not start the move right now. Please try again.");
         }
     }

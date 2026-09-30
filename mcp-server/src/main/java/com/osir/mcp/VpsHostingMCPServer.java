@@ -82,7 +82,7 @@ public class VpsHostingMCPServer {
     // Authenticated VPS tools
 
     @RequiresAuth
-    @Tool(description = "orderVps: Stage an order for a new VPS instance; deducts from account balance. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "orderVps: Stage an order for a new VPS instance; deducts from account balance. If this server is being ordered to host an Osir app, do NOT configure it by hand afterwards: deploy the app with osirAppDeploy, then put it on the box with osirAppDeployToVps. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Order a VPS",
                     readOnlyHint = false,
@@ -138,7 +138,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "buildVpsInstance: Stage an operating system install (or reinstall) on a VPS instance. DESTRUCTIVE: ERASES ALL DATA on the server, including any deployed application, and cannot be undone. The install is asynchronous; afterwards poll getVpsInstanceDetails until buildState is COMPLETE. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "buildVpsInstance: Stage an operating system install (or reinstall) on a VPS instance. DESTRUCTIVE: ERASES ALL DATA on the server, including any deployed application, and cannot be undone. The install is asynchronous; afterwards poll getVpsInstanceDetails until buildState is COMPLETE. If an Osir app was deployed onto this instance, a rebuild erases it; re-attach it afterwards with osirAppDeployToVps. Never rebuild a box just to install an app runtime by hand. Requires authentication. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
             annotations = @Tool.Annotations(
                     title = "Install OS on VPS",
                     readOnlyHint = false,
@@ -223,7 +223,7 @@ public class VpsHostingMCPServer {
     }
 
     @RequiresAuth
-    @Tool(description = "listMyVpsInstances: List all VPS instances owned by the authenticated user. Requires authentication.",
+    @Tool(description = "listMyVpsInstances: List all VPS instances owned by the authenticated user. An instanceId from this list is what osirAppDeployToVps takes to put an app on a server the user already owns, at no cost. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "List my VPS instances",
                     readOnlyHint = true,

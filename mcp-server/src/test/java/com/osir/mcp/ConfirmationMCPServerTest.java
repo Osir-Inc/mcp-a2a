@@ -71,9 +71,9 @@ class ConfirmationMCPServerTest {
     @Test
     void executeConfirmedAction_recordResultFailure_reportsFailure() {
         // Records expose success(), not isSuccess() — a failed record result must NOT be
-        // wrapped as "executed successfully" (the osirAppMoveToOwned BUILD_FAILED case).
+        // wrapped as "executed successfully" (the osirAppDeployToVps BUILD_FAILED case).
         record RecordResult(boolean success, String status) {}
-        PendingAction pending = action("action-rec", "osirAppMoveToOwned", PRINCIPAL,
+        PendingAction pending = action("action-rec", "osirAppDeployToVps", PRINCIPAL,
                 DestructiveOpRateLimiter.Bucket.FINANCIAL,
                 System.currentTimeMillis() + 300_000, () -> new RecordResult(false, "BUILD_FAILED"));
         when(pendingActionStore.claim("action-rec")).thenReturn(Optional.of(pending));
@@ -87,7 +87,7 @@ class ConfirmationMCPServerTest {
     @Test
     void executeConfirmedAction_recordResultSuccess_reportsSuccess() {
         record RecordResult(boolean success) {}
-        PendingAction pending = action("action-rec-ok", "osirAppMoveToOwned", PRINCIPAL,
+        PendingAction pending = action("action-rec-ok", "osirAppDeployToVps", PRINCIPAL,
                 DestructiveOpRateLimiter.Bucket.FINANCIAL,
                 System.currentTimeMillis() + 300_000, () -> new RecordResult(true));
         when(pendingActionStore.claim("action-rec-ok")).thenReturn(Optional.of(pending));

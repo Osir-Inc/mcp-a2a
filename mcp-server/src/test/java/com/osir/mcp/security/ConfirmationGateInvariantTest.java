@@ -26,7 +26,7 @@ class ConfirmationGateInvariantTest {
     private static final Path SERVERS = Path.of("src/main/java/com/osir/mcp");
 
     // A tool "stages" if its source calls pendingActionStore.stage("<toolName>", ...). Source-level on
-    // purpose: osirAppMoveToOwned returns Object and stages only when it has to order a VPS.
+    // purpose: osirAppDeployToVps returns Object and stages only when it has to order a VPS.
     private static final Pattern STAGE_CALL = Pattern.compile("pendingActionStore\\.stage\\(\\s*\"([A-Za-z]+)\"");
 
     // ponytail: financial tools are named, not inferred. A new billable tool must be added here
@@ -34,7 +34,7 @@ class ConfirmationGateInvariantTest {
     private static final Set<String> GATED = Set.of(
             // money
             "orderVps", "payInvoice", "createPaymentSession", "registerDomain", "renewDomain",
-            "transferDomain", "initiateTransfer", "createMailbox", "changeVpsPaymentTerm", "osirAppMoveToOwned",
+            "transferDomain", "initiateTransfer", "createMailbox", "changeVpsPaymentTerm", "osirAppDeployToVps",
             // data loss
             "deleteSshKey", "deleteContact", "osirAppDelete", "deleteDnsRecord", "unlockDomain",
             "deleteHost", "deleteMailbox", "cancelTransfer", "buildVpsInstance", "deleteVpsInstance");

@@ -57,7 +57,7 @@ class DeploymentServiceStatusTest {
                 "box 1.2.3.4 refused the Osir deploy key — it was not built with it; add the platform key "
                         + "to root's authorized_keys, then retry", "2026-09-19T10:00:00Z"));
 
-        assertTrue(msg.contains("do NOT call osirAppMoveToOwned yet"), msg);
+        assertTrue(msg.contains("do NOT call osirAppDeployToVps yet"), msg);
         assertTrue(msg.contains("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAconfigured osir-deploy"), msg);
         assertTrue(msg.contains("/root/.ssh/authorized_keys"), msg);
         assertTrue(msg.contains("PermitRootLogin"), msg);
@@ -115,7 +115,7 @@ class DeploymentServiceStatusTest {
                 C2Reason.BOX_PORTS_IN_USE, false, Map.of("ports", "80,443")));
 
         assertTrue(msg.contains("port(s) 80/443"), msg);
-        assertTrue(msg.contains("do NOT call osirAppMoveToOwned yet"), msg);
+        assertTrue(msg.contains("do NOT call osirAppDeployToVps yet"), msg);
         assertTrue(msg.contains("replaced by this app"), msg);
         assertTrue(msg.contains("same instanceId"), msg);
         assertFalse(msg.contains("authorized_keys"), msg);
@@ -164,5 +164,18 @@ class DeploymentServiceStatusTest {
 
         assertTrue(msg.contains("scp-to failed (exit 255)"), msg);
         assertTrue(msg.contains("retries it"), msg);
+    }
+
+    /**
+     * The whole point of spec_mcp_client_update_flow.md §4: a model that already deployed never
+     * re-reads tool descriptions, so an owned-tier result must carry the update rule itself. If
+     * this hint goes quiet, the 2026-09-30 hand-written-install.sh failure comes straight back.
+     */
+    @Test
+    void anAppOnItsOwnBoxIsToldHowToUpdateIt() {
+        String msg = statusMessage(new OwnedMoveDto("MOVED", null, null, null));
+
+        assertTrue(msg.contains("osirAppDeploy under the SAME name"), msg);
+        assertTrue(msg.contains("install script"), msg);
     }
 }

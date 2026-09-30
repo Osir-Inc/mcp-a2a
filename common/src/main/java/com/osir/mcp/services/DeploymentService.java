@@ -79,8 +79,11 @@ public class DeploymentService {
                     ? null : SourceRefBody.inlineArchive(uploadTicket);
             AppEnvelope e = client.deploy(new DeployAppBody(name, language, region, source), bearer(), tenant());
             var a = e.app();
-            return new DeployResult(true, "Deploy started for '" + a.name() + "'. Poll osirAppStatus until READY.",
-                    a.appId(), a.liveUrl(), a.status());
+            String note = "Deploy started for '" + a.name() + "'. Poll osirAppStatus until READY.";
+            if ("owned".equalsIgnoreCase(a.tier())) {
+                note += " This app runs on the user's own VPS; this deploy re-ships it there and keeps its domain.";
+            }
+            return new DeployResult(true, note, a.appId(), a.liveUrl(), a.status());
         } catch (jakarta.ws.rs.WebApplicationException ex) {
             // Surface C2's 4xx reason — it's written for the caller (e.g. invalid name/region) and
             // the LLM needs it to fix the call. 5xx stays generic.
@@ -210,6 +213,17 @@ public class DeploymentService {
     }
 
     /**
+     * The update loop, repeated in every owned-tier result. A model that already deployed will not
+     * re-read tool descriptions, so the rule has to travel with the payload — the failure of
+     * 2026-09-30 was an assistant offering to hand-write an install.sh for a box the platform
+     * already ships to (spec_mcp_client_update_flow.md §4).
+     */
+    public static final String OWNED_UPDATE_RULE =
+            "To update it, change the source and call osirAppDeploy under the SAME name - the platform "
+            + "re-ships it to the box automatically. Never deploy to the box by hand, over SSH or with "
+            + "an install script.";
+
+    /**
      * A move onto an owned box leaves tier=instant and status=READY for its whole run, so a bare
      * "OK" reads as "nothing is happening" — say what is happening instead.
      */
@@ -225,7 +239,7 @@ public class DeploymentService {
         return switch (move.state().toUpperCase()) {
             case "MOVING" -> "OK. A move onto the user's own VPS is in progress (stage " + stage
                     + "). It takes about two minutes end to end; poll this tool until tier reads 'owned'.";
-            case "MOVED" -> "OK. This app runs on the user's own VPS.";
+            case "MOVED" -> "OK. This app runs on the user's own VPS. " + OWNED_UPDATE_RULE;
             case "FAILED", "REFUSED" -> userFix != null
                     ? "OK. The last move onto the user's own VPS did not complete. " + userFix
                     // Only an explicit false stops the retry advice: null is a row from before the flag.
@@ -235,7 +249,7 @@ public class DeploymentService {
                             + "they can fix, to contact Osir support"
                             + (move.reason() == null ? "" : " quoting reason " + move.reason()) + "."
                     : "OK. The last move onto the user's own VPS did not complete: "
-                            + detail + ". Calling osirAppMoveToOwned again retries it - it does not order "
+                            + detail + ". Calling osirAppDeployToVps again retries it - it does not order "
                             + "a second server.";
             default -> "OK";
         };
@@ -252,9 +266,9 @@ public class DeploymentService {
             return null;
         }
         String retryLast = "Retrying without changing the VPS fails the same way, so do NOT call "
-                + "osirAppMoveToOwned yet. ";
+                + "osirAppDeployToVps yet. ";
         String replaceWarning = "WARN them first: whatever that VPS serves today is replaced by this app. ";
-        String thenRetry = "Only after they confirm, call osirAppMoveToOwned again with the same instanceId.";
+        String thenRetry = "Only after they confirm, call osirAppDeployToVps again with the same instanceId.";
         if (move.keyRefused()) {
             String key = displayKey(move.param("publicKey"));
             if (key == null) {
