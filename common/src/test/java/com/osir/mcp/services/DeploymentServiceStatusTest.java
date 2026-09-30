@@ -178,4 +178,26 @@ class DeploymentServiceStatusTest {
         assertTrue(msg.contains("osirAppDeploy under the SAME name"), msg);
         assertTrue(msg.contains("install script"), msg);
     }
+
+    /**
+     * An app moved onto a box long enough ago that C2 no longer returns a move row still has to be
+     * told how to update itself — the binding is the durable signal, not the move row. Without this
+     * the oldest owned apps, the ones most likely to be updated by hand, get a bare "OK".
+     */
+    @Test
+    void anAppBoundToABoxWithNoMoveRowStillGetsTheUpdateRule() {
+        String msg = statusMessage((OwnedMoveDto) null);
+
+        assertTrue(msg.contains("runs on the user's own VPS"), msg);
+        assertTrue(msg.contains("osirAppDeploy under the SAME name"), msg);
+    }
+
+    /** A free-tier app is bound to nothing and must not be told it has a box. */
+    @Test
+    void aFreeTierAppIsNotToldItHasAVps() {
+        when(client.status(eq("app1"), anyString(), anyString()))
+                .thenReturn(new StatusEnvelope(null, null, null, List.of(), null, null, null, null));
+
+        assertEquals("OK", service.getStatus("app1").message());
+    }
 }

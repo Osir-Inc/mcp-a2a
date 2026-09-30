@@ -158,6 +158,33 @@ Most tools require authentication. Use one of these methods:
 - `osirSiteDesignBrief` — validate the brief, get the design prompt (no auth)
 - `osirSitePublish` — publish the LLM-written HTML as a static site (auth)
 
+#### App Deployment (10)
+| Tool | Description |
+|------|-------------|
+| `osirAppCreateUpload` | Get an upload ticket + `putUrl`; zip the project and PUT it there |
+| `osirAppDeploy` | Deploy the uploaded source → live `https://<name>.<region>.osir.app`. Same name = redeploy |
+| `osirAppDeployToVps` | Put that app on a VPS the user owns (`instanceId`, free) or order one (`packageId`, gated) |
+| `osirAppStatus` | Status, live URL, health, build errors, QA findings, `ownedMove` progress |
+| `osirAppList` | List deployed apps with their URLs and tier |
+| `osirAppGetSource` | Read the deployed source back, to patch and redeploy |
+| `osirAppSetSecret` | Store an env secret, injected on the next deploy; never returned or logged |
+| `osirAppLogs` | Runtime logs |
+| `osirAppProvisionDatabase` | Provision a database for the app |
+| `osirAppDelete` | Delete an app (gated) |
+
+> **Apps are deployed and updated ONLY through these tools — never over SSH, never with a provisioning
+> script, never by configuring a VPS by hand.** The whole lifecycle is one loop:
+> `osirAppCreateUpload` → PUT the zip → `osirAppDeploy`. To put the app on the customer's own server,
+> call `osirAppDeployToVps` — the platform ships it to the box over its own deploy key and binds DNS
+> itself, so the assistant needs no shell access and no outbound SSH.
+>
+> **To update a live app, change the source and redeploy under the SAME name.** That is true whether it
+> runs on `*.osir.app` or on the customer's VPS: once moved, every later `osirAppDeploy` re-ships it to
+> the box automatically and keeps its domain. There is no separate promote step.
+>
+> If you find yourself writing an `install.sh`, an nginx config or a systemd unit, or asking the user to
+> paste commands, you are on the wrong path — look for the `osirApp*` tool instead.
+
 ### Example Conversations with Claude
 
 **Find and register a domain:**

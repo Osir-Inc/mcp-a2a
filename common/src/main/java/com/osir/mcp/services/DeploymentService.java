@@ -204,8 +204,8 @@ public class DeploymentService {
             StatusEnvelope e = client.status(appId, bearer(), tenant());
             String depState = e.deployment() == null ? null : e.deployment().state();
             var errors = e.recentErrors() == null ? java.util.List.<RecentErrorDto>of() : e.recentErrors();
-            return new AppStatusResult(true, moveNote(e.ownedMove()), e.app(), e.health(), depState,
-                    errors, e.qa(), e.ownedInstanceId(), e.boxIp(), e.ownedMove());
+            return new AppStatusResult(true, moveNote(e.ownedMove(), e.ownedInstanceId()), e.app(),
+                    e.health(), depState, errors, e.qa(), e.ownedInstanceId(), e.boxIp(), e.ownedMove());
         } catch (Exception ex) {
             LOG.errorf(ex, "getStatus failed for %s", appId);
             return AppStatusResult.fail("Could not get the app status right now. Please try again.");
@@ -227,9 +227,14 @@ public class DeploymentService {
      * A move onto an owned box leaves tier=instant and status=READY for its whole run, so a bare
      * "OK" reads as "nothing is happening" — say what is happening instead.
      */
-    private String moveNote(OwnedMoveDto move) {
+    private String moveNote(OwnedMoveDto move, String ownedInstanceId) {
         if (move == null || move.state() == null) {
-            return "OK";
+            // No move row, but the app is bound to a box: one moved long enough ago that C2 no longer
+            // reports the move still answers here, and it is exactly the app an assistant is most
+            // likely to try to update by hand. The binding is the durable signal, not the move row.
+            return ownedInstanceId == null || ownedInstanceId.isBlank()
+                    ? "OK"
+                    : "OK. This app runs on the user's own VPS. " + OWNED_UPDATE_RULE;
         }
         // Every field but state is nullable on the wire; an unfilled one must not reach the model as
         // the word "null".

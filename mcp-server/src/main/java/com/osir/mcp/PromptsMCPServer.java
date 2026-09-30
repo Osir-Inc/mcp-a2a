@@ -41,6 +41,13 @@ public class PromptsMCPServer {
                - getDomainInfo("yourdomain.com") for details on any domain
                - getAccountBalance() to check your account balance
 
+            6. DEPLOY A SITE OR APP
+               - osirAppCreateUpload() → zip the project and PUT it to the returned putUrl
+               - osirAppDeploy(name, language, uploadTicket) → a live https://<name>.<region>.osir.app
+               - osirAppDeployToVps(appName, instanceId) puts that same app on a VPS the user owns
+               - To update it later, redeploy under the SAME name. Never SSH in or write an install
+                 script: the platform ships the app to the box itself.
+
             Tips:
             - Always enable WHOIS privacy protection for personal domains
             - Set up auto-renewal to prevent accidental expiration
@@ -48,10 +55,17 @@ public class PromptsMCPServer {
             """));
     }
 
-    @Prompt(name = "vps_setup_guide", description = "Order and provision a VPS end to end: pick a package, store an SSH key, order, wait for the OS build, connect your domain.")
+    @Prompt(name = "vps_setup_guide", description = "Order and provision a RAW VPS the user administers over SSH: pick a package, store an SSH key, order, wait for the OS build, connect your domain. NOT for hosting an Osir app - use osirAppDeploy then osirAppDeployToVps for that.")
     public PromptMessage vpsSetupGuide() {
         return PromptMessage.withUserRole(new TextContent("""
             VPS Setup Guide, Step by Step
+
+            FIRST, CHECK THIS IS THE RIGHT GUIDE.
+            This covers a RAW server the user administers themselves over SSH. If the goal is to host
+            an Osir app or a website, STOP: none of the steps below apply. Deploy with osirAppDeploy,
+            then put it on the user's box with osirAppDeployToVps - the platform ships the app over
+            its own deploy key and binds DNS itself. You never SSH in, write an install script, or
+            configure nginx, systemd or TLS by hand.
 
             1. BROWSE OPTIONS
                - listVpsPackages() to see available plans (CPU, RAM, storage, price)
