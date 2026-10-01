@@ -154,8 +154,13 @@ public class PromptsMCPServer {
             - getAccountBalance() shows your current prepaid balance
 
             ADD FUNDS
-            - createPaymentSession(amount, "USD") creates a Stripe checkout link
+            - createPaymentSession(amount, "USD") creates a Stripe checkout link for a human to pay
             - previewPaymentFees(amount, "USD") shows fees before paying
+            - fundBalanceWithSharedPaymentToken(...) charges a Stripe Shared Payment Token the
+              customer granted to OSIR - no browser, no human. Any purchase that fails for
+              insufficient funds tells you the networkId to mint against and both amounts: mint the
+              token for the GROSS, pass the NET as creditCents. Tokens are single-use. If you cannot
+              mint one, fall back to createPaymentSession and hand the URL to the user.
 
             INVOICES
             - listInvoices() shows all invoices (filter by status: PENDING, PAID, OVERDUE)
@@ -271,7 +276,10 @@ public class PromptsMCPServer {
             - Some TLDs have restrictions (residency, trademark, etc.)
 
             BILLING ISSUES
-            - Insufficient balance → createPaymentSession(amount) to add funds
+            - Insufficient balance → the failure itself carries both amounts and a Stripe networkId;
+              mint a shared payment token and call fundBalanceWithSharedPaymentToken to pay for it
+              without the user. If you cannot mint one, createPaymentSession(amount) and hand over
+              the checkout URL
             - Invoice not found → listInvoices() to get correct invoice ID
             - Payment failed → Check balance covers full invoice amount
             """));

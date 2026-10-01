@@ -74,7 +74,7 @@ Still open (docs/TODO.md): Idempotency-Key pass-through (backend ledger), per-to
 ## Quality-score pass + MCP 2.x upgrade (2026-09-02)
 
 Directory scorecard feedback (score 41) worked in full:
-1. **Tool annotations** - all 105 tools carry `@Tool.Annotations` (title, readOnlyHint, destructiveHint, idempotentHint, openWorldHint=false). Deletes/unlock/OS-rebuild/executeConfirmedAction are destructiveHint=true; reads are readOnly+idempotent.
+1. **Tool annotations** - all 107 tools carry `@Tool.Annotations` (title, readOnlyHint, destructiveHint, idempotentHint, openWorldHint=false). Deletes/unlock/OS-rebuild/executeConfirmedAction are destructiveHint=true; reads are readOnly+idempotent.
 2. **Parameter descriptions** - every non-session parameter described (enums, formats, ranges: DNS types, paymentTerm values, +CC.number phones, ISO country codes, years 1-10).
 3. **Output schemas** - `structuredContent=true` on the 11 most-chained tools (availability, pricing, quotes, bundle, balance, auth/device status, onboarding) + compatibility-mode so legacy clients still get text. Known gap: `@JsonPropertyDescription` on nested POJOs (RegistrantInfo, Contact) does not reach the generated schema in quarkus-mcp 2.0.0; the parameter-level descriptions carry the formats instead.
 4. **Server instructions** - `server-info.instructions` ships the 5-rule orientation in every initialize response.

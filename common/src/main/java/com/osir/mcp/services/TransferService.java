@@ -2,6 +2,7 @@ package com.osir.mcp.services;
 
 import com.osir.mcp.clients.TransferBackendClient;
 import com.osir.mcp.models.transfer.*;
+import com.osir.mcp.util.FundingHint;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
@@ -59,7 +60,7 @@ public class TransferService {
             return result;
         } catch (Exception e) {
             LOG.errorf(e, "Error initiating transfer for %s: %s", domain, e.getMessage());
-            return new TransferInitiateResult(false, "Failed to initiate transfer: " + e.getMessage());
+            return new TransferInitiateResult(false, FundingHint.describe("Failed to initiate transfer", e));
         }
     }
 

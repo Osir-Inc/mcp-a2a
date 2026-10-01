@@ -517,7 +517,7 @@ docker-compose logs -f
 ┌──────▼──────┐ ┌─▼──────────────────────────┐
 │ MCP Server  │ │ A2A Server                  │
 │ :8081       │ │ :8082                       │
-│ 105 tools   │ │ Orchestrator                │
+│ 107 tools   │ │ Orchestrator                │
 │  11 prompts │ │  ├─ Domain Agent (13 skills)│
 │             │ │  ├─ DNS Agent (5 skills)    │
 │             │ │  ├─ VPS Agent (12 skills)   │

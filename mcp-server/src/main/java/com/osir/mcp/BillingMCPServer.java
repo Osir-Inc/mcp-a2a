@@ -125,6 +125,35 @@ public class BillingMCPServer {
         );
     }
 
+    @Tool(description = "fundBalanceWithSharedPaymentToken: Stage adding funds to the balance by charging a Stripe Shared Payment Token the customer granted to OSIR. Use when a purchase (registerDomain, renewDomain, transferDomain, orderVps) failed for insufficient funds: that error tells you the networkId to mint against and both amounts. Mint the token for the GROSS and pass the NET as creditCents. Tokens are single-use. Requires authentication. Returns an actionId; tell the user what the card will be charged, then call executeConfirmedAction with the actionId if they approve. If this fails in any way you cannot fix by minting a fresh token, fall back to createPaymentSession and give the user the checkout URL.",
+            annotations = @Tool.Annotations(
+                    title = "Fund balance with a shared payment token",
+                    readOnlyHint = false,
+                    destructiveHint = false,
+                    idempotentHint = false,
+                    openWorldHint = false))
+    public ConfirmationRequiredResult fundBalanceWithSharedPaymentToken(
+            @ToolArg(description = "The Stripe Shared Payment Token, 'spt_...'. Minted for the GROSS amount against the networkId from the insufficient-funds error. Single-use.") String sharedPaymentToken,
+            @ToolArg(description = "NET amount to land in the balance, in minor units (cents). Use fundNetCents from the insufficient-funds error. The card is charged this plus the processing fee.") int creditCents,
+            @ToolArg(required = false, description = "3-letter ISO 4217 currency code, default USD. Must match the balance currency.") String currency,
+            @ToolArg(required = false, description = "The usage_limits max_amount the token was minted with, i.e. fundGrossCents. Supplying it lets OSIR reject an impossible charge without calling Stripe.") Integer maxChargeCents,
+            @ToolArg(required = false, description = "What the funds are for, e.g. 'Funding registration of example.com'. Lands on the customer's transaction record.") String description,
+            @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
+            McpConnection connection) {
+        String currencyLabel = currency != null ? currency : "USD";
+        String charge = maxChargeCents != null ? maxChargeCents + " " + currencyLabel + " (gross)" : "the token limit";
+        return pendingActionStore.stage(
+                "fundBalanceWithSharedPaymentToken",
+                "Charge the customer's granted payment token " + charge + " to add "
+                        + creditCents + " " + currencyLabel + " (net) to the OSIR balance"
+                        + (description != null ? " - " + description : ""),
+                connection.id(),
+                DestructiveOpRateLimiter.Bucket.FINANCIAL,
+                () -> billingService.fundBalanceWithSharedPaymentToken(
+                        sharedPaymentToken, creditCents, currency, maxChargeCents, description)
+        );
+    }
+
     @Tool(description = "getPaymentTransactions: Get payment transaction history for the authenticated user. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get payment transactions",

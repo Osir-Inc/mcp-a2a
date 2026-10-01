@@ -35,6 +35,7 @@ class ConfirmationGateInvariantTest {
             // money
             "orderVps", "payInvoice", "createPaymentSession", "registerDomain", "renewDomain",
             "transferDomain", "initiateTransfer", "createMailbox", "changeVpsPaymentTerm", "osirAppDeployToVps",
+            "fundBalanceWithSharedPaymentToken",
             // data loss
             "deleteSshKey", "deleteContact", "osirAppDelete", "deleteDnsRecord", "unlockDomain",
             "deleteHost", "deleteMailbox", "cancelTransfer", "buildVpsInstance", "deleteVpsInstance");

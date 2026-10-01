@@ -2,6 +2,7 @@ package com.osir.mcp.services;
 
 import com.osir.mcp.clients.DomainBackendClient;
 import com.osir.mcp.models.*;
+import com.osir.mcp.util.FundingHint;
 import com.osir.mcp.models.contact.RegistrantInfo;
 import com.osir.mcp.models.domain.*;
 import com.osir.mcp.models.nameserver.NameserverUpdateRequest;
@@ -104,7 +105,7 @@ public class DomainService {
 
             return result;
         } catch (Exception e) {
-            return new DomainRegistrationResult(domain, false, "Registration failed: " + e.getMessage());
+            return new DomainRegistrationResult(domain, false, FundingHint.describe("Registration failed", e));
         }
     }
 
@@ -246,7 +247,7 @@ public class DomainService {
                     response.getStatus()
             );
         } catch (Exception e) {
-            return new DomainRenewalResult(false, "Domain renewal failed: " + e.getMessage(), domain, null);
+            return new DomainRenewalResult(false, FundingHint.describe("Domain renewal failed", e), domain, null);
         }
     }
 

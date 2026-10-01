@@ -2,6 +2,7 @@ package com.osir.mcp.services;
 
 import com.osir.mcp.clients.VpsBackendClient;
 import com.osir.mcp.models.vps.*;
+import com.osir.mcp.util.FundingHint;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
@@ -94,7 +95,7 @@ public class VpsService {
             return result;
         } catch (Exception e) {
             LOG.errorf(e, "Error ordering VPS: %s", e.getMessage());
-            return new VpsOrderResult(false, "VPS order failed: " + e.getMessage());
+            return new VpsOrderResult(false, FundingHint.describe("VPS order failed", e));
         }
     }
 

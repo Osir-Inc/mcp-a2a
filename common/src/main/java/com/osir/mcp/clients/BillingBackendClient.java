@@ -56,6 +56,14 @@ public interface BillingBackendClient {
             @HeaderParam("Authorization") String bearerToken
     );
 
+    @POST
+    @Path("/v1/payment/topups")
+    TopUpResponse createTopUp(
+            @HeaderParam("Idempotency-Key") String idempotencyKey,
+            TopUpRequest request,
+            @HeaderParam("Authorization") String bearerToken
+    );
+
     @GET
     @Path("/v1/payment/balance/history")
     TransactionListResponse getPaymentTransactions(

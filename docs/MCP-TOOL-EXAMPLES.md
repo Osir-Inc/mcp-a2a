@@ -884,6 +884,52 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 }'
 ```
 
+### fundBalanceWithSharedPaymentToken
+
+Pay for a purchase without a human. A purchase that fails for insufficient funds answers with the
+`networkId` to mint against and both amounts — **mint the token for the GROSS, send the NET**:
+
+```
+registerDomain("example.com")
+  -> "Registration failed: ... The balance is short by 11.99 USD. To pay for this without the user:
+      mint a Stripe Shared Payment Token with usage_limits {currency: 'USD', max_amount: 1266} ...
+      against networkId 'profile_...' , then call fundBalanceWithSharedPaymentToken(...)"
+```
+
+```bash
+curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
+  "jsonrpc": "2.0", "id": 66, "method": "tools/call",
+  "params": {
+    "name": "fundBalanceWithSharedPaymentToken",
+    "arguments": {
+      "sharedPaymentToken": "spt_1A2b3C...",
+      "creditCents": 1199,
+      "currency": "USD",
+      "maxChargeCents": 1266,
+      "description": "Funding registration of example.com"
+    }
+  }
+}'
+# -> actionId; confirm with the user, then executeConfirmedAction, then retry registerDomain.
+```
+
+Four things that bite:
+
+- **Never hardcode `networkId`.** Read it from the failure every time — live and sandbox differ.
+- **Mint against the gross, send the net.** Minting against the net gets the charge declined for
+  exceeding the token limit, which reads like a token bug and is arithmetic.
+- **Tokens are single-use.** Stripe deactivates one the instant a charge succeeds. Mint a fresh one
+  per top-up; never cache or reuse.
+- **Any failure you cannot fix by minting a fresh token ends at `createPaymentSession`**, with the
+  checkout URL handed to the user. The customer still wants the purchase. On `CARD_DECLINED`, say so
+  plainly and stop.
+
+`status: "processing"` means the outcome is unknown and the card may already have been charged: poll
+`pollEndpoint` or `getPaymentTransactions` until `completed` or `failed`. Do not mint another token.
+
+After a success, tell the user both numbers — *"Added $11.99 to your balance (card charged $12.66
+including the processing fee) to register example.com."* The gross is what shows on their statement.
+
 ### getPaymentTransactions
 
 ```bash
@@ -1441,6 +1487,7 @@ secret, injected on the next deploy, never returned or logged), `osirAppLogs`,
 | 101 | `executeConfirmedAction` | Yes | Confirmation |
 | 102 | `osirSiteDesignBrief` | No | Website Design |
 | 103 | `osirSitePublish` | Yes | Website Design |
+| 104 | `fundBalanceWithSharedPaymentToken` | Yes | Billing |
 | - | DomainRegistrarMCPServer has 26 `@Tool` methods (tools #1-25 above) | - | - |
 
 ---
