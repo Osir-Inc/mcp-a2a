@@ -276,6 +276,8 @@ All settings are environment variables with sensible defaults — nothing secret
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama LLM (MCP chat UI) |
 | `CORS_ORIGINS` | `https://osir.com,…` | Allowed CORS origins |
 | `A2A_SIGNING_SECRET` | *(empty)* | Optional HMAC-SHA256 request signing |
+| `SENTRY_DSN` | *(empty)* | Optional crash reporting to a Sentry-protocol endpoint (GlitchTip); empty = off |
+| `SENTRY_ENVIRONMENT` | `production` | Environment label on reported events |
 
 See [`.env.example`](.env.example) for the full list.
 

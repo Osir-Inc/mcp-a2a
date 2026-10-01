@@ -88,8 +88,9 @@ This realm's admin console (Keycloak 26.7) doesn't show client registration poli
 On your build machine (Windows):
 
 ```batch
-:: Build all modules (runs 351 tests)
-gradlew.bat build
+:: Build all modules and run their test suites. Use "clean build" whenever the version changed:
+:: build/quarkus-app/app/ keeps one jar per version ever built and the Dockerfile copies all of them.
+gradlew.bat clean build
 
 :: Build and push Docker images
 build-and-deploy.bat
@@ -292,6 +293,25 @@ curl -s -X POST http://localhost:8082/a2a \
 curl -s http://localhost:8082/q/metrics | grep a2a.tasks
 # Expected: a2a.tasks.created_total, a2a.tasks.completed_total, etc.
 ```
+
+### Crash reporting (GlitchTip)
+Only if you set `SENTRY_DSN`. Confirm it took:
+```bash
+docker-compose logs com-osir-mcp | grep "Error reporting enabled"
+# Expected: environment and the release you just deployed. No line = the DSN never
+# reached the container, and nothing is being reported.
+```
+Then wait for traffic: the first backend 5xx is what proves `BackendErrorCaptureFilter` is
+registered, since it rides a config property rather than code. Silence after a day of normal
+traffic means suspect the filter, not the DSN.
+
+Reported: backend 5xx (one event per route per minute), transport and parse failures, uncaught
+exceptions. Never reported: any 4xx — an expired session, a declined card, an unavailable domain are
+the system working. Credentials are masked before send, keeping four characters so an event can
+still be matched against a Stripe entry or a support ticket.
+
+To turn it off, clear `SENTRY_DSN` and restart the container — reporting becomes a no-op with no
+rebuild.
 
 ### Swagger UI
 Open in browser: `http://your-server:8082/q/swagger-ui`

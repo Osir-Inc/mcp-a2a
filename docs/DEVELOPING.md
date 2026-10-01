@@ -61,6 +61,17 @@ docker-compose logs -f             # View logs
   goes to its own rotating file (`AUDIT_LOG_PATH`, default `data/audit.log`; mount it in production).
   The Quarkus handler is named `audit-trail` on purpose — a handler literally named `audit` fails to
   attach on Quarkus 3.34 with "linked to a category but not configured".
+- **Crash reporting** (`telemetry/ErrorReporting`, off unless `SENTRY_DSN` is set): GlitchTip over the
+  Sentry protocol. Captures come from `telemetry/BackendErrorCaptureFilter`, a `ClientResponseFilter`
+  on the global REST-client providers — that is the only place that sees a backend 5xx a tool
+  swallowed into a `success:false` result, since `ToolErrors` covers barely any of the 106 tools.
+  `ToolErrors` still reports transport and parse failures, which never reach a response filter.
+  A 4xx is never reported: it is the user or a business refusal, not an incident.
+  **Adding a credential shape:** put the regex in `ErrorReporting.CREDENTIALS` and a case in
+  `ErrorReportingTest` — `beforeSend` is the only thing between a stack frame and a live token, and
+  the same shapes are masked backend-side in `com.osir.logging.SecretMaskingLogFilter`. Events are
+  throttled to one per route per minute because the monthly quota is shared with the backend and the
+  panel, and `route()` strips ids, uuids and domains so customer data stays out of the tracker.
 
 ### A2A Server
 - 9 agents, 89 skills: Domain (27), VPS (16), Billing (11), Mail (8), DNS (7), Contact (7), Account (6),
