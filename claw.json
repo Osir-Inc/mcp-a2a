@@ -1,7 +1,7 @@
 {
   "name": "OSIR Domain Registrar",
   "version": "2.4.1",
-  "description": "AI-powered domain registrar with 105 MCP tools and 9 A2A specialist agents for domain, DNS, VPS, mail, billing, contact, deployment, and account management.",
+  "description": "AI-powered domain registrar with 106 MCP tools and 9 A2A specialist agents for domain, DNS, VPS, mail, billing, contact, deployment, and account management.",
   "provider": {
     "name": "OSIR",
     "url": "https://osir.com"
@@ -11,7 +11,7 @@
       "transport": "sse",
       "url": "/mcp/sse",
       "port": 8081,
-      "tools": 105,
+      "tools": 106,
       "prompts": 11
     },
     "a2a": {

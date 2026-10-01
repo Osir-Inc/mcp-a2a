@@ -39,6 +39,30 @@
   owner's email or the portal). Note the existing push-notification webhook is caller-supplied, so it
   is not that channel.
 
+## Agent funding (shipped 2026-10-01)
+
+- [x] **`fundBalanceWithSharedPaymentToken`** — charges a Stripe Shared Payment Token via
+  `POST /v1/payment/topups`, plus the `funding`-block passthrough it depends on (nothing surfaced it
+  before, so a 402 reached the agent as "Payment Required, status code 402" and hardcoding the Stripe
+  networkId was the only option). Staged on the FINANCIAL gate. Contract:
+  `../domain-registrar/docs/agent-funding-spt-mcp-tool.md`.
+- [ ] **Verify once against sandbox with a real `spt_`.** Needs a Stripe test key; mint with
+  `POST /v1/test_helpers/shared_payment/granted_tokens`, sandbox profile
+  `profile_test_61VV1TM8ZoDCFkYYgA6VV1TLTRSQNr03byh35e9IGQpk`. Everything so far is unit-level.
+- [ ] **A2A has no funding skill.** `BillingSpecialistAgent` already does MOVES-MONEY confirmation
+  and has `create_payment_session`; a `fund_balance` skill is ~40 lines against the same
+  `BillingService` method. Decide whether A2A callers get it.
+- [ ] **Confirm whether the gate belongs on this tool.** It is staged for consistency with
+  `payInvoice` / `createPaymentSession`, which costs the "four calls, no human" flow an extra round
+  trip. The real caps are the token's own `usage_limits` and the customer's Stripe grant, so the gate
+  here may be ceremony. Unstaging is two lines plus the `GATED` set.
+- [ ] **Fold `MailService.readErrorMessage` and `VpsService.readErrorMessage` into
+  `util/BackendError`.** It now does what both hand-roll, reads the single-shot entity once and
+  buffers it. Left alone during the funding work rather than churning working code.
+- [ ] **Delete the commented-out `bulkCheckDomains` `@Tool`** in `DomainRegistrarMCPServer`. Dead
+  since before this work, and it makes `grep -c "@Tool("` report one tool more than exists — which is
+  how the docs briefly claimed 107. Count with `tools/list`.
+
 ## MCP transport
 
 - [x] **Upgrade quarkus-mcp-server to 2.0.0** (done 2026-09-02) — source-compatible; one merged `-http` artifact serves Streamable at `/mcp` and legacy SSE at `/mcp/sse`; the published `/mcp/http` URL is preserved by `McpHttpPathCompatFilter`. `streamable.auto-init=true` makes stale sessions auto-initialize (verified: bogus `Mcp-Session-Id` gets a valid response, no more "Mcp session not found") - server restarts no longer strand clients.

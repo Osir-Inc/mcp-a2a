@@ -31,8 +31,11 @@ Create, read, update, and delete DNS records (A, AAAA, CNAME, MX, TXT, SRV).
 ### VPS Hosting (10 tools)
 Browse packages, order servers, manage instances, control panel access.
 
-### Billing (9 tools)
-Account balance, invoices, payments, pricing, transaction history.
+### Billing (10 tools)
+Account balance, invoices, payments, pricing, transaction history, and agent funding — when a
+purchase fails for insufficient funds the error carries the Stripe networkId and both amounts, so
+`fundBalanceWithSharedPaymentToken` can top the balance up without a human. Mint the token for the
+gross, send the net. If you cannot mint one, use `createPaymentSession` and hand over the URL.
 
 ### Contacts (6 tools)
 Manage registrant and domain contact records.

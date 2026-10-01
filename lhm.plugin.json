@@ -2,7 +2,7 @@
   "identifier": "osir-inc-mcp-a2a",
   "name": "OSIR Domain Name MCP Server",
   "version": "2.4.1",
-  "description": "Domain registrar MCP server from OSIR (ICANN-accredited): 105 tools and 11 prompts to search, register, renew, transfer, and manage domains, DNS, VPS, email, and websites from Claude, ChatGPT, Cursor, or any MCP client. Remote Streamable HTTP, no local install.",
+  "description": "Domain registrar MCP server from OSIR (ICANN-accredited): 106 tools and 11 prompts to search, register, renew, transfer, and manage domains, DNS, VPS, email, and websites from Claude, ChatGPT, Cursor, or any MCP client. Remote Streamable HTTP, no local install.",
   "author": "OSIR",
   "authorUrl": "https://github.com/Osir-Inc",
   "homepage": "https://github.com/Osir-Inc/mcp-a2a",
@@ -727,6 +727,34 @@
         },
         "required": [
           "actionId"
+        ]
+      }
+    },
+    {
+      "name": "fundBalanceWithSharedPaymentToken",
+      "description": "Stage adding funds to the balance by charging a Stripe Shared Payment Token the customer granted to OSIR. Use when a purchase (registerDomain, renewDomain, transferDomain, orderVps) failed for insufficient funds: that error names the Stripe networkId to mint against and gives both amounts. Mint the token for the GROSS (fundGrossCents) and pass the NET as creditCents (fundNetCents); tokens are single-use. Requires authentication. Required: sharedPaymentToken (string, 'spt_...'), creditCents (integer, minor units). Optional: currency (string, 3-letter ISO 4217, default 'USD'), maxChargeCents (integer, the usage_limits max_amount the token was minted with), description (string). Returns an actionId - tell the user what the card will be charged, then call executeConfirmedAction with the actionId if they approve. A result with status 'processing' or 'unknown' means the card may already have been charged: poll getPaymentTransactions, do not mint a new token. If this fails in a way you cannot fix by minting a fresh token, fall back to createPaymentSession and give the user the checkout URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sharedPaymentToken": {
+            "type": "string"
+          },
+          "creditCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "maxChargeCents": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sharedPaymentToken",
+          "creditCents"
         ]
       }
     },

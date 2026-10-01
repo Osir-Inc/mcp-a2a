@@ -167,6 +167,7 @@ Full tool/skill catalog, example conversations, and end-to-end walkthroughs are 
 - **deleteVpsInstance** - Stage deletion/cancellation of a VPS instance.
 - **enableMailDomain** - Enable email hosting on a domain you own.
 - **executeConfirmedAction** - Execute a previously staged destructive or financial action after user approval.
+- **fundBalanceWithSharedPaymentToken** - Stage adding funds to the balance by charging a Stripe Shared Payment Token the customer granted to OSIR, so an agent can pay for a purchase without sending anyone to a checkout page.
 - **generateDomainSuggestions** - Generate domain name suggestions based on keywords.
 - **getAccountBalance** - Get the current account balance for the authenticated user.
 - **getAccountSummary** - Get a comprehensive summary of the user's account: profile, balance, domain count, VPS count, and pending transfers.
