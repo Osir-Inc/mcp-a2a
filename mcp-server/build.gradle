@@ -25,6 +25,9 @@ dependencies {
     implementation 'io.quarkus:quarkus-cache'
     implementation 'io.quarkus:quarkus-scheduler'
 
+    // GlitchTip crash reporting: it speaks the Sentry protocol, no GlitchTip-specific client exists.
+    implementation 'io.sentry:sentry:8.59.0'
+
     testImplementation 'io.quarkus:quarkus-junit5'
     testImplementation 'io.rest-assured:rest-assured'
     testImplementation 'org.mockito:mockito-core'

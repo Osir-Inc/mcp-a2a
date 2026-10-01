@@ -144,6 +144,11 @@ A2A_PUBLIC_URL=https://be.osir.com
 # issued for the MCP service; sent as X-API-Key. Leave empty to disable telemetry.
 OSIR_TELEMETRY_API_KEY=
 
+# Crash reporting to GlitchTip (project mcp). The DSN is an ingestion key: it can submit
+# events, never read them. Leave empty to disable reporting entirely.
+SENTRY_DSN=
+SENTRY_ENVIRONMENT=production
+
 # Rate limiting
 A2A_RATE_LIMIT_GLOBAL=50
 A2A_RATE_LIMIT_PER_USER=10

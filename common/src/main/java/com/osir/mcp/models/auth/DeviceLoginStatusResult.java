@@ -1,5 +1,17 @@
 package com.osir.mcp.models.auth;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+/**
+ * While the login is pending, {@code sessionKey}, {@code tokenType} and {@code expiresIn} have no
+ * value yet. Serialising them as null made the whole result fail the tool's generated output schema
+ * ("Structured content does not match the tool's output schema"): the schema types them string and
+ * integer, and nothing in it is marked required, so omitting them validates while null does not. A
+ * polling agent could therefore not tell "not approved yet" from "broken", and either gave up or
+ * hammered the endpoint. {@code status} ("pending", RFC 8628's authorization_pending) is what the
+ * caller branches on.
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class DeviceLoginStatusResult {
     private boolean success;
     private String message;

@@ -75,3 +75,20 @@
 ## Health
 
 - [x] **`McpHealthCheck` told the truth** (2026-09-04) — it reported `version 1.0.0` / `protocol MCP 2025-03-26` on a 2.3.0 Streamable server and `testBackendConnection()` was a `return true` with a TODO. It now reports the configured version and a real (10 s-cached, 2 s-timeout) HEAD probe of the domain backend as `backend: reachable|unreachable`. Readiness deliberately stays UP on a backend blip — a DOWN would pull the MCP from the load balancer and turn a degraded backend into a full outage.
+
+## Crash reporting (GlitchTip, wired 2026-10-01)
+
+- [ ] **Send the first real event.** `SENTRY_DSN` is unset everywhere until the next deploy, so
+  nothing has ever reached the `mcp` project. The doc's smoke test applies: without `flush()` a
+  short-lived process exits before the send completes and the test looks like it did nothing.
+- [ ] **Confirm `BackendErrorCaptureFilter` is really registered.** It rides the existing
+  `org.eclipse.microprofile.rest.client.global.providers` property, which is config, not code: no
+  test proves the runtime picked it up. Point `OSIR_BACKEND_URL` at something that answers 500 and
+  watch for one event, once, on first deploy.
+- [ ] **Routes keep non-numeric path segments.** `route()` normalises ids, uuids and domains, so an
+  app slug (`/v1/apps/my-shop/deploy`) still reaches GlitchTip and still splits groups. Fine while
+  errors.osir.com is ours; revisit if grouping gets noisy.
+- [ ] **No tool-name tag.** `ErrorReporting.capture` tags `backend.status` and carries the action
+  label; the tool is only identifiable from the stack trace. Threading a tool name through 100+
+  call sites was not worth it — revisit if grouping in GlitchTip is unusable.
+- [ ] **A2A has no reporting.** Same masker would serve `a2a-server`; the doc only covered MCP.

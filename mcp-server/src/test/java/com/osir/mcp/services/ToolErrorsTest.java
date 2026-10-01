@@ -38,6 +38,19 @@ class ToolErrorsTest {
     }
 
     @Test
+    void reportsOurFailuresAndStaysQuietForBusinessRefusals() {
+        assertTrue(ToolErrors.worthReporting(500, true), "a 5xx is ours even when it parses");
+        assertTrue(ToolErrors.worthReporting(502, false), "bad gateway");
+        assertTrue(ToolErrors.worthReporting(400, false), "a body we cannot parse is contract drift");
+        assertFalse(ToolErrors.worthReporting(400, true), "INSUFFICIENT_FUNDS is the system working");
+        assertFalse(ToolErrors.worthReporting(409, true), "so is DOMAIN_NOT_AVAILABLE");
+        assertFalse(ToolErrors.worthReporting(401, false), "an expired session is normal");
+        assertFalse(ToolErrors.worthReporting(403, false), "so is a forbidden scope");
+        assertFalse(ToolErrors.worthReporting(404, false), "an empty 404 body is ordinary REST, not drift");
+        assertFalse(ToolErrors.worthReporting(429, false), "the backend rate-limiting a user is not an incident");
+    }
+
+    @Test
     void plainException_usesItsMessage() {
         ToolCallException e = ToolErrors.toolError("Availability check", new RuntimeException("Connection refused"));
         assertTrue(e.getMessage().contains("Connection refused"));

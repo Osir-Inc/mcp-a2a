@@ -1,5 +1,6 @@
 package com.osir.mcp;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.osir.mcp.models.auth.DeviceLoginResult;
 import com.osir.mcp.models.auth.DeviceLoginStatusResult;
 import com.osir.mcp.services.DomainService;
@@ -93,5 +94,22 @@ class DomainRegistrarMCPServerDeviceFlowTest {
         assertFalse(result.isSuccess());
         assertEquals("error", result.getStatus());
         assertTrue(result.getMessage().contains("Network error"));
+    }
+
+    /**
+     * The pending response must not carry nulls: the generated output schema types sessionKey as a
+     * string and expiresIn as an integer, so a null failed validation and the client rejected the
+     * whole result ("Structured content does not match the tool's output schema").
+     */
+    @Test
+    void checkDeviceLoginStatus_pendingResponseOmitsTheFieldsItHasNoValueFor() throws Exception {
+        String json = new ObjectMapper().writeValueAsString(
+                new DeviceLoginStatusResult(true, "Waiting for user to authorize.", "pending"));
+
+        assertFalse(json.contains("null"), json);
+        assertFalse(json.contains("sessionKey"), json);
+        assertFalse(json.contains("tokenType"), json);
+        assertFalse(json.contains("expiresIn"), json);
+        assertTrue(json.contains("\"status\":\"pending\""), json);
     }
 }
