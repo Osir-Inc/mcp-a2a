@@ -12,7 +12,7 @@ OSIR MCP Server provides 105 AI-powered tools for managing domains, DNS, VPS hos
 
 ## Authentication
 
-Most tools require authentication. Use `loginWithDevice` for secure OAuth login or `authenticateUser` for username/password.
+Most tools require authentication. Use `loginWithDevice` for secure browser-based login (device flow), or connect to the OAuth endpoint. There is no password tool.
 
 ## Tool Categories
 

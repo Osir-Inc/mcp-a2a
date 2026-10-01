@@ -84,17 +84,18 @@ Most tools require authentication. Use one of these methods:
 3. Authenticate with KeyCloak (supports MFA/SSO)
 4. Call `checkDeviceLoginStatus` with the device code to complete login
 
-**Option B: Username/Password**
-1. Call `authenticateUser` with username and password
+**Option B: OAuth**
+1. Connect to the `/mcp/oauth` endpoint and let the client complete the flow
 
-### Available Tools (105 total)
+There is no password tool; `authenticateUser` was retired.
 
-#### Authentication (5)
+### Available Tools (106 total)
+
+#### Authentication (4)
 | Tool | Description |
 |------|-------------|
 | `loginWithDevice` | Start browser-based OAuth login (RFC 8628) |
 | `checkDeviceLoginStatus` | Poll for login completion |
-| `authenticateUser` | Username/password login |
 | `getAuthStatus` | Check if authenticated |
 | `logout` | End session |
 
@@ -144,8 +145,12 @@ Most tools require authentication. Use one of these methods:
 > `verifyMailDns`), then `getMailboxQuote` → confirm with the user → `createMailbox`. The generated
 > mailbox password is returned **exactly once** — show it to the user immediately.
 
-#### Billing (9)
-`getAccountBalance`, `listInvoices`, `getInvoiceDetails`, `payInvoice`, `getInvoiceStatistics`, `createPaymentSession`, `getPaymentTransactions`, `previewPaymentFees`, `getDomainPricing`
+#### Billing (10)
+`getAccountBalance`, `listInvoices`, `getInvoiceDetails`, `payInvoice`, `getInvoiceStatistics`, `createPaymentSession`, `fundBalanceWithSharedPaymentToken`, `getPaymentTransactions`, `previewPaymentFees`, `getDomainPricing`
+
+> `fundBalanceWithSharedPaymentToken` lets an agent pay for a purchase itself, by charging a Stripe
+> Shared Payment Token the customer granted to OSIR. Any purchase that fails for insufficient funds
+> returns the Stripe `networkId` to mint against and both amounts: mint for the gross, send the net.
 
 #### Contacts (6), Transfers (5), Hosts (4), Audit (3), Catalog (4), Account (2)
 
@@ -517,7 +522,7 @@ docker-compose logs -f
 ┌──────▼──────┐ ┌─▼──────────────────────────┐
 │ MCP Server  │ │ A2A Server                  │
 │ :8081       │ │ :8082                       │
-│ 107 tools   │ │ Orchestrator                │
+│ 106 tools   │ │ Orchestrator                │
 │  11 prompts │ │  ├─ Domain Agent (13 skills)│
 │             │ │  ├─ DNS Agent (5 skills)    │
 │             │ │  ├─ VPS Agent (12 skills)   │

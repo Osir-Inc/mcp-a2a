@@ -6,7 +6,7 @@ the design decisions worth knowing before you change something.
 ## Project Overview
 
 OSIR domain registrar AI platform with two servers:
-- **MCP Server** (Quarkus, port 8081) — 107 tools + 11 prompts via Model Context Protocol
+- **MCP Server** (Quarkus, port 8081) — 106 tools + 11 prompts via Model Context Protocol
 - **A2A Server** (Quarkus, port 8082) — 9 agents / 89 skills via Google Agent-to-Agent protocol
 
 **Note:** CLI tools moved to `../com.osir.cli`.
@@ -48,7 +48,7 @@ docker-compose logs -f             # View logs
 
 ### MCP Server
 - 15 `*MCPServer.java` classes with `@Tool` and `@Prompt` annotations at `/mcp` (SSE)
-- 107 tools: domain+suggestions (25), VPS (20), mail (11), deployment (12), billing (10), DNS (7), contacts (6), transfer (5), catalog (5), host (4), audit (3), account (2), website design (2), confirmation (1) — canonical list in `MCP-TOOL-EXAMPLES.md`
+- 106 tools, counted per `*MCPServer` class: domain+auth+suggestions (24), VPS (15), mail (11), deployment (10), billing (10), DNS (6), contacts (6), transfer (5), catalog (5), host (4), account (2) + onboarding (2), audit (3), website design (2), confirmation (1) — canonical list in `MCP-TOOL-EXAMPLES.md`. Verify with `tools/list`, not by grepping `@Tool(` — `DomainRegistrarMCPServer` carries a commented-out `bulkCheckDomains` annotation that inflates a naive grep by one.
 - 11 prompts: getting_started, vps_setup_guide, dns_setup_guide, billing_overview, domain_management_guide, hosting_comparison, troubleshooting, security_best_practices (PromptsMCPServer); domain_registration_guide, domain_transfer_checklist (DomainRegistrarMCPServer); website_designer (WebsiteDesignMCPServer)
 - Website design: the calling LLM designs; `osirSiteDesignBrief` returns the prompt, `osirSitePublish` gates + zips + deploys. Open items in [TODO.md](TODO.md)
 - Caching: CatalogService + domain pricing (15min TTL via `@CacheResult`)

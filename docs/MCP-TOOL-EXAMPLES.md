@@ -105,8 +105,10 @@ curl -X POST http://localhost:8081/mcp/messages/abc123-session-id \
 
 Most tools require authentication. Two login methods are available:
 
-- **Device Authorization Flow (preferred)** -- Secure browser-based login supporting MFA and SSO via KeyCloak. The user never shares their password with the MCP server.
-- **Password Login (fallback)** -- Direct username/password authentication via the backend.
+- **Device Authorization Flow** -- Secure browser-based login supporting MFA and SSO via KeyCloak. The user never shares their password with the MCP server. Served on `/mcp/http`.
+- **OAuth** -- For clients that speak it, served on `/mcp/oauth`.
+
+There is no password tool; `authenticateUser` was retired.
 
 Token refresh is automatic: when a token is within 60 seconds of expiry, `getCurrentToken()` silently refreshes it using the refresh token.
 
@@ -151,20 +153,8 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 
 **Possible statuses:** `pending` (user hasn't authorized yet), `complete` (authenticated -- session is now active), `expired` (device code timed out), `denied` (user rejected), `slow_down` (polling too fast).
 
-### authenticateUser (fallback)
-
-```bash
-curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
-  "jsonrpc": "2.0", "id": 3, "method": "tools/call",
-  "params": {
-    "name": "authenticateUser",
-    "arguments": {
-      "username": "your_username",
-      "password": "your_password"
-    }
-  }
-}'
-```
+> **`authenticateUser` was retired.** There is no password tool: the device flow above is the only
+> interactive path, and OAuth (`/mcp/oauth`) the only other one.
 
 ### getAuthStatus
 
@@ -1386,7 +1376,6 @@ secret, injected on the next deploy, never returned or logged), `osirAppLogs`,
 |---|------|:----:|----------|
 | 1 | `loginWithDevice` | No | Auth |
 | 2 | `checkDeviceLoginStatus` | No | Auth |
-| 3 | `authenticateUser` | No | Auth |
 | 4 | `getAuthStatus` | No | Auth |
 | 5 | `logout` | No | Auth |
 | 6 | `checkDomainAvailability` | Yes | Domain |
@@ -1488,7 +1477,10 @@ secret, injected on the next deploy, never returned or logged), `osirAppLogs`,
 | 102 | `osirSiteDesignBrief` | No | Website Design |
 | 103 | `osirSitePublish` | Yes | Website Design |
 | 104 | `fundBalanceWithSharedPaymentToken` | Yes | Billing |
-| - | DomainRegistrarMCPServer has 26 `@Tool` methods (tools #1-25 above) | - | - |
+| 105 | `createAccount` | No | Onboarding |
+| 106 | `verifyAccount` | No | Onboarding |
+| 107 | `getHostingBundle` | Yes | Catalog |
+| - | 106 tools. The numbers above are positional, not stable ids, and one row was retired. Authoritative source is `tools/list`. | - | - |
 
 ---
 
@@ -1534,45 +1526,3 @@ curl -s -X POST "$SESSION_URL" -H "Content-Type: application/json" -d '{
 }'
 ```
 
-### Password Login (fallback)
-
-```bash
-#!/bin/bash
-BASE_URL="http://localhost:8081"
-
-# 1. Open SSE and capture session endpoint
-echo "Connecting to MCP server..."
-SESSION_PATH=$(curl -s -N "$BASE_URL/mcp/sse" 2>&1 | head -2 | grep "data:" | sed 's/data: //')
-SESSION_URL="$BASE_URL$SESSION_PATH"
-echo "Session: $SESSION_URL"
-
-# 2. Initialize
-curl -s -X POST "$SESSION_URL" -H "Content-Type: application/json" -d '{
-  "jsonrpc":"2.0","id":1,"method":"initialize",
-  "params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"script","version":"1.0"}}
-}'
-
-# 3. Authenticate with password
-curl -s -X POST "$SESSION_URL" -H "Content-Type: application/json" -d '{
-  "jsonrpc":"2.0","id":2,"method":"tools/call",
-  "params":{"name":"authenticateUser","arguments":{"username":"myuser","password":"mypass"}}
-}'
-
-# 4. Check a domain
-curl -s -X POST "$SESSION_URL" -H "Content-Type: application/json" -d '{
-  "jsonrpc":"2.0","id":3,"method":"tools/call",
-  "params":{"name":"checkDomainAvailability","arguments":{"domain":"example.com"}}
-}'
-
-# 5. List my domains
-curl -s -X POST "$SESSION_URL" -H "Content-Type: application/json" -d '{
-  "jsonrpc":"2.0","id":4,"method":"tools/call",
-  "params":{"name":"listUserDomains","arguments":{}}
-}'
-
-# 6. Get account summary
-curl -s -X POST "$SESSION_URL" -H "Content-Type: application/json" -d '{
-  "jsonrpc":"2.0","id":5,"method":"tools/call",
-  "params":{"name":"getAccountSummary","arguments":{}}
-}'
-```

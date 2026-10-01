@@ -138,7 +138,7 @@ Full tool/skill catalog, example conversations, and end-to-end walkthroughs are 
 
 ## Tools
 
-107 tools, verified against the live server (tools/list on https://be.osir.com/mcp/http).
+106 tools, verified against the live server (tools/list on https://be.osir.com/mcp/http).
 
 - **addPrefixToDomain** - Generate domain suggestions by adding prefixes.
 - **addSshKey** - Store an SSH public key on your account so it can be injected into VPS installs.
@@ -282,7 +282,7 @@ See [`.env.example`](.env.example) for the full list.
 
 ```
 common/      Shared library — 12 services, 9 REST clients, ~174 models
-mcp-server/  Quarkus MCP server — 107 tools, 11 prompts, 2 resources, chat UI
+mcp-server/  Quarkus MCP server — 106 tools, 11 prompts, 2 resources, chat UI
 a2a-server/  Quarkus A2A server — 9 agents, 89 skills, JSON-RPC, JPA task persistence
 ```
 
