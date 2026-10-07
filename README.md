@@ -79,7 +79,7 @@ via the wrapper.
 ./gradlew :a2a-server:quarkusDev
 ```
 
-Copy `.env.example` to `.env` and adjust if you're pointing at your own backend/KeyCloak/Ollama.
+Copy `.env.example` to `.env` and adjust if you're pointing at your own backend/KeyCloak.
 Everything defaults to the public OSIR endpoints, so the servers run out of the box.
 
 ### Connect an MCP client (Claude Desktop / Claude Code)
@@ -273,7 +273,6 @@ All settings are environment variables with sensible defaults — nothing secret
 | `KEYCLOAK_URL` | `https://auth.osir.com` | KeyCloak auth server |
 | `KEYCLOAK_REALM` | `osir` | KeyCloak realm |
 | `KEYCLOAK_CLIENT_ID` | `osir-cli` | OAuth client ID |
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama LLM (MCP chat UI) |
 | `CORS_ORIGINS` | `https://osir.com,…` | Allowed CORS origins |
 | `A2A_SIGNING_SECRET` | *(empty)* | Optional HMAC-SHA256 request signing |
 | `SENTRY_DSN` | *(empty)* | Optional crash reporting to a Sentry-protocol endpoint (GlitchTip); empty = off |
@@ -285,7 +284,7 @@ See [`.env.example`](.env.example) for the full list.
 
 ```
 common/      Shared library — 12 services, 9 REST clients, ~174 models
-mcp-server/  Quarkus MCP server — 106 tools, 11 prompts, 2 resources, chat UI
+mcp-server/  Quarkus MCP server — 106 tools, 11 prompts, 2 resources
 a2a-server/  Quarkus A2A server — 9 agents, 89 skills, JSON-RPC, JPA task persistence
 ```
 

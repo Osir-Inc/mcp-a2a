@@ -495,7 +495,6 @@ docker-compose logs -f
 | `KEYCLOAK_URL` | `https://auth.osir.com` | KeyCloak auth server |
 | `KEYCLOAK_REALM` | `osir` | KeyCloak realm |
 | `KEYCLOAK_CLIENT_ID` | `osir-cli` | OAuth client ID |
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama LLM service |
 | `CORS_ORIGINS` | `https://osir.com,...` | Allowed CORS origins |
 | `A2A_RATE_LIMIT_GLOBAL` | `50` | Max concurrent A2A requests total |
 | `A2A_RATE_LIMIT_PER_USER` | `10` | Max concurrent A2A requests per user |

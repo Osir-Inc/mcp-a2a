@@ -127,9 +127,6 @@ KEYCLOAK_URL=https://auth.osir.com
 KEYCLOAK_REALM=osir
 KEYCLOAK_CLIENT_ID=osir-cli
 
-# Ollama LLM
-OLLAMA_URL=http://localhost:11434
-
 # CORS — add your frontend domains
 CORS_ORIGINS=https://osir.com,https://agent.osir.com
 

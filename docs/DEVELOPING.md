@@ -17,7 +17,7 @@ OSIR domain registrar AI platform with two servers:
 com.osir.agent/
 ├── common/          # Java library: 12 services, 9 REST clients, ~174 models
 │   └── security/    # DestructiveOpRateLimiter — shared by BOTH transports' confirmation gates
-├── mcp-server/      # Quarkus: 15 *MCPServer classes (tools + prompts), chat UI, health
+├── mcp-server/      # Quarkus: 15 *MCPServer classes (tools + prompts), health
 ├── a2a-server/      # Quarkus: A2A protocol, 9 agents, audit logging
 │   ├── protocol/    # AgentCard, A2ATask, Message/Part, Artifact, JSON-RPC, TaskStore
 │   ├── agents/      # BaseSpecialistAgent + 8 specialists + OrchestratorAgent
@@ -103,7 +103,6 @@ docker-compose logs -f             # View logs
 - `common/` module: 12 services, 9 REST clients, shared by both servers
 - Backend URL: `${OSIR_BACKEND_URL:https://be.osir.com}`
 - KeyCloak: `${KEYCLOAK_URL:https://auth.osir.com}`, realm `osir`
-- Ollama: `${OLLAMA_URL:http://localhost:11434}`, model `qwen2.5:14b`
 
 ### Backend API Versions
 - Domain: `/v2/domains/{domain}/...` (available, info, register, renew, lock, unlock, autorenew, privacy, nameservers)
@@ -124,7 +123,6 @@ docker-compose logs -f             # View logs
 | `KEYCLOAK_URL` | `https://auth.osir.com` | KeyCloak auth |
 | `KEYCLOAK_REALM` | `osir` | KeyCloak realm |
 | `KEYCLOAK_CLIENT_ID` | `osir-cli` | OAuth client |
-| `OLLAMA_URL` | `http://localhost:11434` | LLM service |
 | `CORS_ORIGINS` | `https://osir.com,...` | Allowed origins |
 | `A2A_PUBLIC_URL` | _(request-derived)_ | Public HTTPS base for the agent card `url` (set behind a TLS proxy) |
 | `A2A_DOCUMENTATION_URL` | `github.com/Osir-Inc/mcp-a2a` | Agent card `documentationUrl` |
