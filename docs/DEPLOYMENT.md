@@ -180,7 +180,7 @@ services:
     image: registry.example.com/com-osir-mcp:latest
     container_name: com-osir-mcp
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     volumes:
       - ./data:/app/data
     env_file:
@@ -197,7 +197,7 @@ services:
     image: registry.example.com/com-osir-a2a:latest
     container_name: com-osir-a2a
     ports:
-      - "8082:8082"
+      - "127.0.0.1:8082:8082"
     volumes:
       - ./data:/app/data
     env_file:
@@ -211,6 +211,10 @@ services:
     restart: unless-stopped
 EOF
 ```
+
+Both ports are published to `127.0.0.1` on purpose: nginx (Step 7) reaches them over loopback, and
+nothing else can. A bare `"8081:8081"` publishes on every interface, and Docker writes its own nat
+rules, so such a port stays reachable from the internet even when ufw/firewalld says otherwise.
 
 ## Step 5: Deploy
 
@@ -311,7 +315,8 @@ To turn it off, clear `SENTRY_DSN` and restart the container — reporting becom
 rebuild.
 
 ### Swagger UI
-Open in browser: `http://your-server:8082/q/swagger-ui`
+Reachable on the server itself at `http://localhost:8082/q/swagger-ui`. From your workstation, tunnel it:
+`ssh -L 8082:127.0.0.1:8082 your-server` — the port is not published off-box.
 
 ## Step 7: Configure Reverse Proxy
 

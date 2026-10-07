@@ -6,7 +6,7 @@ This project provides two complementary AI integration servers for the OSIR doma
 
 | Server | Port | Protocol | Purpose |
 |--------|------|----------|---------|
-| **MCP Server** | 8081 | Model Context Protocol (SSE) | 105 individual tools for AI assistants |
+| **MCP Server** | 8081 | Model Context Protocol (Streamable HTTP + SSE) | 106 individual tools for AI assistants |
 | **A2A Server** | 8082 | Google Agent-to-Agent (JSON-RPC) | Specialist agents for task-level orchestration |
 
 **MCP** is for single-agent use: Claude, ChatGPT, or any MCP-compatible client calls individual tools like `checkDomainAvailability` or `registerDomain`.
@@ -505,7 +505,7 @@ docker-compose logs -f
 
 | Service | Port | Endpoints |
 |---------|------|-----------|
-| MCP Server | 8081 | `/mcp/sse`, `/mcp/http`, `/q/health`, `/q/dev` |
+| MCP Server | 8081 | `/mcp/http` (no sign-in), `/mcp/oauth` (OAuth), `/mcp/sse` (legacy), `/.well-known/oauth-*`, `/q/health` |
 | A2A Server | 8082 | `/a2a`, `/a2a/stream`, `/.well-known/agent.json`, `/q/swagger-ui`, `/q/health`, `/q/metrics` |
 
 ---

@@ -5,7 +5,7 @@ services:
     image: registry.example.com/com-osir-mcp:latest
     container_name: com-osir-mcp
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     volumes:
       - ./data:/app/data
     env_file:
@@ -22,7 +22,7 @@ services:
     image: registry.example.com/com-osir-a2a:latest
     container_name: com-osir-a2a
     ports:
-      - "8082:8082"
+      - "127.0.0.1:8082:8082"
     volumes:
       - ./data:/app/data
     env_file:
