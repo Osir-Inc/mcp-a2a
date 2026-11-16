@@ -208,7 +208,7 @@ code, only its settings. MCP-only for now (not exposed over A2A).
 
 > Every `osirApp*` tool refuses an agent and points here; `osirAppSetSecret` refuses the
 > `HERMES_DASHBOARD_*` keys. Until the deploy backend releases an agent, installing it answers
-> "not available yet". Ordering a new VPS for an agent opens only when `OSIR_AGENTS_ORDERABLE` lists it
+> "not available yet". Ordering a new VPS for an agent is open for the agents `OSIR_AGENTS_ORDERABLE` lists (default `hermes`)
 > (see `docs/DEPLOYMENT.md`).
 
 ### Example Conversations with Claude

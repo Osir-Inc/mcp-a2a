@@ -52,7 +52,7 @@ with a password-protected dashboard. Later they say "connect it to DeepSeek" or 
 4. Only if none of that applies and `packageId` is given → stage a VPS order (confirmation). At execute
    time it re-runs step 3 first, so a second confirmation never buys a second VPS.
 
-Ordering a new VPS for an agent is only possible when `OSIR_AGENTS_ORDERABLE` lists it (see §5).
+Ordering a new VPS for an agent is only possible when `OSIR_AGENTS_ORDERABLE` lists it (default: `hermes`; see §5).
 
 ## 4. Rules that must hold (each has a test)
 
@@ -78,15 +78,17 @@ Hermes goes live in three steps, in this order.
 test run on a 4 GB+ test VPS, pin the tested image digest). Until then `POST /v1/agents` answers
 **503 "not available yet"** and `osirAgentDeploy` relays it plainly. Nothing is installed.
 
-**2. Open VPS ordering for the agent** (MCP server `.env`, then restart the MCP container):
+**2. VPS ordering for the agent** is controlled by `OSIR_AGENTS_ORDERABLE` (MCP server `.env`). Since
+2026-11-16 the built-in default is `hermes` (open). If the deploy backend switches an agent OFF again,
+close ordering at once - no rebuild:
 
 ```
-OSIR_AGENTS_ORDERABLE=hermes
+OSIR_AGENTS_ORDERABLE=none      # then restart the MCP container
 ```
 
 Why this exists: C2 has no read-only way to ask whether an agent is released, and its 503 only arrives
-after the VPS is bought. Leave it empty until step 1 is done. Installing on a VPS the customer already
-owns works without it. Remove this setting once C2 offers an availability endpoint.
+after the VPS is bought. Installing on a VPS the customer already owns does not depend on it. Remove
+this setting once C2 offers an availability endpoint.
 
 **3. Verify** (§6).
 
@@ -134,7 +136,7 @@ Run in Claude with the OSIR connector, on a test account that owns a 4 GB+ test 
 | Symptom (what the customer or model sees) | Cause | Fix |
 |---|---|---|
 | "Hermes is not available on Osir yet" | C2 503: image not pinned (§5 step 1 not done) | Release on the deploy backend |
-| "Ordering a new VPS for Hermes is not open yet" | `OSIR_AGENTS_ORDERABLE` does not list `hermes` | Set it (§5 step 2), or install on a VPS the customer owns |
+| "Ordering a new VPS for Hermes is not open yet" | `OSIR_AGENTS_ORDERABLE` was set without `hermes` | Remove the override or add `hermes` (§5 step 2), or install on a VPS the customer owns |
 | "VPS … has N MB of memory; Hermes needs at least 4096 MB" | VPS or package under 4 GB | Bigger VPS |
 | Status: install failed, `BOX_TOO_SMALL` | C2 measured the box under 4 GB | Bigger VPS |
 | Status: `BOX_KEY_REFUSED` | The VPS rejects the platform deploy key | Customer adds the key shown in the message to `/root/.ssh/authorized_keys`, then retries with the same `instanceId` |

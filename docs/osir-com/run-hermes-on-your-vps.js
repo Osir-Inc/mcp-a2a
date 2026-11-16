@@ -8,8 +8,9 @@
  *   3. public/llms.txt: add LLMS_TXT_LINE under the help articles.
  *   4. Run `npm run seo:coverage` (sitemap, feed and llms.txt must agree).
  *
- * PUBLISH ONLY AFTER Hermes is released on the deploy backend AND OSIR_AGENTS_ORDERABLE=hermes is set
- * on the MCP server (docs/RUNBOOK-AGENTS.md §5). Before that, the install answers "not available yet".
+ * PUBLISH ONLY AFTER Hermes is released for good on the deploy backend (pinned digest in its
+ * application.properties, not the temporary test env line) and v2.5.1+ is live on the MCP server.
+ * Before that, an install may answer "not available yet".
  *
  * Facts in this article come from the shipped tools (v2.5.0). If any of these change, update it:
  * 4 GB minimum RAM; providers deepseek/openai/openrouter/anthropic; password shown once; delete keeps

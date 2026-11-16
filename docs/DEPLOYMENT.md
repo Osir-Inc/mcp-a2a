@@ -148,10 +148,10 @@ SENTRY_DSN=
 SENTRY_ENVIRONMENT=production
 
 # AI agents (osirAgentDeploy): agents for which a NEW VPS may be ordered, comma-separated.
-# Leave empty until the deploy backend has released the agent (its POST /v1/agents answers
-# 503 until then, and that answer would only arrive after the customer paid for the VPS).
-# Installing on a VPS the customer already owns works without this. At release: hermes
-OSIR_AGENTS_ORDERABLE=
+# Default (unset): hermes. If the deploy backend switches Hermes off again, its POST /v1/agents
+# answers 503 - but only after the customer paid for the VPS - so then set this to none and
+# restart (no rebuild). Installing on a VPS the customer already owns does not depend on it.
+# OSIR_AGENTS_ORDERABLE=none
 
 # Rate limiting
 A2A_RATE_LIMIT_GLOBAL=50

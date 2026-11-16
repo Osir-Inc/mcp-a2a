@@ -71,8 +71,8 @@ public class AgentService {
     /**
      * Agents for which ordering a NEW VPS is open (env OSIR_AGENTS_ORDERABLE, comma-separated). C2 has no
      * way to ask "is this agent released?" without starting a real install, and an unreleased agent
-     * answers 503 only AFTER the box is bought. So ordering stays closed until the operator lists the
-     * agent here at release time; installing on a VPS the user already owns works regardless.
+     * answers 503 only AFTER the box is bought. application.properties defaults it to "hermes"; the operator
+     * sets "none" if C2 switches an agent off. Installing on a VPS the user already owns works regardless.
      * ponytail: a second source of truth — drop it when C2 grows a read-only catalog/availability route.
      */
     @ConfigProperty(name = "osir.agents.orderable", defaultValue = "none")
