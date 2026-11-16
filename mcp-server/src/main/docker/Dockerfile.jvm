@@ -1,6 +1,7 @@
 FROM eclipse-temurin:21-jre-alpine
 
-RUN apk add --no-cache curl
+# Patched OS packages even when the base tag is stale (image scans flag Alpine CVEs otherwise).
+RUN apk upgrade --no-cache && apk add --no-cache curl
 
 WORKDIR /work/
 
