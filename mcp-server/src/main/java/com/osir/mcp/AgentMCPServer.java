@@ -47,9 +47,10 @@ public class AgentMCPServer {
                     + "VPS: pass instanceId (from listMyVpsInstances) - spends nothing, no confirmation; (2) no server yet: "
                     + "pass packageId (from listVpsPackages, 4 GB+ RAM) - stages a VPS order (COSTS MONEY): returns an "
                     + "actionId; present the price/summary and call executeConfirmedAction only if the user approves. "
-                    + "The result carries the dashboard URL, username and the PASSWORD: show the password to the user once, "
-                    + "in that reply - it is never shown again (osirAgentResetPassword makes a new one). Then poll "
-                    + "osirAgentStatus until installed and connect a model provider with osirAgentConfigure. Calling this "
+                    + "The result carries the username and the PASSWORD: show the password to the user once, in that "
+                    + "reply - it is never shown again (osirAgentResetPassword makes a new one). Then poll osirAgentStatus "
+                    + "until installed - it gives the dashboard URL (without a domain, Osir assigns the address; never "
+                    + "build it) - and connect a model provider with osirAgentConfigure. Calling this "
                     + "again resumes an install and never buys a second VPS. If the platform says the agent is not "
                     + "available yet, tell the user plainly. Requires authentication.",
             annotations = @Tool.Annotations(
@@ -62,12 +63,15 @@ public class AgentMCPServer {
             @ToolArg(description = "The agent to install. Currently only 'hermes'.") String agent,
             @ToolArg(required = false, description = "Id of a VPS the user ALREADY owns, from listMyVpsInstances. Nothing is ordered or charged. Never invent one.") String instanceId,
             @ToolArg(required = false, description = "VPS package id from listVpsPackages (at least 4 GB RAM). Only when a server has to be ordered; omit it when passing instanceId.") String packageId,
-            @ToolArg(required = false, description = "Domain to serve the dashboard on, e.g. 'agent.example.com'. Bound automatically if its DNS is hosted at Osir, otherwise the result says which A record to add.") String domain,
+            @ToolArg(required = false, description = "A domain the user owns to serve the dashboard on, e.g. 'agent.example.com'. Bound automatically if its DNS is hosted at Osir, otherwise the result says which A record to add. Omit it to get an Osir address automatically; never pass an osir.app name.") String domain,
             @ToolArg(required = false, description = "Dashboard login name; default 'admin'.") String username,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection) {
         try {
             String unknown = agentService.unknownAgent(agent);
+            if (unknown == null) {
+                unknown = AgentService.refusedDomain(domain);
+            }
             if (unknown != null) {
                 return AgentDeployResult.fail(unknown);
             }

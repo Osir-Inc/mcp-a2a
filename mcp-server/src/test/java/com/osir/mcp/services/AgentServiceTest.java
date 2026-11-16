@@ -285,6 +285,33 @@ class AgentServiceTest {
                 new com.osir.mcp.models.deploy.DeployDtos.OwnedMoveDto("MOVED", "MOVED_TO_OWNED", null, since)));
     }
 
+    // ---- the URL comes from the backend, never built; osir.app domains refused before any spend -------
+
+    @Test
+    void osirAppDomains_areRefusedUpFront_ownDomainsAreFine() {
+        assertNotNull(AgentService.refusedDomain("osir.app"));
+        assertNotNull(AgentService.refusedDomain("hermes-1-owned.OSIR.app."));
+        assertNull(AgentService.refusedDomain("agent.example.com"));
+        assertNull(AgentService.refusedDomain("notosir.app"));
+        assertNull(AgentService.refusedDomain(null));
+    }
+
+    @Test
+    void noDomain_andNoUrlYet_returnsNoUrl_andSaysWhereItWillAppear() {
+        owned(box("vf-1", "my-box", 8192));
+        when(deploymentService.installAgent(anyString(), eq("hermes"), anyString(), anyString(), any(), any()))
+                .thenAnswer(inv -> new AgentCall<>(new AgentInstallEnvelope(new AppDto("app_x", inv.getArgument(0),
+                        "us", "owned", null, "node", "REQUESTED", null, null, "agent", "hermes"), "MOVING", "admin",
+                        PASSWORD), 202, null));
+
+        AgentDeployResult r = (AgentDeployResult) service.deployWithoutSpending("hermes", "vf-1", null, null);
+
+        assertNull(r.url(), "never build an osir.app address");
+        assertTrue(r.nextStep().contains("appears in osirAgentStatus"), r.nextStep());
+        assertFalse(r.nextStep().contains("the URL,"), r.nextStep());
+        assertEquals(PASSWORD, r.password());
+    }
+
     // ---- 2026-11-16 live run: C2 said MOVED, the box served only Caddy's default page ---------------
 
     @Test

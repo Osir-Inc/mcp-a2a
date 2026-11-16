@@ -1,7 +1,7 @@
 {
   "identifier": "osir-inc-mcp-a2a",
   "name": "OSIR Domain Name MCP Server",
-  "version": "2.5.3",
+  "version": "2.5.4",
   "description": "Domain registrar MCP server from OSIR (ICANN-accredited): 113 tools and 11 prompts to search, register, renew, transfer, and manage domains, DNS, VPS, email, and websites from Claude, ChatGPT, Cursor, or any MCP client. Remote Streamable HTTP, no local install.",
   "author": "OSIR",
   "authorUrl": "https://github.com/Osir-Inc",
@@ -1646,7 +1646,7 @@
     },
     {
       "name": "osirAgentDeploy",
-      "description": "Install a ready-made AI agent - Hermes (Hermes Agent by Nous Research, a self-hosted personal AI agent with a web dashboard) - on the user's OWN VPS, behind HTTPS with a password-protected dashboard. Use this for 'run/install Hermes on my server' INSTEAD of osirAppDeploy, a hand-written Dockerfile, SSH or an install script: the platform installs the vetted agent itself. Needs a VPS with at least 4 GB RAM. TWO WAYS IN, like osirAppDeployToVps: (1) the user already owns a VPS: pass instanceId (from listMyVpsInstances) - spends nothing, no confirmation; (2) no server yet: pass packageId (from listVpsPackages, 4 GB+ RAM) - stages a VPS order (COSTS MONEY): returns an actionId; present the price/summary and call executeConfirmedAction only if the user approves. The result carries the dashboard URL, username and the PASSWORD: show the password to the user once, in that reply - it is never shown again (osirAgentResetPassword makes a new one). Then poll osirAgentStatus until installed and connect a model provider with osirAgentConfigure. Calling this again resumes an install and never buys a second VPS. If the platform says the agent is not available yet, tell the user plainly. Requires authentication.",
+      "description": "Install a ready-made AI agent - Hermes (Hermes Agent by Nous Research, a self-hosted personal AI agent with a web dashboard) - on the user's OWN VPS, behind HTTPS with a password-protected dashboard. Use this for 'run/install Hermes on my server' INSTEAD of osirAppDeploy, a hand-written Dockerfile, SSH or an install script: the platform installs the vetted agent itself. Needs a VPS with at least 4 GB RAM. TWO WAYS IN, like osirAppDeployToVps: (1) the user already owns a VPS: pass instanceId (from listMyVpsInstances) - spends nothing, no confirmation; (2) no server yet: pass packageId (from listVpsPackages, 4 GB+ RAM) - stages a VPS order (COSTS MONEY): returns an actionId; present the price/summary and call executeConfirmedAction only if the user approves. The result carries the username and the PASSWORD: show the password to the user once, in that reply - it is never shown again (osirAgentResetPassword makes a new one). Then poll osirAgentStatus until installed - it gives the dashboard URL (without a domain, Osir assigns the address; never build it) - and connect a model provider with osirAgentConfigure. Calling this again resumes an install and never buys a second VPS. If the platform says the agent is not available yet, tell the user plainly. Requires authentication.",
       "inputSchema": {
         "type": "object",
         "properties": {

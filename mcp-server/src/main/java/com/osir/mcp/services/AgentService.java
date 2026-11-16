@@ -97,6 +97,18 @@ public class AgentService {
     }
 
     /**
+     * Null when {@code domain} may be used. osir.app is Osir's zone: the backend assigns those addresses and
+     * refuses one passed in (422), but only AFTER a VPS was bought - so refuse here, before anything happens.
+     */
+    public static String refusedDomain(String domain) {
+        String d = domain == null ? "" : domain.trim().toLowerCase(Locale.ROOT).replaceAll("\\.$", "");
+        return d.equals("osir.app") || d.endsWith(".osir.app")
+                ? "'" + domain + "' is an osir.app address; those are assigned by Osir. Leave domain out to get one "
+                        + "automatically, or use a domain the user owns. Nothing was done."
+                : null;
+    }
+
+    /**
      * Every path that spends nothing: install on a VPS the user owns ({@code instanceId}), or resume an
      * install whose VPS was already ordered. Returns null when the only way forward is ordering a VPS
      * (the caller stages that behind the confirmation gate).
@@ -245,7 +257,12 @@ public class AgentService {
             }
             AgentInstallEnvelope r = call.body();
             Boolean dnsBound = host == null ? null : moveToOwnedService.bindDomain(host, ip);
-            String url = host != null ? "https://" + host : r.app() == null ? null : r.app().liveUrl();
+            // Never build an Osir address: with no domain the backend assigns <name>-<id>-owned.osir.app
+            // and reports it (liveUrl) only once the install is verified. The user's own domain is theirs.
+            String fromBackend = r.app() == null ? null : r.app().liveUrl();
+            String url = fromBackend != null ? fromBackend : host != null ? "https://" + host : null;
+            String urlNote = url != null ? "" : "The dashboard address is assigned by Osir and appears in osirAgentStatus "
+                    + "once the install is verified - do not guess or build it. ";
             String agentId = r.app() == null ? name : r.app().appId();
             String dns = Boolean.FALSE.equals(dnsBound)
                     ? "The domain '" + host + "' could not be pointed at the VPS automatically (its DNS is not hosted "
@@ -259,13 +276,14 @@ public class AgentService {
                 return new AgentDeployResult(true, "INSTALLING", "Installation resumed for '" + name + "' on VPS '"
                         + instanceId + "'. The dashboard password was shown when the agent was first created; if the "
                         + "user no longer has it, use osirAgentResetPassword.", agentId, url, r.username(), null,
-                        instanceId, ip, host, dnsBound, dns + wait);
+                        instanceId, ip, host, dnsBound, urlNote + dns + wait);
             }
             return new AgentDeployResult(true, "INSTALLING", capitalize(agent) + " is being installed on the user's "
                     + "VPS '" + instanceId + "' (" + ip + ") as '" + name + "'.", agentId, url, r.username(), r.password(),
                     instanceId, ip, host, dnsBound,
-                    "Give the user the URL, the username and the password NOW, in this reply: the password is shown "
-                            + "only this once, cannot be retrieved later, and must not be repeated afterwards. " + dns + wait);
+                    "Give the user " + (url != null ? "the URL, " : "") + "the username and the password NOW, in this "
+                            + "reply: the password is shown only this once, cannot be retrieved later, and must not be "
+                            + "repeated afterwards. " + urlNote + dns + wait);
         };
     }
 
