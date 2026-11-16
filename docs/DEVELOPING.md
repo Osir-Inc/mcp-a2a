@@ -137,6 +137,10 @@ docker-compose logs -f             # View logs
 - `A2A-CONFIRMATION-GATE-SPEC.md` — the staged-confirmation design, what it does NOT protect, and the
   three layers still missing (scopes, spend cap, out-of-band approval)
 - `SKILL.md` — OpenClaw compatibility manifest
+- `RUNBOOK-AGENTS.md` — the `osirAgent*` tools (Hermes on the customer's VPS): what decides each step,
+  the rules that must hold and their tests, release/switch-on (`OSIR_AGENTS_ORDERABLE`), live
+  verification, troubleshooting. **Read before touching the agent tools.** The customer-facing
+  osir.com article lives in `osir-com/run-hermes-on-your-vps.js`.
 
 ## Remaining Work
 
