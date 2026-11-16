@@ -124,6 +124,9 @@ public class DeploymentMCPServer {
                     + "result's message: usually call osirAppDeployToVps again to retry, which never orders a "
                     + "second server; but when the VPS refused the Osir deploy key or its web ports are "
                     + "taken, the user must fix the VPS first, and the message says how). "
+                    + "For an app on the user's own VPS (tier 'owned'), health is always UNKNOWN: the platform "
+                    + "does not probe the user's server. Use qa to tell whether it works; do not redeploy "
+                    + "because of UNKNOWN. "
                     + "Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get app status",
@@ -168,7 +171,9 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppLogs",
-            description = "osirAppLogs: Get recent logs from an Osir app's microVM ('why is my app broken?'). Requires authentication.",
+            description = "osirAppLogs: Get recent logs from an Osir app ('why is my app broken?'). Not available yet "
+                    + "for an app on the user's own VPS - the result says so; then use osirAppStatus (qa.findings) "
+                    + "instead, and never ask the user for SSH access. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get app logs",
                     readOnlyHint = true,
@@ -256,7 +261,9 @@ public class DeploymentMCPServer {
                     + "reports its progress, and calling it after one FAILED retries the ship - unless osirAppStatus "
                     + "says the VPS refused the Osir deploy key or its web ports are taken: then retry only after "
                     + "the user has made the changes that message lists. If the result status "
-                    + "is BUILDING or BUILD_FAILED, follow its nextStep. Requires authentication.",
+                    + "is BUILDING or BUILD_FAILED, follow its nextStep. After the move the app is served ONLY "
+                    + "from the user's server: its earlier osir.app address stops working. Give the user the URL "
+                    + "from osirAppStatus, and never tell them the old link still works. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Deploy app to the user's own VPS",
                     readOnlyHint = false,

@@ -222,7 +222,7 @@ Full tool/skill catalog, example conversations, and end-to-end walkthroughs are 
 - **osirAppDeploy** - Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a microVM. Redeploying an app that was moved to the user's own VPS updates it there and keeps its domain.
 - **osirAppGetSource** - Get a short-lived signed download URL for an Osir app's current source zip - use this to make edits to a deployed app without the user re-attaching the project: download, patch the files, then osirAppCreateUpload (PUT the new zip) and osirAppDeploy under the SAME name; the platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box.
 - **osirAppList** - List the authenticated user's deployed Osir apps with their live URLs and status.
-- **osirAppLogs** - Get recent logs from an Osir app's microVM ('why is my app broken?').
+- **osirAppLogs** - Get recent logs from an Osir app ('why is my app broken?'). Not available yet for an app on the user's own VPS; then use osirAppStatus (qa.findings).
 - **osirAppDeployToVps** - Deploy a live Osir app onto a VPS the user owns, moving it off the shared free tier: attach one they already have (instanceId, spends nothing) or order one (packageId, gated). The platform ships the app over its own deploy key - never SSH, never an install script.
 - **osirAppProvisionDatabase** - Provision a managed Postgres database for an Osir app.
 - **osirAppSetSecret** - Set an environment secret for an Osir app (e.g.

@@ -1696,7 +1696,7 @@
     },
     {
       "name": "osirAppLogs",
-      "description": "Get recent logs from an Osir app's microVM ('why is my app broken?'). Required: appId (string). Optional: tail (number of recent lines, default 100). Requires authentication.",
+      "description": "Get recent logs from an Osir app ('why is my app broken?'). Not available yet for an app on the user's own VPS - the result says so; then use osirAppStatus (qa.findings). Required: appId (string). Optional: tail (number of recent lines, default 100). Requires authentication.",
       "inputSchema": {
         "type": "object",
         "properties": {
