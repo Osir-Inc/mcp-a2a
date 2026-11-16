@@ -1,14 +1,26 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.json",
-  "name": "com.osir/registrar",
-  "description": "AI-native domain registrar: search and register domains, manage DNS, order VPS, host email, and deploy sites/apps. Anonymous lookups work without login; staged confirmations gate every financial or destructive action.",
-  "status": "active",
-  "websiteUrl": "https://osir.com",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.osir/domain-registrar",
+  "title": "OSIR Domain Registrar",
+  "description": "Register, renew, transfer, and manage domains, DNS, VPS, email, and self-hosted AI agents with 113 tools. By OSIR.",
   "repository": {
     "url": "https://github.com/Osir-Inc/mcp-a2a",
     "source": "github"
   },
-  "version": "2.4.2",
+  "version": "2.5.0",
+  "websiteUrl": "https://osir.com/en/mcp/",
+  "icons": [
+    {
+      "src": "https://osir.com/og-image.png",
+      "mimeType": "image/png",
+      "sizes": ["400x400"]
+    },
+    {
+      "src": "https://osir.com/favicon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": ["any"]
+    }
+  ],
   "remotes": [
     {
       "type": "streamable-http",

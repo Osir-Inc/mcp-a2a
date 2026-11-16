@@ -42,11 +42,18 @@ public class PromptsMCPServer {
                - getAccountBalance() to check your account balance
 
             6. DEPLOY A SITE OR APP
-               - osirAppCreateUpload() → zip the project and PUT it to the returned putUrl
-               - osirAppDeploy(name, language, uploadTicket) → a live https://<name>.<region>.osir.app
+               - osirAppDeploy(name, language, files) → a live https://<name>.<region>.osir.app
+                 (files = [{path, content}]; poll osirAppStatus until READY before calling it live)
                - osirAppDeployToVps(appName, instanceId) puts that same app on a VPS the user owns
-               - To update it later, redeploy under the SAME name. Never SSH in or write an install
-                 script: the platform ships the app to the box itself.
+               - To update it later: osirAppGetSource(appName, inline=true) → patch → osirAppDeploy
+                 under the SAME name. Never SSH in or write an install script: the platform ships
+                 the app to the box itself.
+
+            7. RUN A READY-MADE AI AGENT (Hermes) ON THE USER'S VPS
+               - osirAgentDeploy("hermes", instanceId) for a VPS they own (4 GB+ RAM), or packageId
+                 to order one (confirmation). Show the returned password once, then poll
+                 osirAgentStatus and connect a model with osirAgentConfigure.
+               - Never osirAppDeploy, a hand-written Dockerfile or SSH for an agent.
 
             Tips:
             - Always enable WHOIS privacy protection for personal domains

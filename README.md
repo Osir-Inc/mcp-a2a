@@ -138,7 +138,7 @@ Full tool/skill catalog, example conversations, and end-to-end walkthroughs are 
 
 ## Tools
 
-106 tools, verified against the live server (tools/list on https://be.osir.com/mcp/http).
+113 tools, verified against the live server (tools/list on https://be.osir.com/mcp/http).
 
 - **addPrefixToDomain** - Generate domain suggestions by adding prefixes.
 - **addSshKey** - Store an SSH public key on your account so it can be injected into VPS installs.
@@ -217,10 +217,17 @@ Full tool/skill catalog, example conversations, and end-to-end walkthroughs are 
 - **loginWithDevice** - Start a device authorization login (RFC 8628).
 - **logout** - Log out: revokes the session's tokens at the identity provider immediately.
 - **orderVps** - Stage an order for a new VPS instance.
-- **osirAppCreateUpload** - Create an upload ticket for deploying app source code to Osir.
+- **osirAgentConfigure** - Connect the user's AI agent (e.g. Hermes) to a model provider (deepseek, openai, openrouter, anthropic); the key is stored as an encrypted secret.
+- **osirAgentDelete** - Stage removal of the user's AI agent from their VPS; its data stays and the VPS is not cancelled.
+- **osirAgentDeploy** - Install a ready-made AI agent (Hermes) on the user's own VPS (4 GB+ RAM) behind HTTPS with a password-protected dashboard; the password is shown once.
+- **osirAgentList** - List the user's installed AI agents.
+- **osirAgentLogs** - Logs of the user's AI agent; not available yet, the result says so.
+- **osirAgentResetPassword** - Set a new dashboard password for the user's AI agent, shown once.
+- **osirAgentStatus** - Install progress, dashboard URL, and a live check that the dashboard asks for a login.
+- **osirAppCreateUpload** - Upload ticket for a zipped project; only for shell clients with a project over the inline caps (500 files / 6 MiB).
 - **osirAppDelete** - Stage deletion of an Osir app.
-- **osirAppDeploy** - Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a microVM. Redeploying an app that was moved to the user's own VPS updates it there and keeps its domain.
-- **osirAppGetSource** - Get a short-lived signed download URL for an Osir app's current source zip - use this to make edits to a deployed app without the user re-attaching the project: download, patch the files, then osirAppCreateUpload (PUT the new zip) and osirAppDeploy under the SAME name; the platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box.
+- **osirAppDeploy** - Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a microVM. The source travels as `files` in the call, so chat clients with no shell can deploy. Redeploying an app that was moved to the user's own VPS updates it there and keeps its domain.
+- **osirAppGetSource** - Get a deployed app's current source (`inline=true` returns the files themselves) to edit it without the user re-attaching the project: patch the files and osirAppDeploy them under the SAME name; the platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box.
 - **osirAppList** - List the authenticated user's deployed Osir apps with their live URLs and status.
 - **osirAppLogs** - Get recent logs from an Osir app ('why is my app broken?'). Not available yet for an app on the user's own VPS; then use osirAppStatus (qa.findings).
 - **osirAppDeployToVps** - Deploy a live Osir app onto a VPS the user owns, moving it off the shared free tier: attach one they already have (instanceId, spends nothing) or order one (packageId, gated). The platform ships the app over its own deploy key - never SSH, never an install script.
@@ -284,7 +291,7 @@ See [`.env.example`](.env.example) for the full list.
 
 ```
 common/      Shared library — 12 services, 9 REST clients, ~174 models
-mcp-server/  Quarkus MCP server — 106 tools, 11 prompts, 2 resources
+mcp-server/  Quarkus MCP server — 113 tools, 11 prompts, 2 resources
 a2a-server/  Quarkus A2A server — 9 agents, 89 skills, JSON-RPC, JPA task persistence
 ```
 

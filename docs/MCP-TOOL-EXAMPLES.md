@@ -1278,12 +1278,16 @@ over its own deploy key, so the assistant needs no shell access and no outbound 
 ### The whole lifecycle
 
 ```
-osirAppCreateUpload → PUT the zip to putUrl → osirAppDeploy → https://<name>.<region>.osir.app
-                                                    ↓
-                                        osirAppDeployToVps (the customer's own box)
-                                                    ↓
-              update: osirAppGetSource → patch → osirAppCreateUpload → osirAppDeploy (SAME name)
+osirAppDeploy(files) → https://<name>.<region>.osir.app
+          ↓
+osirAppDeployToVps (the customer's own box)
+          ↓
+update: osirAppGetSource(inline=true) → patch → osirAppDeploy(files, SAME name)
 ```
+
+Files travel as tool arguments, so a chat client with no shell can run the whole loop. The zip route
+(`osirAppCreateUpload` → PUT → `osirAppDeploy(uploadTicket)`) remains for shell clients and projects
+over the inline caps (500 files / 6 MiB).
 
 There is no separate promote step. Once an app is on the customer's VPS, every later `osirAppDeploy`
 under the same name re-ships it to that box automatically and keeps its domain.
@@ -1297,7 +1301,8 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 }'
 ```
 
-Returns an `uploadTicket` and a `putUrl`. Zip the project and `curl -X PUT --upload-file app.zip "$putUrl"`.
+Shell clients and large projects only. Returns an `uploadTicket` and a `putUrl`. Zip the project and
+`curl -X PUT --upload-file app.zip "$putUrl"`, then pass `uploadTicket` to `osirAppDeploy` instead of `files`.
 
 ### osirAppDeploy
 
@@ -1309,14 +1314,20 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
     "arguments": {
       "name": "javacar-rentals",
       "language": "node",
-      "uploadTicket": "upl_..."
+      "files": [
+        { "path": "package.json", "content": "{\"scripts\":{\"start\":\"node index.js\"}}" },
+        { "path": "index.js", "content": "require('http').createServer((q, s) => s.end('hi')).listen(8080)" },
+        { "path": "public/logo.png", "content": "iVBORw0KGgo...", "encoding": "base64" }
+      ]
     }
   }
 }'
 ```
 
 `language` is `node`, `python`, `php-laravel` or `go`; use `node` for a plain static site. Deploying an
-existing name redeploys it and applies any secrets set with `osirAppSetSecret`.
+existing name redeploys it and applies any secrets set with `osirAppSetSecret`. Send every file: a
+redeploy replaces the source, so a file left out is gone. Returns `BUILDING` — poll `osirAppStatus`
+until `READY` before calling the URL live.
 
 ### osirAppDeployToVps
 
@@ -1480,7 +1491,7 @@ secret, injected on the next deploy, never returned or logged), `osirAppLogs`,
 | 105 | `createAccount` | No | Onboarding |
 | 106 | `verifyAccount` | No | Onboarding |
 | 107 | `getHostingBundle` | Yes | Catalog |
-| - | 106 tools. The numbers above are positional, not stable ids, and one row was retired. Authoritative source is `tools/list`. | - | - |
+| - | 113 tools. The numbers above are positional, not stable ids, and one row was retired. Authoritative source is `tools/list`. | - | - |
 
 ---
 

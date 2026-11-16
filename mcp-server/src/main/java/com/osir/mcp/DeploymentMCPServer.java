@@ -1,11 +1,12 @@
 package com.osir.mcp;
 
-import com.osir.mcp.models.confirmation.ConfirmationRequiredResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppListResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppSourceResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppLogsResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
+import com.osir.mcp.models.deploy.DeployDtos.DeleteResult;
 import com.osir.mcp.models.deploy.DeployDtos.DeployResult;
+import com.osir.mcp.models.deploy.DeployDtos.InlineFile;
 import com.osir.mcp.models.deploy.DeployDtos.ProvisionDbResult;
 import com.osir.mcp.models.deploy.DeployDtos.SetSecretResult;
 import com.osir.mcp.models.deploy.DeployDtos.UploadTicketResult;
@@ -22,6 +23,8 @@ import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+
+import java.util.List;
 
 /**
  * LLM-facing tools for the Osir app-deploy platform (chat-native deploy to *.osir.app). All tools
@@ -44,9 +47,10 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppCreateUpload",
-            description = "osirAppCreateUpload: Create an upload ticket for deploying app source code to Osir. Returns an uploadTicket, "
-                    + "a putUrl, and instructions to zip the project and upload it. After uploading, call osirAppDeploy "
-                    + "with the uploadTicket. Requires authentication.",
+            description = "osirAppCreateUpload: ONLY for a client with a shell and a project too large to send inline "
+                    + "(over 500 files or 6 MiB). Usually you do NOT need this: call osirAppDeploy with the project's "
+                    + "files directly. Returns an uploadTicket, a putUrl, and instructions to zip the project and "
+                    + "PUT it there; then call osirAppDeploy with the uploadTicket. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Create app upload ticket",
                     readOnlyHint = false,
@@ -65,9 +69,19 @@ public class DeploymentMCPServer {
     @RequiresAuth
     @Tool(name = "osirAppDeploy",
             description = "osirAppDeploy: Deploy an app to Osir (free tier) and get a live HTTPS URL; the app runs isolated in a "
-                    + "microVM. Deploying an existing app name redeploys it (new version) and applies any secrets set "
+                    + "microVM. Send the project's source as 'files' (each {path, content}) - you never zip, upload "
+                    + "or make an HTTP request yourself. Returns immediately with status BUILDING: poll osirAppStatus "
+                    + "until READY (typically 1-2 min, up to ~7 for a first build) before telling the user the URL "
+                    + "is live; if it ends BUILD_FAILED, fix the source and redeploy - never deploy around a failed "
+                    + "build by hand. "
+                    + "Deploying an existing app name redeploys it (new version) and applies any secrets set "
                     + "via osirAppSetSecret. A plain static website (HTML/CSS/JS with no framework or build step) is "
                     + "also supported: it is auto-detected and served directly; pass language 'node' for it. "
+                    + "If the project has its own Dockerfile at the root, the platform builds exactly that: pass "
+                    + "language 'node' for it; the container must listen on port 8080. Shared-tier apps get 256 MB / "
+                    + "0.5 CPU, so a big image-based app belongs on the user's own VPS (osirAppDeployToVps). "
+                    + "For a ready-made AI agent (Hermes), use osirAgentDeploy - never this tool and never a "
+                    + "hand-written Dockerfile. "
                     + "To put the app on the user's OWN VPS, server or production box instead, deploy it here "
                     + "first and then call osirAppDeployToVps - never SSH into the box or write an install "
                     + "script. Once an app is on the user's own VPS, redeploying HERE under the same name is "
@@ -81,12 +95,13 @@ public class DeploymentMCPServer {
                     openWorldHint = false))
     public DeployResult osirAppDeploy(
                                       @ToolArg(description = "App name: lowercase letters, digits, and hyphens, e.g. 'habit-tracker'.") String name,
-                                      @ToolArg(description = "Runtime language: 'node', 'python', 'php-laravel', or 'go'; use 'node' for a plain static site.") String language,
-                                      @ToolArg(description = "Upload ticket from osirAppCreateUpload, after uploading the zipped source to its putUrl.") String uploadTicket,
+                                      @ToolArg(description = "Runtime language: 'node', 'python', 'php-laravel', or 'go'; use 'node' for a plain static site or a project with its own Dockerfile.") String language,
+                                      @ToolArg(required = false, description = "The project's source files: [{path, content, encoding?}]. path is relative and forward-slashed (e.g. 'src/index.js'); encoding is 'utf8' (default) or 'base64' for binaries such as images. Include every file the app needs - omitted files are not in the new version. Up to 500 files / 6 MiB. Use this OR uploadTicket.") List<InlineFile> files,
+                                      @ToolArg(required = false, description = "Only for the shell path: upload ticket from osirAppCreateUpload, after PUTting the zipped source to its putUrl. Leave out when sending files.") String uploadTicket,
                                       @ToolArg(required = false, description = "Region: 'us' or 'al' ('al' is Albania/Tirana); defaults to the platform's home region.") String region,
                                       @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
-            return deploymentService.deploy(name, language, region, uploadTicket);
+            return deploymentService.deploy(name, language, region, uploadTicket, files);
         } catch (Exception e) {
             Log.errorf(e, "osirAppDeploy error: %s", e.getMessage());
             return DeployResult.fail("Deploy failed: " + e.getMessage());
@@ -95,7 +110,9 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppList",
-            description = "osirAppList: List the authenticated user's deployed Osir apps with their live URLs and status. Requires authentication.",
+            description = "osirAppList: List the authenticated user's deployed Osir apps with their live URLs and status. "
+                    + "An entry with kind 'agent' is a ready-made AI agent (e.g. Hermes): manage it with the osirAgent* "
+                    + "tools, never the osirApp* ones. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "List deployed apps",
                     readOnlyHint = true,
@@ -138,7 +155,9 @@ public class DeploymentMCPServer {
             @ToolArg(description = "App id from osirAppList or a deploy result.") String appId,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
-            return deploymentService.getStatus(appId);
+            AppStatusResult status = deploymentService.getStatus(appId);
+            return status.app() != null && status.app().isAgent()
+                    ? AppStatusResult.fail(DeploymentService.agentRefusal(status.app())) : status;
         } catch (Exception e) {
             Log.errorf(e, "osirAppStatus error: %s", e.getMessage());
             return AppStatusResult.fail("Failed to get app status: " + e.getMessage());
@@ -218,11 +237,13 @@ public class DeploymentMCPServer {
 
     @RequiresAuth
     @Tool(name = "osirAppGetSource",
-            description = "osirAppGetSource: Get a short-lived signed download URL for an Osir app's current source zip. Use this to "
-                    + "make edits to a deployed app without the user re-attaching the project: download, patch the "
-                    + "files, then osirAppCreateUpload (PUT the new zip) and osirAppDeploy under the SAME name; the "
-                    + "platform rebuilds and, for owned-tier apps, auto-ships the new version to the user's box. "
-                    + "Requires authentication.",
+            description = "osirAppGetSource: Get a deployed Osir app's current source, to make edits without the user "
+                    + "re-attaching the project. With inline=true it returns the files themselves: patch them and "
+                    + "call osirAppDeploy with ALL the files under the SAME name; the platform rebuilds and, for "
+                    + "owned-tier apps, auto-ships the new version to the user's box. If the result says "
+                    + "truncated=true the files are only PART of the app - do NOT redeploy from them. Without "
+                    + "inline it returns only a short-lived signed zip URL (getUrl), useful only to a client "
+                    + "with a shell. Requires authentication.",
             annotations = @Tool.Annotations(
                     title = "Get app source",
                     readOnlyHint = true,
@@ -231,10 +252,11 @@ public class DeploymentMCPServer {
                     openWorldHint = false))
     public AppSourceResult osirAppGetSource(
             @ToolArg(description = "The deployed app's name, as shown by osirAppList.") String appName,
+            @ToolArg(required = false, description = "true (recommended): return the files themselves (up to 300 files / 2 MiB). false/omitted: only a signed zip URL.") Boolean inline,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection) {
         try {
-            return deploymentService.getSource(appName);
+            return deploymentService.getSource(appName, Boolean.TRUE.equals(inline));
         } catch (Exception e) {
             Log.errorf(e, "osirAppGetSource error for %s: %s", appName, e.getMessage());
             return AppSourceResult.fail("Failed to get the source URL. Please try again.");
@@ -278,6 +300,10 @@ public class DeploymentMCPServer {
                                      @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
                                      McpConnection connection) {
         try {
+            String agent = deploymentService.refuseIfAgent(appName);
+            if (agent != null) {
+                return MoveToOwnedResult.fail(agent);
+            }
             // The user named a box they own: attach it. Spends nothing, so no gate — and it comes
             // FIRST, before the resume shortcut, so an explicit instanceId is never overridden.
             if (instanceId != null && !instanceId.isBlank()) {
@@ -325,9 +351,13 @@ public class DeploymentMCPServer {
                     destructiveHint = true,
                     idempotentHint = true,
                     openWorldHint = false))
-    public ConfirmationRequiredResult osirAppDelete(
+    public Object osirAppDelete(
             @ToolArg(description = "App id from osirAppList.") String appId,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+        String agent = deploymentService.refuseIfAgent(appId);
+        if (agent != null) {
+            return new DeleteResult(false, agent);
+        }
         return pendingActionStore.stage(
                 "osirAppDelete",
                 "Permanently delete app '" + appId + "', removes its microVM, image, route, and all data. Irreversible.",

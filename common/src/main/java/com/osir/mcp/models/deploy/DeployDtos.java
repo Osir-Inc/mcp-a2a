@@ -13,8 +13,20 @@ public final class DeployDtos {
     }
 
     // ---- Backend wire shapes (deserialized from C2 responses) -------------------------------
+    /** {@code kind} is "app" or "agent" (derived by C2 from {@code catalog}, e.g. "hermes"). An agent is
+     *  managed only by the osirAgent* tools; every osirApp* tool refuses it. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     public record AppDto(String appId, String name, String region, String tier, String runtimeClass,
-                         String language, String status, String liveUrl, String currentVersionId) {
+                         String language, String status, String liveUrl, String currentVersionId,
+                         String kind, String catalog) {
+        public AppDto(String appId, String name, String region, String tier, String runtimeClass,
+                      String language, String status, String liveUrl, String currentVersionId) {
+            this(appId, name, region, tier, runtimeClass, language, status, liveUrl, currentVersionId, null, null);
+        }
+
+        public boolean isAgent() {
+            return "agent".equalsIgnoreCase(kind);
+        }
     }
 
     public record AppEnvelope(AppDto app) {
@@ -115,8 +127,28 @@ public final class DeployDtos {
     public record SourceEnvelope(String getUrl, String expiresAt) {
     }
 
+    /** One source file carried as a tool argument (CONTRACTS §4, POST /v1/uploads/inline). Path is
+     *  relative and forward-slashed; encoding 'utf8' (default) or 'base64' for binaries. */
+    public record InlineFile(String path, String content, String encoding) {
+    }
+
+    public record InlineUploadBody(List<InlineFile> files) {
+    }
+
+    /** C2's answer to GET /v1/apps/{appId}/source?inline=true. {@code truncated}: a PARTIAL view. */
+    public record InlineSourceEnvelope(List<InlineFile> files, boolean truncated, String getUrl, String note) {
+    }
+
+    /** {@code files}/{@code truncated} are present only for an inline read. NON_NULL: the generated
+     *  output schema types every field, so a null fails it while an omitted one validates. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     public record AppSourceResult(boolean success, String message, String getUrl,
-                                  String expiresAt, String instructions) {
+                                  String expiresAt, String instructions,
+                                  List<InlineFile> files, Boolean truncated) {
+        public AppSourceResult(boolean success, String message, String getUrl, String expiresAt, String instructions) {
+            this(success, message, getUrl, expiresAt, instructions, null, null);
+        }
+
         public static AppSourceResult fail(String msg) {
             return new AppSourceResult(false, msg, null, null, null);
         }

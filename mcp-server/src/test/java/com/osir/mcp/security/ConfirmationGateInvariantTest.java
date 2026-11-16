@@ -35,10 +35,10 @@ class ConfirmationGateInvariantTest {
             // money
             "orderVps", "payInvoice", "createPaymentSession", "registerDomain", "renewDomain",
             "transferDomain", "initiateTransfer", "createMailbox", "changeVpsPaymentTerm", "osirAppDeployToVps",
-            "fundBalanceWithSharedPaymentToken",
+            "fundBalanceWithSharedPaymentToken", "osirAgentDeploy",
             // data loss
             "deleteSshKey", "deleteContact", "osirAppDelete", "deleteDnsRecord", "unlockDomain",
-            "deleteHost", "deleteMailbox", "cancelTransfer", "buildVpsInstance", "deleteVpsInstance");
+            "deleteHost", "deleteMailbox", "cancelTransfer", "buildVpsInstance", "deleteVpsInstance", "osirAgentDelete");
 
     @Test
     void everyDestructiveToolStages_andTheGatedSetIsExactlyWhatWeExpect() throws IOException {

@@ -23,4 +23,8 @@ public final class C2Reason {
 
     /** Async: something other than our Caddy holds :80/:443 on the box ({@code params.ports}). */
     public static final String BOX_PORTS_IN_USE = "BOX_PORTS_IN_USE";
+
+    /** Async, agents only: the VPS has less memory than the agent needs ({@code params.memoryMb},
+     *  {@code params.requiredMb}). Only a bigger VPS fixes it. */
+    public static final String BOX_TOO_SMALL = "BOX_TOO_SMALL";
 }

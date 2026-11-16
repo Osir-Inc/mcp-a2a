@@ -147,6 +147,12 @@ OSIR_TELEMETRY_API_KEY=
 SENTRY_DSN=
 SENTRY_ENVIRONMENT=production
 
+# AI agents (osirAgentDeploy): agents for which a NEW VPS may be ordered, comma-separated.
+# Leave empty until the deploy backend has released the agent (its POST /v1/agents answers
+# 503 until then, and that answer would only arrive after the customer paid for the VPS).
+# Installing on a VPS the customer already owns works without this. At release: hermes
+OSIR_AGENTS_ORDERABLE=
+
 # Rate limiting
 A2A_RATE_LIMIT_GLOBAL=50
 A2A_RATE_LIMIT_PER_USER=10

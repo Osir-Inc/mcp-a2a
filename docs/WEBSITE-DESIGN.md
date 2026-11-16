@@ -69,7 +69,7 @@ Give your agent loop these MCP tools (names as served at `/mcp`):
 | Tool | Auth | Purpose |
 |---|---|---|
 | `osirSiteDesignBrief` | none | Validate the brief → returns `systemPrompt` (the design instructions the model must follow), `editRules` (revision rules), `brief` (normalized echo) |
-| `osirSitePublish` | Bearer / sessionKey | **Standalone** — publishes ANY complete single-page HTML document (the customer's own site, a page designed anywhere in the chat, or output of the design flow). `name` + full `html` → gate, zip, deploy. Same `name` = redeploy. Pass `designContract: true` only for pages from the design flow. Multi-file sites: `osirAppCreateUpload` + `osirAppDeploy` with a zip |
+| `osirSitePublish` | Bearer / sessionKey | **Standalone** — publishes ANY complete single-page HTML document (the customer's own site, a page designed anywhere in the chat, or output of the design flow). `name` + full `html` → gate, zip, deploy. Same `name` = redeploy. Pass `designContract: true` only for pages from the design flow. Multi-file sites: `osirAppDeploy` with all the site's `files` |
 | `osirAppStatus` | Bearer / sessionKey | Poll until `READY`; `qa` is a black-box check of the live page |
 | `osirAppList`, `osirAppGetSource` | Bearer / sessionKey | Optional: list the customer's sites; retrieve last deployed HTML |
 
@@ -92,7 +92,7 @@ The MCP prompt `website_designer` contains the full interview + flow script. If 
 
 **Only with `designContract: true`** (set by the design-flow prompts, never for a customer's own site): exactly one `<h1>`; no `<iframe>/<object>/<embed>`; no external `<script src>`; external CSS only from Google Fonts. A customer's own site with CDN scripts or a YouTube embed publishes fine without the flag.
 
-The gate is contract enforcement, not the security layer (C2's microVM isolation is). Multi-file sites (separate CSS/JS/images) go through the existing zip route: `osirAppCreateUpload` → PUT the zip → `osirAppDeploy`.
+The gate is contract enforcement, not the security layer (C2's microVM isolation is). Multi-file sites (separate CSS/JS/images) go through `osirAppDeploy` with every file passed as `files`.
 
 ### Transport requirement: survive server restarts
 

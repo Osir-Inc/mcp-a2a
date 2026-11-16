@@ -112,7 +112,30 @@ public class MoveToOwnedService {
             throw new IllegalStateException("App '" + appName + "' is in state " + appState
                     + ", it must be running before it can be moved. Check osirAppStatus and fix it first.");
         }
+        return prepareBox(packageId);
+    }
 
+    /**
+     * Pre-flight for ordering a VPS to install an agent on: the package must have at least
+     * {@code minMemoryMb} (checked BEFORE anything is bought — C2 would only refuse the box after the
+     * customer paid for it), then the same OS-template and key steps as a move.
+     */
+    public Prepared prepareAgentBox(String packageId, int minMemoryMb) {
+        var pkg = vpsService.getPackageDetails(packageId);
+        if (pkg == null || !pkg.isSuccess() || pkg.getPackageDetail() == null) {
+            throw new IllegalStateException("VPS package '" + packageId + "' could not be read"
+                    + (pkg == null ? "" : ": " + pkg.getMessage()) + ". Use listVpsPackages to pick one. Nothing was ordered.");
+        }
+        int memoryMb = pkg.getPackageDetail().getMemoryMb();
+        if (memoryMb < minMemoryMb) {
+            throw new IllegalStateException("VPS package '" + packageId + "' has " + memoryMb + " MB of memory; this "
+                    + "agent needs at least " + minMemoryMb + " MB. Pick a larger package from listVpsPackages. "
+                    + "Nothing was ordered.");
+        }
+        return prepareBox(packageId);
+    }
+
+    private Prepared prepareBox(String packageId) {
         VpsOsTemplateListResult templates = vpsService.listOsTemplates(packageId, null, false);
         if (!templates.isSuccess() || templates.getTemplates() == null) {
             throw new IllegalStateException("Could not list OS templates for package '" + packageId
@@ -216,7 +239,24 @@ public class MoveToOwnedService {
      * instanceId. C2 re-checks tenancy and its one-app-one-box rules on top of that.
      */
     public MoveToOwnedResult attach(String appName, String instanceId, String domain) {
-        String moveKey = key(appName);
+        return (MoveToOwnedResult) attachThen(appName, instanceId, domain, APP_TOOL, appShip(appName, domain));
+    }
+
+    /** The final step once the box is built and has an IP: an app is moved there, an agent installed. */
+    @FunctionalInterface
+    interface Ship {
+        Object onReady(String moveKey, String instanceId, VpsInstanceSummary instance);
+    }
+
+    static final String APP_TOOL = "osirAppDeployToVps";
+
+    private Ship appShip(String appName, String domain) {
+        return (moveKey, instanceId, instance) -> finishMove(appName, moveKey, instanceId, instance, domain);
+    }
+
+    /** {@link #attach} for any {@link Ship}: {@code tool} names the tool the model should call again. */
+    Object attachThen(String name, String instanceId, String domain, String tool, Ship ship) {
+        String moveKey = key(name);
         VpsInstanceDetailResult details = vpsService.getInstanceDetails(instanceId);
         if (!details.isSuccess() || details.getInstance() == null) {
             return MoveToOwnedResult.fail("VPS '" + instanceId + "' could not be read on your account: "
@@ -227,17 +267,16 @@ public class MoveToOwnedService {
         // naming different boxes both pass the one-box-at-a-time guard.
         String tracked = orderedInstances.putIfAbsent(moveKey, instanceId);
         if (ORDER_PENDING.equals(tracked)) {
-            return MoveToOwnedResult.fail("An order for '" + appName + "' is being placed right now. "
-                    + "Wait a moment, then call osirAppDeployToVps again to check progress, do not order again.");
+            return MoveToOwnedResult.fail("An order for '" + name + "' is being placed right now. "
+                    + "Wait a moment, then call " + tool + " again to check progress, do not order again.");
         }
         if (tracked != null && !tracked.equals(instanceId)) {
-            return MoveToOwnedResult.fail("A move of '" + appName + "' onto VPS '" + tracked
-                    + "' is already in progress, and an app can have only one owned box at a time. Call "
-                    + "osirAppDeployToVps without instanceId to resume that one.");
+            return MoveToOwnedResult.fail("A move of '" + name + "' onto VPS '" + tracked
+                    + "' is already in progress, and it can have only one owned box at a time. Call "
+                    + tool + " without instanceId to resume that one.");
         }
-        LOG.infof("moveToOwned: attaching app %s to instance %s the customer already owns (no order)",
-                appName, instanceId);
-        return pollAndFinish(appName, moveKey, instanceId, domain);
+        LOG.infof("moveToOwned: attaching %s to instance %s the customer already owns (no order)", name, instanceId);
+        return pollThen(tool, instanceId, domain, moveKey, ship);
     }
 
     /**
@@ -250,16 +289,21 @@ public class MoveToOwnedService {
      * buying a second server.
      */
     public MoveToOwnedResult orderAndMove(String appName, String packageId, Prepared prep, String domain) {
+        return (MoveToOwnedResult) orderThen(appName, packageId, prep, domain, APP_TOOL, appShip(appName, domain));
+    }
+
+    /** {@link #orderAndMove} for any {@link Ship}. The box is named {@code <name>-owned.osir.app}. */
+    Object orderThen(String appName, String packageId, Prepared prep, String domain, String tool, Ship ship) {
         String moveKey = key(appName);
         String existing = orderedInstances.putIfAbsent(moveKey, ORDER_PENDING);
         if (ORDER_PENDING.equals(existing)) {
             return MoveToOwnedResult.fail("An order for '" + appName + "' is being placed right now. "
-                    + "Wait a moment, then call osirAppDeployToVps again to check progress, do not order again.");
+                    + "Wait a moment, then call " + tool + " again to check progress, do not order again.");
         }
         if (existing != null) {
-            LOG.infof("moveToOwned: duplicate execute for app %s, resuming instance %s instead of re-ordering",
+            LOG.infof("moveToOwned: duplicate execute for %s, resuming instance %s instead of re-ordering",
                     appName, existing);
-            return pollAndFinish(appName, moveKey, existing, domain);
+            return pollThen(tool, existing, domain, moveKey, ship);
         }
 
         VpsOrderResult order;
@@ -275,26 +319,36 @@ public class MoveToOwnedService {
             throw new RuntimeException("VPS order failed: " + order.getMessage());
         }
         orderedInstances.put(moveKey, order.getInstanceId());
-        LOG.infof("moveToOwned: ordered instance %s for app %s", order.getInstanceId(), appName);
-        return pollAndFinish(appName, moveKey, order.getInstanceId(), domain);
+        LOG.infof("moveToOwned: ordered instance %s for %s", order.getInstanceId(), appName);
+        return pollThen(tool, order.getInstanceId(), domain, moveKey, ship);
     }
 
     /** Continue a move whose VPS is already ordered, never orders again. */
     public MoveToOwnedResult resume(String appName, String domain) {
+        return (MoveToOwnedResult) resumeThen(appName, domain, APP_TOOL, appShip(appName, domain));
+    }
+
+    Object resumeThen(String appName, String domain, String tool, Ship ship) {
         String moveKey = key(appName);
         String instanceId = orderedInstances.get(moveKey);
         if (instanceId == null) {
             return MoveToOwnedResult.fail("No move in progress for '" + appName
-                    + "'. Call osirAppDeployToVps with a packageId to start one.");
+                    + "'. Call " + tool + " with a packageId to start one.");
         }
         if (ORDER_PENDING.equals(instanceId)) {
             return MoveToOwnedResult.fail("The order for '" + appName + "' is still being placed. "
-                    + "Wait a moment and call osirAppDeployToVps again, do not order again.");
+                    + "Wait a moment and call " + tool + " again, do not order again.");
         }
-        return pollAndFinish(appName, moveKey, instanceId, domain);
+        return pollThen(tool, instanceId, domain, moveKey, ship);
     }
 
-    private MoveToOwnedResult pollAndFinish(String appName, String moveKey, String instanceId, String domain) {
+    /** The tracker no longer needs this entry: the ship step handed the box to C2. */
+    void release(String moveKey) {
+        orderedInstances.remove(moveKey);
+        shipRefusals.remove(moveKey);
+    }
+
+    private Object pollThen(String tool, String instanceId, String domain, String moveKey, Ship ship) {
         long deadline = System.currentTimeMillis() + pollBudgetMs;
         while (true) {
             VpsInstanceDetailResult details = vpsService.getInstanceDetails(instanceId);
@@ -302,7 +356,17 @@ public class MoveToOwnedService {
             String buildState = instance == null ? null : instance.getBuildState();
 
             if ("COMPLETE".equalsIgnoreCase(buildState)) {
-                return finishMove(appName, moveKey, instanceId, instance, domain);
+                String ip = instance.getIpAddress();
+                // Guard: a box can report COMPLETE before its IP field populates. Shipping ip=null would
+                // just bounce off C2's 422, wait instead, the tracker keeps the move resumable.
+                if (ip == null || ip.isBlank()) {
+                    return new MoveToOwnedResult(false, "BUILDING",
+                            "VPS '" + instanceId + "' is built but has no IP address assigned yet. "
+                                    + "Nothing more will be charged.",
+                            instanceId, null, domain, null,
+                            "Call " + tool + " again with the same arguments in a minute, it resumes and never orders twice.");
+                }
+                return ship.onReady(moveKey, instanceId, instance);
             }
             if ("FAILED".equalsIgnoreCase(buildState)) {
                 // Money rule: NEVER re-order. buildVpsInstance is a free, bounded rebuild.
@@ -312,7 +376,7 @@ public class MoveToOwnedService {
                         instanceId, instance.getIpAddress(), domain, null,
                         "1) listVpsOsTemplates(instanceId=" + instanceId + ") to resolve the current Ubuntu 24.04 "
                                 + "template id. 2) buildVpsInstance with that id (confirm via executeConfirmedAction). "
-                                + "3) Call osirAppDeployToVps again with the same arguments to resume.");
+                                + "3) Call " + tool + " again with the same arguments to resume.");
             }
             // UNBUILT is not a phase that passes on its own: the box has no operating system, which
             // is reachable now that a customer can attach a server this tool never built. Waiting it
@@ -324,7 +388,7 @@ public class MoveToOwnedService {
                         instanceId, instance.getIpAddress(), domain, null,
                         "1) listVpsOsTemplates(instanceId=" + instanceId + ") to resolve the current Ubuntu 24.04 "
                                 + "template id. 2) buildVpsInstance with that id (confirm via executeConfirmedAction). "
-                                + "3) Call osirAppDeployToVps again with the same arguments to resume. Installing an OS "
+                                + "3) Call " + tool + " again with the same arguments to resume. Installing an OS "
                                 + "ERASES the server, so confirm with the user that it holds nothing they need.");
             }
             if (System.currentTimeMillis() >= deadline) {
@@ -332,29 +396,20 @@ public class MoveToOwnedService {
                         "VPS '" + instanceId + "' is still building (" + (buildState == null ? "status pending" : buildState)
                                 + "). Nothing more will be charged.",
                         instanceId, instance == null ? null : instance.getIpAddress(), domain, null,
-                        "Call osirAppDeployToVps again with the same arguments in a minute, it resumes and never orders twice.");
+                        "Call " + tool + " again with the same arguments in a minute, it resumes and never orders twice.");
             }
             try {
                 Thread.sleep(pollIntervalMs);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return MoveToOwnedResult.fail("Interrupted while waiting for the VPS build. "
-                        + "Call osirAppDeployToVps again with the same arguments to resume.");
+                        + "Call " + tool + " again with the same arguments to resume.");
             }
         }
     }
 
     private MoveToOwnedResult finishMove(String appName, String moveKey, String instanceId, VpsInstanceSummary instance, String domain) {
-        String ip = instance.getIpAddress();
-        // Guard: a box can report COMPLETE before its IP field populates. Shipping ip=null would
-        // just bounce off C2's 422, wait instead, the tracker keeps the move resumable.
-        if (ip == null || ip.isBlank()) {
-            return new MoveToOwnedResult(false, "BUILDING",
-                    "VPS '" + instanceId + "' is built but has no IP address assigned yet. "
-                            + "Nothing more will be charged.",
-                    instanceId, null, domain, null,
-                    "Call osirAppDeployToVps again with the same arguments in a minute, it resumes and never orders twice.");
-        }
+        String ip = instance.getIpAddress();   // non-blank: pollThen waits for it
         // C2 is ALREADY shipping this app: re-POSTing would re-dispatch a move that is running.
         // Only MOVING suppresses. FAILED and REFUSED must still re-dispatch — a repeat call is how a
         // transient ship failure recovers (proven live 2026-09-04: scp exit 255, then done in 42s).
@@ -474,7 +529,7 @@ public class MoveToOwnedService {
      * Bind the apex A record to the new box when the zone is hosted with us. ALWAYS re-lists for
      * the current record id right before updating, ids are content-derived, a stale id is a 500.
      */
-    private boolean bindDomain(String domain, String ip) {
+    boolean bindDomain(String domain, String ip) {
         DnsRecordListResult zone = dnsService.listRecords(domain);
         if (!zone.isSuccess() || zone.getRecords() == null) {
             // A domain of ours can simply never have had its zone created - that is the "Zone not

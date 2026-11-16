@@ -1,6 +1,13 @@
 package com.osir.mcp.services;
 
 import com.osir.mcp.clients.DeployBackendClient;
+import com.osir.mcp.models.deploy.AgentDtos.AgentInstallBody;
+import com.osir.mcp.models.deploy.AgentDtos.AgentInstallEnvelope;
+import com.osir.mcp.models.deploy.AgentDtos.PasswordEnvelope;
+import com.osir.mcp.models.deploy.AgentDtos.ProviderBody;
+import com.osir.mcp.models.deploy.AgentDtos.ProviderEnvelope;
+import com.osir.mcp.models.deploy.C2Reason;
+import com.osir.mcp.models.deploy.DeployDtos.AppDto;
 import com.osir.mcp.models.deploy.DeployDtos.AppEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.AppListResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppSourceResult;
@@ -13,6 +20,9 @@ import com.osir.mcp.models.deploy.DeployDtos.DeployAppBody;
 import com.osir.mcp.models.deploy.DeployDtos.DeployResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppLogsResult;
 import com.osir.mcp.models.deploy.DeployDtos.DeleteResult;
+import com.osir.mcp.models.deploy.DeployDtos.InlineFile;
+import com.osir.mcp.models.deploy.DeployDtos.InlineSourceEnvelope;
+import com.osir.mcp.models.deploy.DeployDtos.InlineUploadBody;
 import com.osir.mcp.models.deploy.DeployDtos.LogsEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.OwnedMoveDto;
 import com.osir.mcp.models.deploy.DeployDtos.ProvisionDbEnvelope;
@@ -30,6 +40,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jboss.logging.Logger;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -73,13 +84,139 @@ public class DeploymentService {
         }
     }
 
+    /**
+     * Deploy from files carried as tool arguments (spec_mcp_inline_deploy.md): C2 zips them into the
+     * same one-time ticket the PUT path makes, then this is an ordinary deploy. Exists because a chat
+     * client cannot PUT. Neither given = the old ticketless call, passed through unchanged.
+     */
+    public DeployResult deploy(String name, String language, String region, String uploadTicket, List<InlineFile> files) {
+        boolean hasFiles = files != null && !files.isEmpty();
+        if (!hasFiles) {
+            return deploy(name, language, region, uploadTicket);
+        }
+        if (uploadTicket != null && !uploadTicket.isBlank()) {
+            return DeployResult.fail("Pass either files or uploadTicket, not both. With files, leave uploadTicket out.");
+        }
+        String agent = refuseIfAgent(name);
+        if (agent != null) {
+            return DeployResult.fail(agent);
+        }
+        try {
+            UploadEnvelope e = client.createInlineUpload(new InlineUploadBody(files), bearer(), tenant());
+            return doDeploy(name, language, region, e.uploadTicket());
+        } catch (jakarta.ws.rs.WebApplicationException ex) {
+            // 413 (over the caps) and 422 (bad path) carry C2's message, written to name a way out
+            // the caller can take. 5xx stays generic (CONTRACTS §8).
+            String detail = readErrorMessage(ex.getResponse());
+            LOG.errorf("inline upload failed for name=%s: %s", name, detail);
+            int status = ex.getResponse() == null ? 0 : ex.getResponse().getStatus();
+            if (status == 413 || status == 422) {
+                return DeployResult.fail("Files rejected by the platform: " + detail);
+            }
+            if (status == 401 || status == 403) {
+                return DeployResult.fail("The platform did not accept your session (HTTP " + status + "). Log in again "
+                        + "(loginWithDevice) and retry; the files themselves were not the problem.");
+            }
+            return status >= 400 && status < 500
+                    ? DeployResult.fail("Upload refused by the platform: " + detail)
+                    : DeployResult.fail("The files could not be uploaded right now. Please try again.");
+        } catch (Exception ex) {
+            LOG.errorf(ex, "inline upload failed for name=%s", name);
+            return DeployResult.fail("The files could not be uploaded right now. Please try again.");
+        }
+    }
+
     public DeployResult deploy(String name, String language, String region, String uploadTicket) {
+        String agent = refuseIfAgent(name);
+        return agent != null ? DeployResult.fail(agent) : doDeploy(name, language, region, uploadTicket);
+    }
+
+    // ---- Agents are not apps ---------------------------------------------------------------------
+
+    /** The four dashboard-login keys of a Hermes agent. Only POST /v1/agents and /password set them;
+     *  osirAppSetSecret overwriting one could open the dashboard or lock the user out. */
+    static final String RESERVED_SECRET_PREFIX = "HERMES_DASHBOARD_";
+
+    /**
+     * Null when {@code appRef} (an app id or name) is not an agent, else the refusal every osirApp* path
+     * returns for it. Best-effort: an unreadable app is not refused here (C2 answers the real call;
+     * for deploy/move it refuses an agent's name with 409 on its own).
+     */
+    public String refuseIfAgent(String appRef) {
+        if (appRef == null || appRef.isBlank()) {
+            return null;
+        }
+        try {
+            StatusEnvelope e = client.status(appRef, bearer(), tenant());
+            return e != null && e.app() != null && e.app().isAgent() ? agentRefusal(e.app()) : null;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public static String agentRefusal(AppDto app) {
+        String what = app.catalog() == null ? "an AI agent" : "a " + capitalize(app.catalog()) + " agent";
+        return "'" + app.name() + "' is " + what + ", not an app - the osirApp* tools do not manage it. Use "
+                + "osirAgentStatus, osirAgentConfigure, osirAgentResetPassword, osirAgentLogs or osirAgentDelete "
+                + "with agentId '" + app.appId() + "' instead.";
+    }
+
+    public static String capitalize(String s) {
+        return s == null || s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    /** A /v1/agents call: the body on 2xx, else the HTTP status and C2's parsed error. */
+    public record AgentCall<T>(T body, int status, C2Error error) {
+        public boolean ok() {
+            return body != null;
+        }
+    }
+
+    /** POST /v1/agents. The response is never logged: it carries the dashboard password. */
+    public AgentCall<AgentInstallEnvelope> installAgent(String name, String agent, String instanceId, String ip,
+                                                        String domain, String username) {
+        return agentCall("installAgent " + name, () -> client.installAgent(
+                new AgentInstallBody(name, agent, instanceId, ip, domain, username), bearer(), tenant()));
+    }
+
+    /** POST /v1/agents/{id}/providers. The key is never logged. */
+    public AgentCall<ProviderEnvelope> configureAgent(String agentId, String provider, String apiKey) {
+        return agentCall("configureAgent " + agentId, () -> client.agentProvider(
+                agentId, new ProviderBody(provider, apiKey), bearer(), tenant()));
+    }
+
+    /** POST /v1/agents/{id}/password. The response is never logged: it IS the password. */
+    public AgentCall<PasswordEnvelope> resetAgentPassword(String agentId) {
+        return agentCall("resetAgentPassword " + agentId, () -> client.agentPassword(agentId, bearer(), tenant()));
+    }
+
+    /** Runs one /v1/agents call. Logs the operation and C2's error message only, never a body. */
+    private <T> AgentCall<T> agentCall(String what, java.util.function.Supplier<T> call) {
+        try {
+            T body = call.get();
+            return body == null ? new AgentCall<>(null, 0, C2Error.of("empty response from the platform", true))
+                    : new AgentCall<>(body, 200, null);
+        } catch (jakarta.ws.rs.WebApplicationException ex) {
+            int status = ex.getResponse() == null ? 0 : ex.getResponse().getStatus();
+            C2Error error = readError(ex.getResponse());
+            LOG.errorf("%s refused: HTTP %d reason=%s %s", what, status, error.reason(), error.message());
+            return new AgentCall<>(null, status, status >= 400 && status < 500 || status == 503 ? error
+                    : C2Error.of("the platform could not complete this right now (HTTP " + status + ")", true));
+        } catch (Exception ex) {
+            LOG.errorf("%s failed: %s", what, ex.getClass().getSimpleName());   // no message: may echo a body
+            return new AgentCall<>(null, 0, C2Error.of("the platform could not be reached", true));
+        }
+    }
+
+    private DeployResult doDeploy(String name, String language, String region, String uploadTicket) {
         try {
             SourceRefBody source = (uploadTicket == null || uploadTicket.isBlank())
                     ? null : SourceRefBody.inlineArchive(uploadTicket);
             AppEnvelope e = client.deploy(new DeployAppBody(name, language, region, source), bearer(), tenant());
             var a = e.app();
-            String note = "Deploy started for '" + a.name() + "'. Poll osirAppStatus until READY.";
+            String note = "Deploy started for '" + a.name() + "'. The URL is NOT live yet: poll osirAppStatus "
+                    + "until READY (typically 1-2 min, up to ~7 for a first build) before telling the user it works. "
+                    + "If it ends BUILD_FAILED, read recentErrors/osirAppLogs, fix the source and redeploy.";
             if ("owned".equalsIgnoreCase(a.tier())) {
                 note += " This app runs on the user's own VPS; this deploy re-ships it there and keeps its domain.";
             }
@@ -212,6 +349,10 @@ public class DeploymentService {
         }
     }
 
+    /** C2's install stages for an agent (status.ownedMove.stage). */
+    public static final String AGENT_INSTALLING_STAGE = "OWNED_INSTALLING_AGENT";
+    public static final String AGENT_INSTALLED_STAGE = "OWNED_AGENT_INSTALLED";
+
     /**
      * The update loop, repeated in every owned-tier result. A model that already deployed will not
      * re-read tool descriptions, so the rule has to travel with the payload — the failure of
@@ -242,7 +383,10 @@ public class DeploymentService {
         String detail = asClause(move.detail(), "no reason recorded");
         String userFix = userFixSteps(move, platformSshPubkey);
         return switch (move.state().toUpperCase()) {
-            case "MOVING" -> "OK. A move onto the user's own VPS is in progress (stage " + stage
+            case "MOVING" -> AGENT_INSTALLING_STAGE.equals(move.stage())
+                    ? "OK. The agent is being installed on the user's own VPS. The first install downloads a "
+                            + "multi-GB image and takes several minutes; check again in a minute."
+                    : "OK. A move onto the user's own VPS is in progress (stage " + stage
                     + "). It takes about two minutes end to end; poll this tool until tier reads 'owned'.";
             case "MOVED" -> "OK. This app runs on the user's own VPS. " + OWNED_UPDATE_RULE;
             case "FAILED", "REFUSED" -> userFix != null
@@ -267,13 +411,18 @@ public class DeploymentService {
      * the private half, so it is the source of truth), else from config.
      */
     public static String userFixSteps(OwnedMoveDto move, String configuredKey) {
+        return userFixSteps(move, configuredKey, "osirAppDeployToVps");
+    }
+
+    /** {@link #userFixSteps(OwnedMoveDto, String)} naming {@code retryTool} as the call that retries. */
+    public static String userFixSteps(OwnedMoveDto move, String configuredKey, String retryTool) {
         if (move == null) {
             return null;
         }
         String retryLast = "Retrying without changing the VPS fails the same way, so do NOT call "
-                + "osirAppDeployToVps yet. ";
+                + retryTool + " yet. ";
         String replaceWarning = "WARN them first: whatever that VPS serves today is replaced by this app. ";
-        String thenRetry = "Only after they confirm, call osirAppDeployToVps again with the same instanceId.";
+        String thenRetry = "Only after they confirm, call " + retryTool + " again with the same instanceId.";
         if (move.keyRefused()) {
             String key = displayKey(move.param("publicKey"));
             if (key == null) {
@@ -288,6 +437,17 @@ public class DeploymentService {
                     + "(sshd_config PermitRootLogin prohibit-password or yes); (2) stop any web server holding "
                     + "ports 80/443 (e.g. 'systemctl disable --now nginx', or apache2) - Osir serves the app "
                     + "there with its own TLS. " + replaceWarning + thenRetry;
+        }
+        if (C2Reason.BOX_TOO_SMALL.equals(move.reason())) {
+            // C2 promises integers; anything else is not echoed into the model's context.
+            String have = digits(move.param("memoryMb"));
+            String need = digits(move.param("requiredMb"));
+            return "The VPS is too small for this agent"
+                    + (have == null ? "" : ": it has " + have + " MB of memory")
+                    + (need == null ? "" : " and the agent needs at least " + need + " MB") + ". "
+                    + "Retrying on this VPS fails the same way. Tell the user it needs a VPS with more memory: one "
+                    + "they already own (listMyVpsInstances) or a new one (listVpsPackages), then install again "
+                    + "with that one.";
         }
         if (move.portsInUse()) {
             String ports = move.param("ports");
@@ -317,6 +477,10 @@ public class DeploymentService {
         return s.isEmpty() ? fallback : s;
     }
 
+    private static String digits(String s) {
+        return s != null && s.matches("\\d{1,7}") ? s : null;
+    }
+
     /** "type base64" plus a neutral comment: the configured line's own comment names an internal
      *  host, and customers must not see it. Null for anything that is not a plausible key line. */
     static String displayKey(String line) {
@@ -328,6 +492,15 @@ public class DeploymentService {
     }
 
     public SetSecretResult setSecret(String appId, String key, String value) {
+        // Checked here, in the one place every caller (MCP tool, A2A skill) goes through: no tool can set them.
+        if (key != null && key.trim().toUpperCase(java.util.Locale.ROOT).startsWith(RESERVED_SECRET_PREFIX)) {
+            return SetSecretResult.fail("'" + key + "' is reserved: it controls an AI agent's dashboard login and "
+                    + "can only be changed with osirAgentResetPassword. Nothing was set.");
+        }
+        String agent = refuseIfAgent(appId);
+        if (agent != null) {
+            return SetSecretResult.fail(agent + " To connect a model provider, use osirAgentConfigure.");
+        }
         try {
             client.setSecret(appId, new SecretBody(key, value), bearer(), tenant());
             // NOTE: never log the value (§1.8).
@@ -339,6 +512,10 @@ public class DeploymentService {
     }
 
     public AppLogsResult getLogs(String appId, Integer tail) {
+        String agent = refuseIfAgent(appId);
+        if (agent != null) {
+            return AppLogsResult.fail(agent);
+        }
         try {
             LogsEnvelope e = client.logs(appId, tail, bearer(), tenant());
             return new AppLogsResult(true, "OK", e.logs());
@@ -349,6 +526,10 @@ public class DeploymentService {
     }
 
     public ProvisionDbResult provisionDatabase(String appId, String engine) {
+        String agent = refuseIfAgent(appId);
+        if (agent != null) {
+            return ProvisionDbResult.fail(agent);
+        }
         try {
             ProvisionDbEnvelope e = client.provisionDatabase(appId, engine, bearer(), tenant());
             return new ProvisionDbResult(true, e.message(), e.secretKey());
@@ -380,20 +561,35 @@ public class DeploymentService {
      * since the fix is the same: (re)deploy once.
      */
     public AppSourceResult getSource(String appId) {
+        return getSource(appId, false);
+    }
+
+    /** {@code inline}: return the files themselves, for a client that cannot fetch getUrl. */
+    public AppSourceResult getSource(String appId, boolean inline) {
+        String agent = refuseIfAgent(appId);
+        if (agent != null) {
+            return AppSourceResult.fail(agent);
+        }
         try {
+            if (inline) {
+                InlineSourceEnvelope e = client.inlineSource(appId, true, bearer(), tenant());
+                // C2's note names the next step (or, when truncated, why NOT to redeploy from these).
+                return new AppSourceResult(true, e.note() == null ? "OK" : e.note(), e.getUrl(), null, null,
+                        e.files() == null ? List.of() : e.files(), e.truncated());
+            }
             SourceEnvelope e = client.source(appId, bearer(), tenant());
             return new AppSourceResult(true,
                     "Signed source download URL for '" + appId + "' (expires " + e.expiresAt() + ").",
                     e.getUrl(), e.expiresAt(),
-                    "Download the zip, edit the files, then osirAppCreateUpload (PUT the new zip) and "
-                            + "osirAppDeploy under the same name — the platform rebuilds and, for owned apps, "
-                            + "auto-ships to the box.");
+                    "Download the zip, edit the files, then osirAppDeploy under the same name with the files "
+                            + "(or osirAppCreateUpload + PUT the new zip) — the platform rebuilds and, for owned "
+                            + "apps, auto-ships to the box. No shell? Call this again with inline=true instead.");
         } catch (jakarta.ws.rs.WebApplicationException ex) {
             if (ex.getResponse() != null && ex.getResponse().getStatus() == 404) {
                 return AppSourceResult.fail(
                         "No retained source for '" + appId + "' — either the app doesn't exist on your account, "
                                 + "or it was last deployed before source retention shipped. Redeploying it once "
-                                + "(osirAppCreateUpload + osirAppDeploy) enables source retrieval.");
+                                + "(osirAppDeploy with the project's files) enables source retrieval.");
             }
             LOG.errorf(ex, "getSource failed for %s", appId);
             return AppSourceResult.fail("Could not get the source URL right now. Please try again.");

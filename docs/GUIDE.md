@@ -6,7 +6,7 @@ This project provides two complementary AI integration servers for the OSIR doma
 
 | Server | Port | Protocol | Purpose |
 |--------|------|----------|---------|
-| **MCP Server** | 8081 | Model Context Protocol (Streamable HTTP + SSE) | 106 individual tools for AI assistants |
+| **MCP Server** | 8081 | Model Context Protocol (Streamable HTTP + SSE) | 113 individual tools for AI assistants |
 | **A2A Server** | 8082 | Google Agent-to-Agent (JSON-RPC) | Specialist agents for task-level orchestration |
 
 **MCP** is for single-agent use: Claude, ChatGPT, or any MCP-compatible client calls individual tools like `checkDomainAvailability` or `registerDomain`.
@@ -89,7 +89,7 @@ Most tools require authentication. Use one of these methods:
 
 There is no password tool; `authenticateUser` was retired.
 
-### Available Tools (106 total)
+### Available Tools (113 total)
 
 #### Authentication (4)
 | Tool | Description |
@@ -166,12 +166,12 @@ There is no password tool; `authenticateUser` was retired.
 #### App Deployment (10)
 | Tool | Description |
 |------|-------------|
-| `osirAppCreateUpload` | Get an upload ticket + `putUrl`; zip the project and PUT it there |
-| `osirAppDeploy` | Deploy the uploaded source → live `https://<name>.<region>.osir.app`. Same name = redeploy |
+| `osirAppCreateUpload` | Shell clients / projects over 6 MiB only: upload ticket + `putUrl` for a zip |
+| `osirAppDeploy` | Deploy the project's `files` (or an `uploadTicket`) → live `https://<name>.<region>.osir.app`. Same name = redeploy |
 | `osirAppDeployToVps` | Put that app on a VPS the user owns (`instanceId`, free) or order one (`packageId`, gated) |
 | `osirAppStatus` | Status, live URL, health, build errors, QA findings, `ownedMove` progress |
 | `osirAppList` | List deployed apps with their URLs and tier |
-| `osirAppGetSource` | Read the deployed source back, to patch and redeploy |
+| `osirAppGetSource` | Read the deployed source back (`inline=true` returns the files), to patch and redeploy |
 | `osirAppSetSecret` | Store an env secret, injected on the next deploy; never returned or logged |
 | `osirAppLogs` | Runtime logs |
 | `osirAppProvisionDatabase` | Provision a database for the app |
@@ -179,7 +179,8 @@ There is no password tool; `authenticateUser` was retired.
 
 > **Apps are deployed and updated ONLY through these tools — never over SSH, never with a provisioning
 > script, never by configuring a VPS by hand.** The whole lifecycle is one loop:
-> `osirAppCreateUpload` → PUT the zip → `osirAppDeploy`. To put the app on the customer's own server,
+> `osirAppDeploy` with the project's files (no zip, no upload, no HTTP request of the assistant's own).
+> To put the app on the customer's own server,
 > call `osirAppDeployToVps` — the platform ships it to the box over its own deploy key and binds DNS
 > itself, so the assistant needs no shell access and no outbound SSH.
 >
@@ -189,6 +190,26 @@ There is no password tool; `authenticateUser` was retired.
 >
 > If you find yourself writing an `install.sh`, an nginx config or a systemd unit, or asking the user to
 > paste commands, you are on the wrong path — look for the `osirApp*` tool instead.
+
+#### AI Agents (7)
+Ready-made AI agents (today: Hermes) installed on the customer's **own** VPS, behind HTTPS with a
+password-protected dashboard. A separate product from `osirApp*`: the customer never edits the agent's
+code, only its settings. MCP-only for now (not exposed over A2A).
+
+| Tool | Description |
+|------|-------------|
+| `osirAgentDeploy` | Install on a VPS they own (`instanceId`, free) or order one (`packageId`, gated). Needs ≥ 4 GB RAM. Returns URL, username and the dashboard password — shown once |
+| `osirAgentList` | The customer's agents |
+| `osirAgentStatus` | Install progress, URL, and a live check that the dashboard asks for a login |
+| `osirAgentConfigure` | Connect a model provider (deepseek, openai, openrouter, anthropic); the key is stored as a secret |
+| `osirAgentLogs` | Not available yet — says so |
+| `osirAgentResetPassword` | New dashboard password, shown once; the only way to change the login |
+| `osirAgentDelete` | Remove the agent from the VPS (gated); its data stays, the VPS is not cancelled |
+
+> Every `osirApp*` tool refuses an agent and points here; `osirAppSetSecret` refuses the
+> `HERMES_DASHBOARD_*` keys. Until the deploy backend releases an agent, installing it answers
+> "not available yet". Ordering a new VPS for an agent opens only when `OSIR_AGENTS_ORDERABLE` lists it
+> (see `docs/DEPLOYMENT.md`).
 
 ### Example Conversations with Claude
 
@@ -521,7 +542,7 @@ docker-compose logs -f
 ┌──────▼──────┐ ┌─▼──────────────────────────┐
 │ MCP Server  │ │ A2A Server                  │
 │ :8081       │ │ :8082                       │
-│ 106 tools   │ │ Orchestrator                │
+│ 113 tools   │ │ Orchestrator                │
 │  11 prompts │ │  ├─ Domain Agent (13 skills)│
 │             │ │  ├─ DNS Agent (5 skills)    │
 │             │ │  ├─ VPS Agent (12 skills)   │
