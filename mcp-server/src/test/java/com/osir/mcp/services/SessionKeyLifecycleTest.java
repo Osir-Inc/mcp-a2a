@@ -72,8 +72,10 @@ class SessionKeyLifecycleTest {
         assertTrue(result.isSuccess());
         assertNotNull(result.getSessionKey());
         assertTrue(result.getSessionKey().startsWith(SessionAwareAuthService.SESSION_KEY_PREFIX));
-        assertTrue(result.getMessage().contains(result.getSessionKey()),
-                "message must tell the model to reuse the key");
+        assertFalse(result.getMessage().contains(result.getSessionKey()),
+                "the key itself must never be in prose: a client redacting the field would still leak it");
+        assertTrue(result.getMessage().contains("sessionKey field"),
+                "message must tell the model to reuse the key from the field");
 
         // Token resolvable via the key alone — no connection id involved.
         assertNotNull(service.getCurrentToken(result.getSessionKey()));

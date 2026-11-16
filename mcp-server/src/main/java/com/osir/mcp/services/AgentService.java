@@ -22,16 +22,19 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -309,20 +312,22 @@ public class AgentService {
         String state = move == null ? null : move.state();
         // No move row but bound to a box = installed long enough ago that C2 no longer reports the move
         // (the same rule DeploymentService.moveNote applies to owned apps).
-        boolean installed = move == null ? s.ownedInstanceId() != null && !s.ownedInstanceId().isBlank()
+        boolean platformDone = move == null ? s.ownedInstanceId() != null && !s.ownedInstanceId().isBlank()
                 : isInstalled(move);
         String url = app.liveUrl();
-        Boolean protectedDashboard = installed ? dashboardProtected(url) : null;
+        Boolean protectedDashboard = platformDone ? dashboardProtected(url) : null;
+        // Installed means the dashboard ANSWERED, not just that the platform says it finished: the
+        // 2026-11-16 run had C2 report MOVED while the box served only Caddy's default page.
+        boolean installed = platformDone && protectedDashboard != null;
         String message;
         if (installed) {
             message = Boolean.FALSE.equals(protectedDashboard)
                     ? "Installed, but the dashboard did NOT ask for a login at " + url + ". Tell the user to reset the "
                             + "password with osirAgentResetPassword now, and to contact Osir support if this persists."
-                    : "Installed" + (url == null ? "" : " at " + url)
-                            + (Boolean.TRUE.equals(protectedDashboard) ? "; the dashboard asks for a login."
-                            : "; the dashboard did not answer just now (it may be restarting after a change) - check "
-                                    + "again in a minute.")
+                    : "Installed at " + url + "; the dashboard asks for a login."
                             + " If no model provider is connected yet, use osirAgentConfigure.";
+        } else if (platformDone) {
+            message = notAnswering(app, url, move, s.ownedInstanceId());
         } else if ("MOVING".equalsIgnoreCase(state)) {
             message = "Installing on the user's VPS (stage " + (move.stage() == null ? "in progress" : move.stage())
                     + "). The first install downloads a multi-GB image and takes several minutes; check again in a minute.";
@@ -338,6 +343,51 @@ public class AgentService {
         }
         return new AgentStatusResult(true, message, app.appId(), app.catalog(), url, installed, state,
                 move == null ? null : move.stage(), protectedDashboard, move);
+    }
+
+    /** After this long past the platform's "done", a silent dashboard is a fault, not a restart. */
+    static final Duration ANSWER_GRACE = Duration.ofMinutes(10);
+
+    /** Overridable in tests: does {@code host} have a DNS record? */
+    Predicate<String> resolves = host -> {
+        try {
+            InetAddress.getByName(host);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    };
+
+    /**
+     * The platform says installed but the dashboard did not answer. Tell a terminal state apart from a
+     * transient one, so the model never tells the user to wait for something that cannot happen.
+     */
+    private String notAnswering(AppDto app, String url, OwnedMoveDto move, String instanceId) {
+        String support = " Do NOT tell the user to wait, do not reinstall and do not order another VPS. Tell them the "
+                + "install is not usable yet and to contact Osir support with agent '" + app.appId() + "'"
+                + (instanceId == null ? "" : " and VPS '" + instanceId + "'") + ".";
+        String host = url == null ? null : URI.create(url).getHost();
+        if (host == null) {
+            return "The platform reports the install finished, but it has no dashboard address." + support;
+        }
+        if (!resolves.test(host)) {
+            return "The platform reports the install finished, but " + host + " has no DNS record, so nothing can "
+                    + "reach the dashboard. Waiting will not fix this." + support;
+        }
+        Instant since = null;
+        try {
+            since = move == null || move.since() == null ? null : Instant.parse(move.since());
+        } catch (Exception ignored) {
+            // unparseable: treat as recent
+        }
+        if (since != null && since.plus(ANSWER_GRACE).isBefore(Instant.now())) {
+            long min = Duration.between(since, Instant.now()).toMinutes();
+            return "The platform reports the install finished " + min + " minutes ago, but the dashboard at " + url
+                    + " has not answered since. This will not fix itself." + support;
+        }
+        return "The platform reports the install finished, but the dashboard at " + url + " did not answer yet (it "
+                + "starts within a few minutes of the install, or after a change) - check again in a minute. If it "
+                + "still does not answer " + ANSWER_GRACE.toMinutes() + " minutes after finishing, this tool says so.";
     }
 
     /** An unauthenticated GET must answer 401: the dashboard is a shell on the user's box. Null = unknown. */

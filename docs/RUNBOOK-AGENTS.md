@@ -143,7 +143,9 @@ Run in Claude with the OSIR connector, on a test account that owns a 4 GB+ test 
 | Status: `BOX_PORTS_IN_USE` | Another web server holds 80/443 | Customer stops it (`systemctl disable --now nginx`), then retries |
 | Status: `APP_START_FAILED` | Image pull/build/start failed on the box | Deploy-backend side: `docker logs app-<domain with dashes>` on the VPS; fix in the bundle, not the platform |
 | `dashboardProtected: false` | The dashboard answered a page without a login | Treat as an incident: reset the password, check the bundle on the box |
-| `dashboardProtected` missing | Dashboard did not answer (restarting, 502) | Check again in a minute; not a fault |
+| `installed: false`, `installState: MOVED`, "has no DNS record" | C2 finished but nobody created DNS for the URL (`<name>-owned.osir.app` has no owner today; C2's DnsBinder is a mock) | Deploy-backend side; the customer cannot fix it. Install with `domain` on a zone hosted with us meanwhile |
+| `installed: false`, `installState: MOVED`, "has not answered since" | C2 reported done more than 10 min ago but the dashboard never answered (2026-11-16: box served Caddy's default page) | Deploy-backend side: check the container on the box |
+| `installed: false`, `installState: MOVED`, "did not answer yet" | Dashboard starting or restarting (first 10 min after done) | Check again in a minute; not a fault yet |
 | "Installation resumed … password was shown when first created" | A retry; C2 never returns the password twice | `osirAgentResetPassword` if the customer lost it |
 | An `osirApp*` tool says "… is a Hermes agent, not an app" | By design | Use the `osirAgent*` tool it names |
 

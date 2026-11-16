@@ -254,12 +254,77 @@ class AgentServiceTest {
         apps(agent("hermes-1"));
         owned(box("vf-1", "my-box", 8192));
         agentState("hermes-1", "vf-1", null);
-        service.http = mock(java.net.http.HttpClient.class);
+        dashboardAnswers(401);
 
         AgentDeployResult again = (AgentDeployResult) service.deployWithoutSpending("hermes", null, null, null);
         assertEquals("INSTALLED", again.status(), "a re-call must not order or reinstall");
         assertTrue(service.status("hermes-1").installed());
         verify(deploymentService, never()).installAgent(any(), any(), any(), any(), any(), any());
+    }
+
+    private void dashboardAnswers(int code) {
+        try {
+            java.net.http.HttpClient http = mock(java.net.http.HttpClient.class);
+            if (code == 0) {
+                when(http.send(any(), any())).thenThrow(new java.net.ConnectException("refused"));
+            } else {
+                @SuppressWarnings("unchecked")
+                java.net.http.HttpResponse<Object> resp = mock(java.net.http.HttpResponse.class);
+                when(resp.statusCode()).thenReturn(code);
+                when(http.send(any(), any())).thenReturn(resp);
+            }
+            service.http = http;
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private void platformSaysMoved(String name, String since) {
+        when(deploymentService.getStatus(name)).thenReturn(new AppStatusResult(true, "OK", agent(name), null, null,
+                List.of(), null, "vf-1", "203.0.113.7",
+                new com.osir.mcp.models.deploy.DeployDtos.OwnedMoveDto("MOVED", "MOVED_TO_OWNED", null, since)));
+    }
+
+    // ---- 2026-11-16 live run: C2 said MOVED, the box served only Caddy's default page ---------------
+
+    @Test
+    void platformDone_butNoDnsRecord_isNotInstalled_andSaysWaitingWillNotHelp() {
+        platformSaysMoved("hermes-1", java.time.Instant.now().toString());
+        dashboardAnswers(0);
+        service.resolves = h -> false;
+
+        var r = service.status("hermes-1");
+
+        assertFalse(r.installed());
+        assertEquals("MOVED", r.installState(), "C2's own state stays visible");
+        assertTrue(r.message().contains("no DNS record"), r.message());
+        assertTrue(r.message().contains("Do NOT tell the user to wait"), r.message());
+        assertFalse(r.message().contains("check again"), r.message());
+    }
+
+    @Test
+    void platformDone_dashboardSilentPastTheGrace_isTerminal_notTransient() {
+        platformSaysMoved("hermes-1", java.time.Instant.now().minus(java.time.Duration.ofMinutes(9 + 10)).toString());
+        dashboardAnswers(0);
+        service.resolves = h -> true;
+
+        var r = service.status("hermes-1");
+
+        assertFalse(r.installed());
+        assertTrue(r.message().contains("19 minutes ago"), r.message());
+        assertTrue(r.message().contains("will not fix itself"), r.message());
+    }
+
+    @Test
+    void platformDone_dashboardSilentJustNow_isTransient() {
+        platformSaysMoved("hermes-1", java.time.Instant.now().toString());
+        dashboardAnswers(502);
+        service.resolves = h -> true;
+
+        var r = service.status("hermes-1");
+
+        assertFalse(r.installed());
+        assertTrue(r.message().contains("check again in a minute"), r.message());
     }
 
     @Test

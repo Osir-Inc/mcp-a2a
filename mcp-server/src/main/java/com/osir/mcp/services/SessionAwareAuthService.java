@@ -260,8 +260,10 @@ public class SessionAwareAuthService {
             LOG.infof("Device login complete for user %s on connection %s", username, connectionId);
             DeviceLoginStatusResult result = new DeviceLoginStatusResult(
                     true,
-                    "Authentication successful. Your sessionKey is " + sessionKey
-                            + ", pass it as the sessionKey argument on every subsequent tool call. "
+                    // Never the key itself in prose: a client that redacts the sessionKey field would
+                    // still leak it into its transcript and logs through this message.
+                    "Authentication successful. Pass the sessionKey field of this result as the sessionKey "
+                            + "argument on every subsequent tool call; do not repeat it in your reply. "
                             + "The session ends after " + effectiveIdleMinutes + " minutes of inactivity ("
                             + maxLifetimeHours + "h maximum); call logout with the sessionKey to end it immediately.",
                     "complete",
