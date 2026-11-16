@@ -34,7 +34,7 @@ with a password-protected dashboard. Later they say "connect it to DeepSeek" or 
 |---|---|---|---|
 | `osirAgentDeploy(agent, instanceId? \| packageId?, domain?, username?)` | VPS steps, then `POST /v1/agents` | `packageId` only (FINANCIAL) | Picks the name itself (`hermes-1`, `hermes-2`…). Returns URL, username, **password once** |
 | `osirAgentList()` | `GET /v1/apps`, keep `kind: agent` | no | |
-| `osirAgentStatus(agentId)` | `GET /v1/apps/{id}/status` + live GET of the URL | no | `installed`, `dashboardProtected` (401 = true, 2xx = false, else null) |
+| `osirAgentStatus(agentId)` | `GET /v1/apps/{id}/status` + live GET of `<url>/api/config` (the root redirects to `/login`, `/api/status` is public by design) | no | `installed` only when that GET answers; `dashboardProtected` (401 = true, 2xx = false, else null) |
 | `osirAgentConfigure(agentId, provider, apiKey)` | `POST /v1/agents/{id}/providers` | no | deepseek, openai, openrouter, anthropic. Agent reinstalls with the key |
 | `osirAgentLogs(agentId)` | none | no | Says "not available yet" until C2 has owned-box logs |
 | `osirAgentResetPassword(agentId)` | `POST /v1/agents/{id}/password` | no | New password **once**; the only way to change the login |

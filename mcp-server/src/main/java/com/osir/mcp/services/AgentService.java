@@ -408,16 +408,24 @@ public class AgentService {
                 + "still does not answer " + ANSWER_GRACE.toMinutes() + " minutes after finishing, this tool says so.";
     }
 
-    /** An unauthenticated GET must answer 401: the dashboard is a shell on the user's box. Null = unknown. */
+    /**
+     * Hermes' config API, which must answer 401 without a login. Not the root: it redirects to /login (302)
+     * and /api/status is public by design (deploy backend, howto_agents.md, 2026-11-16).
+     */
+    static final String PROTECTED_PATH = "/api/config";
+
+    /** An unauthenticated GET of {@link #PROTECTED_PATH} must answer 401: the dashboard is a shell on the
+     *  user's box. Null = unknown. */
     Boolean dashboardProtected(String url) {
         if (url == null || !url.startsWith("https://")) {
             return null;
         }
         try {
-            HttpResponse<Void> r = http.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(8))
+            URI probe = URI.create(url.replaceAll("/+$", "") + PROTECTED_PATH);
+            HttpResponse<Void> r = http.send(HttpRequest.newBuilder(probe).timeout(Duration.ofSeconds(8))
                     .GET().build(), HttpResponse.BodyHandlers.discarding());
-            // 401 = protected; a 2xx page = open. Anything else (502 while restarting, 3xx, 403) proves
-            // neither, and a false "your dashboard is open" alarm is worse than "could not check".
+            // 401 = protected; a 2xx = the config API is open. Anything else (502 while restarting, 3xx, 403)
+            // proves neither, and a false "your dashboard is open" alarm is worse than "could not check".
             int code = r.statusCode();
             return code == 401 ? Boolean.TRUE : code >= 200 && code < 300 ? Boolean.FALSE : null;
         } catch (Exception e) {

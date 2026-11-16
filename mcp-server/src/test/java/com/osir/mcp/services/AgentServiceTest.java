@@ -370,6 +370,20 @@ class AgentServiceTest {
     }
 
     @Test
+    void dashboardProbe_asksTheConfigApi_notTheRoot_whichRedirectsToLogin() throws Exception {
+        java.net.http.HttpClient http = mock(java.net.http.HttpClient.class);
+        @SuppressWarnings("unchecked")
+        java.net.http.HttpResponse<Object> resp = mock(java.net.http.HttpResponse.class);
+        when(resp.statusCode()).thenReturn(401);
+        var sent = org.mockito.ArgumentCaptor.forClass(java.net.http.HttpRequest.class);
+        when(http.send(sent.capture(), any())).thenReturn(resp);
+        service.http = http;
+
+        assertEquals(Boolean.TRUE, service.dashboardProtected("https://hermes-2-yvw72c-owned.osir.app/"));
+        assertEquals("https://hermes-2-yvw72c-owned.osir.app/api/config", sent.getValue().uri().toString());
+    }
+
+    @Test
     void aFailedInstall_keepsTheInstanceId_soTheRetryCanUseIt() {
         owned(box("vf-9", "my-box", 8192));
         when(deploymentService.installAgent(anyString(), anyString(), anyString(), anyString(), any(), any()))
