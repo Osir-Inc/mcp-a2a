@@ -1,5 +1,6 @@
 package com.osir.mcp.services;
 
+import com.osir.mcp.models.deploy.C2Reason;
 import com.osir.mcp.models.deploy.AgentDtos.AgentActionResult;
 import com.osir.mcp.models.deploy.AgentDtos.AgentDeployResult;
 import com.osir.mcp.models.deploy.AgentDtos.AgentInstallEnvelope;
@@ -251,7 +252,7 @@ public class AgentService {
             if (!call.ok()) {
                 // instanceId travels with the failure: the recovery text says "retry with the same instanceId",
                 // and for a VPS this tool just ordered the model has no other way to learn it.
-                return new AgentDeployResult(false, "FAILED", installRefusal(agent, call), null, null, null, null,
+                return new AgentDeployResult(false, "FAILED", installRefusal(agent, instanceId, call), null, null, null, null,
                         instanceId, ip, host, null, "Retry with " + TOOL + "(agent='" + agent + "', instanceId='"
                                 + instanceId + "') once the cause is fixed - never with packageId, which would order another VPS.");
             }
@@ -287,11 +288,14 @@ public class AgentService {
         };
     }
 
-    private static String installRefusal(String agent, AgentCall<?> call) {
+    private static String installRefusal(String agent, String instanceId, AgentCall<?> call) {
         String why = DeploymentService.asClause(call.error() == null ? null : call.error().message(), "unknown reason");
         if (call.status() == 503) {
             return capitalize(agent) + " is not available on Osir yet: " + why + ". Tell the user plainly; nothing was "
                     + "installed. Do not try to install it any other way (no Dockerfile, no osirAppDeploy, no SSH).";
+        }
+        if (call.error() != null && C2Reason.BOX_IP_MISMATCH.equals(call.error().reason())) {
+            return C2Reason.ipMismatch(instanceId);
         }
         if (call.status() == 409) {
             return "The platform refused to install " + capitalize(agent) + " on this VPS: " + why + ". Tell the user what "
@@ -334,16 +338,16 @@ public class AgentService {
                 : isInstalled(move);
         String url = app.liveUrl();
         Boolean protectedDashboard = platformDone ? dashboardProtected(url) : null;
-        // Installed means the dashboard ANSWERED, not just that the platform says it finished: the
-        // 2026-11-16 run had C2 report MOVED while the box served only Caddy's default page.
-        boolean installed = platformDone && protectedDashboard != null;
+        // Installed = the backend says MOVED AND <url>/api/config answers 401 (app.osir.deploy
+        // howto_agents.md M3). An open dashboard is not "installed": it is an incident.
+        boolean installed = platformDone && Boolean.TRUE.equals(protectedDashboard);
         String message;
         if (installed) {
-            message = Boolean.FALSE.equals(protectedDashboard)
-                    ? "Installed, but the dashboard did NOT ask for a login at " + url + ". Tell the user to reset the "
-                            + "password with osirAgentResetPassword now, and to contact Osir support if this persists."
-                    : "Installed at " + url + "; the dashboard asks for a login."
-                            + " If no model provider is connected yet, use osirAgentConfigure.";
+            message = "Installed at " + url + "; the dashboard asks for a login."
+                    + " If no model provider is connected yet, use osirAgentConfigure.";
+        } else if (Boolean.FALSE.equals(protectedDashboard)) {
+            message = "The dashboard at " + url + " answers WITHOUT a login. Tell the user to reset the password with "
+                    + "osirAgentResetPassword now, and to contact Osir support if this persists.";
         } else if (platformDone) {
             message = notAnswering(app, url, move, s.ownedInstanceId());
         } else if ("MOVING".equalsIgnoreCase(state)) {

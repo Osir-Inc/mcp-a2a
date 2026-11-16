@@ -34,7 +34,7 @@ with a password-protected dashboard. Later they say "connect it to DeepSeek" or 
 |---|---|---|---|
 | `osirAgentDeploy(agent, instanceId? \| packageId?, domain?, username?)` | VPS steps, then `POST /v1/agents` | `packageId` only (FINANCIAL) | Picks the name itself (`hermes-1`, `hermes-2`…). Returns URL, username, **password once** |
 | `osirAgentList()` | `GET /v1/apps`, keep `kind: agent` | no | |
-| `osirAgentStatus(agentId)` | `GET /v1/apps/{id}/status` + live GET of `<url>/api/config` (the root redirects to `/login`, `/api/status` is public by design) | no | `installed` only when that GET answers; `dashboardProtected` (401 = true, 2xx = false, else null) |
+| `osirAgentStatus(agentId)` | `GET /v1/apps/{id}/status` + live GET of `<url>/api/config` (the root redirects to `/login`, `/api/status` is public by design) | no | `installed` = `ownedMove.state` MOVED **and** that GET answers 401; `dashboardProtected` (401 = true, 2xx = false = open, an incident, never installed; else null) |
 | `osirAgentConfigure(agentId, provider, apiKey)` | `POST /v1/agents/{id}/providers` | no | deepseek, openai, openrouter, anthropic. Agent reinstalls with the key |
 | `osirAgentLogs(agentId)` | none | no | Says "not available yet" until C2 has owned-box logs |
 | `osirAgentResetPassword(agentId)` | `POST /v1/agents/{id}/password` | no | New password **once**; the only way to change the login |
@@ -140,6 +140,7 @@ Run in Claude with the OSIR connector, on a test account that owns a 4 GB+ test 
 | "VPS … has N MB of memory; Hermes needs at least 4096 MB" | VPS or package under 4 GB | Bigger VPS |
 | Status: install failed, `BOX_TOO_SMALL` | C2 measured the box under 4 GB | Bigger VPS |
 | Status: `BOX_KEY_REFUSED` | The VPS rejects the platform deploy key | Customer adds the key shown in the message to `/root/.ssh/authorized_keys`, then retries with the same `instanceId` |
+| Refused: `BOX_IP_MISMATCH` (sync 409) | C2 asked OSIR: the instance is the caller's but at another IP | Re-read the IP with `listMyVpsInstances` and retry; never a typed IP. Not a support case |
 | Status: `BOX_PORTS_IN_USE` | Another web server holds 80/443 | Customer stops it (`systemctl disable --now nginx`), then retries |
 | Status: `APP_START_FAILED` | Image pull/build/start failed on the box | Deploy-backend side: `docker logs app-<domain with dashes>` on the VPS; fix in the bundle, not the platform |
 | `dashboardProtected: false` | The dashboard answered a page without a login | Treat as an incident: reset the password, check the bundle on the box |

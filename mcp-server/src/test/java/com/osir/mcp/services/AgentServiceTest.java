@@ -7,6 +7,7 @@ import com.osir.mcp.models.deploy.AgentDtos.PasswordEnvelope;
 import com.osir.mcp.models.deploy.DeployDtos.AppDto;
 import com.osir.mcp.models.deploy.DeployDtos.AppListResult;
 import com.osir.mcp.models.deploy.DeployDtos.AppStatusResult;
+import com.osir.mcp.models.deploy.C2Reason;
 import com.osir.mcp.models.deploy.DeployDtos.C2Error;
 import com.osir.mcp.models.vps.VpsInstanceDetailResult;
 import com.osir.mcp.models.vps.VpsInstanceListResult;
@@ -343,6 +344,23 @@ class AgentServiceTest {
     }
 
     @Test
+    void installed_isMovedPlus401_anOpenDashboardIsNotInstalled_butAnAlarm() {
+        platformSaysMoved("hermes-1", java.time.Instant.now().toString());
+        service.resolves = h -> true;
+
+        dashboardAnswers(401);
+        var ok = service.status("hermes-1");
+        assertTrue(ok.installed());
+        assertEquals(Boolean.TRUE, ok.dashboardProtected());
+
+        dashboardAnswers(200);
+        var open = service.status("hermes-1");
+        assertFalse(open.installed(), "installed requires the 401");
+        assertEquals(Boolean.FALSE, open.dashboardProtected());
+        assertTrue(open.message().contains("WITHOUT a login"), open.message());
+    }
+
+    @Test
     void platformDone_dashboardSilentJustNow_isTransient() {
         platformSaysMoved("hermes-1", java.time.Instant.now().toString());
         dashboardAnswers(502);
@@ -394,6 +412,19 @@ class AgentServiceTest {
         assertFalse(r.success());
         assertEquals("vf-9", r.instanceId());
         assertTrue(r.nextStep().contains("instanceId='vf-9'") && r.nextStep().contains("never with packageId"));
+    }
+
+    @Test
+    void anIpMismatch_saysUseListMyVpsInstances() {
+        owned(box("vf-9", "my-box", 8192));
+        when(deploymentService.installAgent(anyString(), anyString(), anyString(), anyString(), any(), any()))
+                .thenReturn(new AgentCall<>(null, 409, new C2Error("CONFLICT", C2Reason.BOX_IP_MISMATCH,
+                        "That ip is not the address of that VPS.", false, null, "err_8")));
+
+        AgentDeployResult r = (AgentDeployResult) service.deployWithoutSpending("hermes", "vf-9", null, null);
+
+        assertFalse(r.success());
+        assertTrue(r.message().contains("isn't the address of VPS 'vf-9' - use the one from listMyVpsInstances"), r.message());
     }
 
     @Test

@@ -315,6 +315,21 @@ class MoveToOwnedServiceTest {
     }
 
     @Test
+    void anIpMismatchPointsAtListMyVpsInstances_notSupport() {
+        instanceState("vps-own", "COMPLETE", "1.2.3.4");
+        when(deploymentService.moveToOwned(anyString(), anyString(), anyString(), any()))
+                .thenReturn(new C2Error("CONFLICT", C2Reason.BOX_IP_MISMATCH,
+                        "That ip is not the address of that VPS.", false, null, "err_7"));
+
+        MoveToOwnedResult r = service.attach("app1", "vps-own", null);
+
+        assertFalse(r.success());
+        assertTrue(r.message().contains("isn't the address of VPS 'vps-own'"), r.message());
+        assertTrue(r.message().contains("listMyVpsInstances") && r.nextStep().contains("listMyVpsInstances"), r.nextStep());
+        assertFalse(r.nextStep().contains("support"), r.nextStep());
+    }
+
+    @Test
     void aMoveInProgressIsRecognisedByItsReason_notItsWording() {
         // C2 may reword freely; the reason code is the contract.
         instanceState("vps-own", "COMPLETE", "1.2.3.4");

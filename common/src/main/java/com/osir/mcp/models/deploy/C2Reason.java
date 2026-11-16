@@ -27,4 +27,14 @@ public final class C2Reason {
     /** Async, agents only: the VPS has less memory than the agent needs ({@code params.memoryMb},
      *  {@code params.requiredMb}). Only a bigger VPS fixes it. */
     public static final String BOX_TOO_SMALL = "BOX_TOO_SMALL";
+
+    /** Sync 409, move / agent install: the instance is the caller's but OSIR has it at a different ip.
+     *  Not retryable as sent: the ip must come from listMyVpsInstances (C2 2026-11-16). */
+    public static final String BOX_IP_MISMATCH = "BOX_IP_MISMATCH";
+
+    /** What the model is told for {@link #BOX_IP_MISMATCH}. */
+    public static String ipMismatch(String instanceId) {
+        return "That IP isn't the address of VPS '" + instanceId + "' - use the one from listMyVpsInstances, never "
+                + "an IP typed or remembered. Nothing was installed and nothing more was charged.";
+    }
 }

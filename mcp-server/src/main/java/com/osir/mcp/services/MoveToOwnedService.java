@@ -463,6 +463,12 @@ public class MoveToOwnedService {
                                 + "osirAppDeployToVps for '" + appName + "' WITHOUT instanceId to resume or re-check "
                                 + "that move.");
             }
+            if (C2Reason.BOX_IP_MISMATCH.equals(refusal.reason())) {
+                return new MoveToOwnedResult(false, "FAILED", C2Reason.ipMismatch(instanceId),
+                        instanceId, ip, domain, false,
+                        "Call listMyVpsInstances, check VPS '" + instanceId + "' is the one the user means, then call "
+                                + "osirAppDeployToVps again with that instanceId.");
+            }
             String support = "if it is not something they can fix, ask them to contact Osir support quoting app '"
                     + appName + "', VPS '" + instanceId + "' (" + ip + ")"
                     + (refusal.reason() == null ? "" : " and reason " + refusal.reason()) + ".";
