@@ -19,6 +19,12 @@ public class DomainRegistrationRequest {
     // Backend v2.11.0: zone auto-init is the default; only sent when the caller opts out.
     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     private Boolean initializeDnsZone;
+    // Saved contact used as registrant (and admin/tech/billing). Without it the backend resolves the inline
+    // registrant, else silently falls back to the account's default contact.
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private Long registrantId;
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private com.osir.mcp.models.contact.RegistryAttributes registryAttributes;
 
     public DomainRegistrationRequest() {}
 
@@ -59,4 +65,10 @@ public class DomainRegistrationRequest {
 
     public Boolean getInitializeDnsZone() { return initializeDnsZone; }
     public void setInitializeDnsZone(Boolean initializeDnsZone) { this.initializeDnsZone = initializeDnsZone; }
+
+    public Long getRegistrantId() { return registrantId; }
+    public void setRegistrantId(Long registrantId) { this.registrantId = registrantId; }
+
+    public com.osir.mcp.models.contact.RegistryAttributes getRegistryAttributes() { return registryAttributes; }
+    public void setRegistryAttributes(com.osir.mcp.models.contact.RegistryAttributes registryAttributes) { this.registryAttributes = registryAttributes; }
 }

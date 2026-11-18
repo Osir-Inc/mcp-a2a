@@ -2,6 +2,8 @@ package com.osir.a2a.agents;
 
 import com.osir.a2a.protocol.*;
 import com.osir.mcp.models.*;
+import com.osir.mcp.models.contact.RegistryAttributes;
+import com.osir.mcp.services.ContactService;
 import com.osir.mcp.services.DomainService;
 import com.osir.mcp.services.DomainSuggestionService;
 import com.osir.mcp.services.TransferService;
@@ -58,6 +60,7 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
     @Inject TransferService transferService;
     @Inject HostService hostService;
     @Inject CatalogService catalogService;
+    @Inject ContactService contactService;
 
     @Override
     protected Set<String> getKeywords() { return PRIMARY_KEYWORDS; }
@@ -247,7 +250,29 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
         if (domain == null) return askForDomain(task, "register");
 
         int years = metaInt(task, "years") == null ? 1 : metaInt(task, "years");
-        return stage(task, "register_domain", Map.of("domain", domain, "years", years),
+        List<String> nameservers = csv(meta(task, "nameservers"));
+        if (nameservers == null) {
+            // The backend refuses a registration without nameservers.
+            return askForInput(task, "Which nameservers should " + domain + " use? Send metadata "
+                    + "nameservers, e.g. \"ns1.example.com,ns2.example.com\" (OSIR's are ns1.osir.com, ns3.osir.com).");
+        }
+        String registrantId = meta(task, "registrantId");
+        if (registrantId == null || !registrantId.matches("\\d{1,18}")) {
+            // Without it the backend silently makes the account's default contact the owner. A2A has no inline registrant.
+            return askForInput(task, "Who should own " + domain + "? Send metadata registrantId: the numeric id of a "
+                    + "saved contact (list_contacts, or create_contact to make one).");
+        }
+        RegistryAttributes attrs = null;
+        if (ContactService.isAl(domain)) { // AKEP-only; never forwarded for other TLDs
+            attrs = registryAttributes(task);
+            String problem = contactService.alRegistrantProblem(Long.valueOf(registrantId), attrs);
+            if (problem != null) return askForInput(task, problem);
+        }
+        // Frozen as plain data: the gate stores params as JSON.
+        Map<String, Object> params = new java.util.HashMap<>(Map.of("domain", domain, "years", years,
+                "nameservers", nameservers, "registrantId", registrantId));
+        if (attrs != null) params.put("registryAttributes", toMap(attrs));
+        return stage(task, "register_domain", params,
                 "Register " + domain + " for " + years + " year(s). This CHARGES THE ACCOUNT the "
                         + "registration fee (getDomainPricing has the exact amount) and starts an annual "
                         + "renewal. Domain registrations are not refundable.",
@@ -373,7 +398,11 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
         int years = p.get("years") instanceof Number n ? n.intValue() : 1;
         switch (claim.action().skill()) {
             case "register_domain" -> {
-                var result = domainService.registerDomain(domain, years, null, null, true, true);
+                List<String> ns = csv(String.valueOf(p.get("nameservers")));
+                Long registrantId = Long.valueOf(String.valueOf(p.get("registrantId"))); // validated \d{1,18} at stage time
+                RegistryAttributes attrs = p.get("registryAttributes") == null ? null
+                        : objectMapper.convertValue(p.get("registryAttributes"), RegistryAttributes.class);
+                var result = domainService.registerDomain(domain, years, null, ns, true, true, null, registrantId, attrs);
                 return completeWithResult(task, "registration-result", result, result.isSuccess(),
                         result.getMessage());
             }
@@ -536,7 +565,8 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
         if (value == null || value.isBlank()) {
             return null;
         }
-        List<String> parts = java.util.Arrays.stream(value.split(","))
+        // Metadata arrives as "a,b", a List (toString "[a, b]") or a JSON array in a string; hostnames never hold [ ] "
+        List<String> parts = java.util.Arrays.stream(value.replaceAll("[\\[\\]\"]", "").split(","))
                 .map(String::trim).filter(p -> !p.isEmpty()).toList();
         return parts.isEmpty() ? null : parts;
     }
@@ -556,7 +586,9 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
                         List.of("domains", "availability", "check"),
                         List.of("Is coolstartup.io available?", "Can I get brightharbor.com?")),
                 new Skill("register_domain", "Register Domain",
-                        "Register a new domain name",
+                        "Register a new domain name. Metadata: domain, years, nameservers (required), registrantId (saved contact id). "
+                                + "For .al: registrantId is required and that contact needs entityType, doctype, docnr (and nipt unless "
+                                + "'Person Natyror') - set them with create_contact; the domain then waits in pendingCreate for AKEP approval.",
                         List.of("domains", "register", "purchase"),
                         List.of("Register mapleworks.dev for me", "I want to buy northpine.com")),
                 new Skill("get_domain_info", "Get Domain Info",

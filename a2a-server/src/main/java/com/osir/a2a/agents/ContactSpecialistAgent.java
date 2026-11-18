@@ -72,11 +72,12 @@ public class ContactSpecialistAgent extends BaseSpecialistAgent {
                         || street1 == null || city == null || postalCode == null || country == null) {
                     return askForInput(task,
                             "To create a contact, please provide in metadata: firstName, lastName, email, phone, " +
-                            "street1, city, postalCode, country. Optional: organization, street2, state.");
+                            "street1, city, postalCode, country. Optional: organization, street2, state. " +
+                            "For a .al registrant also: entityType, doctype, docnr, and nipt unless entityType is 'Person Natyror'.");
                 }
                 var result = contactService.createContact(firstName, lastName, email, phone,
                         meta(task, "organization"), street1, meta(task, "street2"),
-                        city, meta(task, "state"), postalCode, country);
+                        city, meta(task, "state"), postalCode, country, registryAttributes(task));
                 return completeWithResult(task, "contact", result, result.isSuccess(),
                         result.isSuccess() ? "Contact created." : result.getMessage());
             } else if ("get_contact".equals(skill)) {
@@ -149,7 +150,10 @@ public class ContactSpecialistAgent extends BaseSpecialistAgent {
                 new Skill("get_contact", "Get Contact", "Get details of a specific contact",
                         List.of("contacts", "details"),
                         List.of("Show me contact C-1042", "Get the details for my admin contact")),
-                new Skill("create_contact", "Create Contact", "Create a new contact record",
+                new Skill("create_contact", "Create Contact", "Create a new contact record. Returns its id (use as registrantId in register_domain). "
+                        + "For a .al registrant add metadata entityType ('Person Natyror' | 'Person Fizik Tregtar' | 'Person Juridik Privat' | "
+                        + "'Person Juridik Publik' | 'Institucion Publik'), doctype ('op' | 'passport' | 'mpsv' | 'ico'), docnr, and nipt "
+                        + "(tax/VAT id, required unless 'Person Natyror'); postalCode is required, prefer plain ASCII, no ';' in street.",
                         List.of("contacts", "create", "registrant"),
                         List.of("Create a new registrant contact for Ana Hoxha, ana@cedarloop.com",
                                 "Add a contact for my new client")),

@@ -5,6 +5,9 @@ import com.osir.mcp.models.auth.DeviceLoginResult;
 import com.osir.mcp.models.auth.DeviceLoginStatusResult;
 import com.osir.mcp.models.confirmation.ConfirmationRequiredResult;
 import com.osir.mcp.models.contact.RegistrantInfo;
+import com.osir.mcp.models.contact.RegistryAttributes;
+import com.osir.mcp.services.ContactService;
+import io.quarkiverse.mcp.server.ToolCallException;
 import com.osir.mcp.models.suggestion.BulkDomainSuggestionsResult;
 import com.osir.mcp.security.DestructiveOpRateLimiter;
 import com.osir.mcp.security.McpAudited;
@@ -51,6 +54,9 @@ public class DomainRegistrarMCPServer {
 
     @Inject
     PendingActionStore pendingActionStore;
+
+    @Inject
+    ContactService contactService;
 
     // ── Authentication ────────────────────────────────────────────────────────
 
@@ -172,7 +178,10 @@ public class DomainRegistrarMCPServer {
 
     // Domain Registration Tools
     @RequiresAuth
-    @Tool(description = "registerDomain: Stage registration of a new domain name. Deducts from account balance. The DNS zone is initialised automatically after registration (asynchronously; if createDnsRecord right after registration reports a missing zone, retry after a few seconds). Pass initializeDnsZone:false to opt out. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "registerDomain: Stage registration of a new domain name. Deducts from account balance. The DNS zone is initialised automatically after registration (asynchronously; if createDnsRecord right after registration reports a missing zone, retry after a few seconds). Pass initializeDnsZone:false to opt out. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve. "
+            + "Owner: pass registrantId (a saved contact from createContact/listContacts) or an inline registrantInfo. "
+            + "For .al domains: first createContact with registryAttributes (see its schema), then pass the returned id as registrantId; ask the user for nameservers rather than guessing. "
+            + "A .al domain ends in pendingCreate until the registry (AKEP) approves it by hand - that is success, not a failure.",
             annotations = @Tool.Annotations(
                     title = "Register a domain",
                     readOnlyHint = false,
@@ -182,14 +191,29 @@ public class DomainRegistrarMCPServer {
     public ConfirmationRequiredResult registerDomain(
             @ToolArg(description = "Fully qualified domain name to register, like \"example.com\", without scheme.") String domain,
             @ToolArg(description = "Registration period in years, 1-10.") int years,
-            @ToolArg(description = "ICANN registrant contact of the domain owner: firstName, lastName, email, phone (+CC.number), and address (street, city, postalCode, country as 2-letter ISO code).") RegistrantInfo registrantInfo,
+            @ToolArg(required = false, description = "Inline registrant contact of the domain owner: firstName, lastName, email, phone (+CC.number), and address (street, city, postalCode, country as 2-letter ISO code). Omit when passing registrantId. Not usable for .al.") RegistrantInfo registrantInfo,
             @ToolArg(description = "List of nameserver hostnames, e.g. [\"ns1.example.com\", \"ns2.example.com\"].") List<String> nameservers,
             @ToolArg(required = false, description = "Enable WHOIS privacy protection; defaults to true.") Boolean privacyProtection,
             @ToolArg(required = false, description = "Enable automatic renewal; defaults to true.") Boolean autoRenew,
             @ToolArg(required = false, description = "Initialise the DNS zone after registration; defaults to true.") Boolean initializeDnsZone,
+            @ToolArg(required = false, description = "id of a saved contact (createContact/listContacts) to use as registrant, and as admin/tech/billing contact. REQUIRED for .al: without it the account's default contact becomes the registrant.") Long registrantId,
+            @ToolArg(required = false, description = "Optional per-order override of the registrant's registry fields (same shape as createContact.registryAttributes). Only for .al.") RegistryAttributes registryAttributes,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey,
             McpConnection connection
     ) {
+        if (registrantId == null && registrantInfo == null) {
+            // Backend would silently fall back to the account's default contact.
+            throw new ToolCallException("registerDomain needs the owner: pass registrantId (a saved contact) or registrantInfo.");
+        }
+        boolean al = ContactService.isAl(domain);
+        if (al) {
+            String problem = contactService.alRegistrantProblem(registrantId, registryAttributes);
+            if (problem != null) {
+                throw new ToolCallException(registrantId == null && registrantInfo != null
+                        ? "Inline registrantInfo cannot carry the .al registry fields. " + problem : problem);
+            }
+        }
+        RegistryAttributes attrs = al ? registryAttributes : null; // AKEP-only; never forwarded for other TLDs
         boolean privacy = privacyProtection != null ? privacyProtection : true;
         boolean renew = autoRenew != null ? autoRenew : true;
         return pendingActionStore.stage(
@@ -197,7 +221,8 @@ public class DomainRegistrarMCPServer {
                 "Register domain '" + domain + "' for " + years + " year(s), deducts registration fee from account balance",
                 connection.id(),
                 DestructiveOpRateLimiter.Bucket.FINANCIAL,
-                () -> domainService.registerDomain(domain, years, registrantInfo, nameservers, privacy, renew, initializeDnsZone)
+                () -> domainService.registerDomain(domain, years, registrantInfo, nameservers, privacy, renew,
+                        initializeDnsZone, registrantId, attrs)
         );
     }
 

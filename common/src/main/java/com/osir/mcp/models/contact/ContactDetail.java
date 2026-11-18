@@ -21,6 +21,8 @@ public class ContactDetail {
     private String state;
     private String postalCode;
     private String country;
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private RegistryAttributes registryAttributes; // null field would fail the generated MCP output schema
 
     public ContactDetail() {}
 
@@ -59,4 +61,7 @@ public class ContactDetail {
 
     public String getCountry() { return country; }
     public void setCountry(String country) { this.country = country; }
+
+    public RegistryAttributes getRegistryAttributes() { return registryAttributes; }
+    public void setRegistryAttributes(RegistryAttributes registryAttributes) { this.registryAttributes = registryAttributes; }
 }

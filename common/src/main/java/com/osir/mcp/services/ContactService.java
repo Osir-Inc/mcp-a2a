@@ -56,9 +56,44 @@ public class ContactService {
         }
     }
 
+    /**
+     * Why a .al order would fail or land on the wrong owner, or null when it can go ahead. A staged .al order
+     * the registry will refuse costs the user a confirmation round for nothing, so callers check before staging.
+     */
+    public String alRegistrantProblem(Long registrantId, RegistryAttributes override) {
+        if (registrantId == null) {
+            return ".al domains need registrantId: first create a contact with registryAttributes "
+                    + "(entityType, doctype, docnr, nipt unless 'Person Natyror'), then pass the returned id as registrantId.";
+        }
+        ContactDetailResult contact = getContact(registrantId.toString());
+        if (!contact.isSuccess() || contact.getContact() == null) {
+            return "Contact " + registrantId + " not found: " + contact.getMessage();
+        }
+        // The backend REPLACES the stored fields with an override (no merge), so the override must be complete on its own.
+        RegistryAttributes attrs = override != null ? override : contact.getContact().getRegistryAttributes();
+        List<String> problems = RegistryAttributes.missingForAl(attrs);
+        return problems.isEmpty() ? null
+                : (override != null ? "registryAttributes on this order" : "Contact " + registrantId)
+                  + " is not valid for .al: " + String.join("; ", problems)
+                  + ". Create a new contact with complete registryAttributes (contacts cannot be updated with them), "
+                  + "or pass all of entityType, doctype, docnr (and nipt) as registryAttributes on this order.";
+    }
+
+    public static boolean isAl(String domain) {
+        return domain != null && domain.trim().toLowerCase(java.util.Locale.ROOT).endsWith(".al");
+    }
+
     public ContactResult createContact(String firstName, String lastName, String email, String phone,
                                         String organization, String street1, String street2,
                                         String city, String state, String postalCode, String country) {
+        return createContact(firstName, lastName, email, phone, organization, street1, street2,
+                city, state, postalCode, country, null);
+    }
+
+    public ContactResult createContact(String firstName, String lastName, String email, String phone,
+                                        String organization, String street1, String street2,
+                                        String city, String state, String postalCode, String country,
+                                        RegistryAttributes registryAttributes) {
         if (!authService.isAuthenticated()) {
             return new ContactResult(false, "Authentication required. Please use loginWithDevice to authenticate.");
         }
@@ -66,6 +101,7 @@ public class ContactService {
         try {
             String token = authService.getCurrentToken();
             ContactCreateRequest request = new ContactCreateRequest();
+            request.setRegistryAttributes(registryAttributes);
             request.setFirstName(firstName);
             request.setLastName(lastName);
             request.setEmail(email);

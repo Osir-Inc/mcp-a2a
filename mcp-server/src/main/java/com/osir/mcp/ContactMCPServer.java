@@ -61,7 +61,9 @@ public class ContactMCPServer {
         }
     }
 
-    @Tool(description = "createContact: Create a new contact for use with domain registrations. Requires authentication. Returns the created contact including its id for assignment to domains.",
+    @Tool(description = "createContact: Create a new contact for use with domain registrations. Requires authentication. Returns the created contact including its id for assignment to domains (registerDomain registrantId). "
+            + "For .al domains (AKEP): registryAttributes is required, postalCode is required, state is the region not the country, no ';' in street, prefer plain ASCII. "
+            + "For a company use the director or contact person as first/last name, the company as organization, entityType 'Person Juridik Privat', its NIPT/VAT, and the director's ID or passport.",
             annotations = @Tool.Annotations(
                     title = "Create contact",
                     readOnlyHint = false,
@@ -80,10 +82,11 @@ public class ContactMCPServer {
             @ToolArg(required = false, description = "State, province, or region, if applicable.") String state,
             @ToolArg(description = "Postal or ZIP code.") String postalCode,
             @ToolArg(description = "Country as a 2-letter ISO 3166-1 alpha-2 code, e.g. 'US'.") String country,
+            @ToolArg(required = false, description = "Registry-specific fields. REQUIRED for .al (AKEP): entityType, doctype, docnr, and nipt for every entityType except 'Person Natyror'. Omit for other TLDs.") RegistryAttributes registryAttributes,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.createContact(firstName, lastName, email, phone, organization,
-                    street1, street2, city, state, postalCode, country);
+                    street1, street2, city, state, postalCode, country, registryAttributes);
         } catch (Exception e) {
             Log.errorf(e, "Error creating contact: %s", e.getMessage());
             return new ContactResult(false, "Failed to create contact: " + e.getMessage());

@@ -137,6 +137,13 @@ public abstract class BaseSpecialistAgent implements SpecialistAgent {
         try { return Integer.parseInt(v); } catch (NumberFormatException ignored) { return null; }
     }
 
+    /** The four .al (AKEP) contact fields as flat metadata keys; null when none is given. */
+    protected com.osir.mcp.models.contact.RegistryAttributes registryAttributes(A2ATask task) {
+        String e = meta(task, "entityType"), t = meta(task, "doctype"), d = meta(task, "docnr"), n = meta(task, "nipt");
+        return e == null && t == null && d == null && n == null ? null
+                : new com.osir.mcp.models.contact.RegistryAttributes(e, t, d, n);
+    }
+
     protected Double metaDouble(A2ATask task, String key) {
         String v = meta(task, key);
         if (v == null) return null;

@@ -70,16 +70,16 @@ class ContactMCPServerTest {
     @Test
     void createContact_delegatesToService() {
         ContactResult expected = new ContactResult(true, "Created");
-        when(contactService.createContact("John", "Doe", "j@e.com", "+1.555", null, "123 St", null, "City", null, "12345", "US"))
+        when(contactService.createContact("John", "Doe", "j@e.com", "+1.555", null, "123 St", null, "City", null, "12345", "US", null))
                 .thenReturn(expected);
-        assertSame(expected, mcpServer.createContact("John", "Doe", "j@e.com", "+1.555", null, "123 St", null, "City", null, "12345", "US", null, mockConnection));
+        assertSame(expected, mcpServer.createContact("John", "Doe", "j@e.com", "+1.555", null, "123 St", null, "City", null, "12345", "US", null, null, mockConnection));
     }
 
     @Test
     void createContact_handlesException() {
-        when(contactService.createContact("John", "Doe", "j@e.com", "+1.555", null, "123 St", null, "City", null, "12345", "US"))
+        when(contactService.createContact("John", "Doe", "j@e.com", "+1.555", null, "123 St", null, "City", null, "12345", "US", null))
                 .thenThrow(new RuntimeException("Fail"));
-        assertFalse(mcpServer.createContact("John", "Doe", "j@e.com", "+1.555", null, "123 St", null, "City", null, "12345", "US", null, mockConnection).isSuccess());
+        assertFalse(mcpServer.createContact("John", "Doe", "j@e.com", "+1.555", null, "123 St", null, "City", null, "12345", "US", null, null, mockConnection).isSuccess());
     }
 
     @Test

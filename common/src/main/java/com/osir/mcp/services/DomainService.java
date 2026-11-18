@@ -4,6 +4,7 @@ import com.osir.mcp.clients.DomainBackendClient;
 import com.osir.mcp.models.*;
 import com.osir.mcp.util.FundingHint;
 import com.osir.mcp.models.contact.RegistrantInfo;
+import com.osir.mcp.models.contact.RegistryAttributes;
 import com.osir.mcp.models.domain.*;
 import com.osir.mcp.models.nameserver.NameserverUpdateRequest;
 import com.osir.mcp.models.nameserver.NameserverUpdateResponse;
@@ -76,6 +77,14 @@ public class DomainService {
     public DomainRegistrationResult registerDomain(String domain, int years, RegistrantInfo registrantInfo,
                                                    List<String> nameservers, boolean privacyProtection,
                                                    boolean autoRenew, Boolean initializeDnsZone) {
+        return registerDomain(domain, years, registrantInfo, nameservers, privacyProtection, autoRenew,
+                initializeDnsZone, null, null);
+    }
+
+    public DomainRegistrationResult registerDomain(String domain, int years, RegistrantInfo registrantInfo,
+                                                   List<String> nameservers, boolean privacyProtection,
+                                                   boolean autoRenew, Boolean initializeDnsZone,
+                                                   Long registrantId, RegistryAttributes registryAttributes) {
         if (!authService.isAuthenticated()) {
             return new DomainRegistrationResult(domain, false, "Authentication required");
         }
@@ -84,6 +93,8 @@ public class DomainService {
             String token = authService.getCurrentToken();
 
             DomainRegistrationRequest request = new DomainRegistrationRequest(domain, years, registrantInfo);
+            request.setRegistrantId(registrantId);
+            request.setRegistryAttributes(registryAttributes);
             request.setNameservers(nameservers);
             request.setPrivacyProtection(privacyProtection);
             request.setAutoRenew(autoRenew);
