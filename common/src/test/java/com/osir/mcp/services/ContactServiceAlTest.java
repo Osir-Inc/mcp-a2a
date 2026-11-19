@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /** .al orders must name a saved contact carrying the AKEP fields, else they land on the account default contact. */
@@ -85,6 +86,19 @@ class ContactServiceAlTest {
         savedContact(new RegistryAttributes("Person Juridik Privat", "passport", "26HE11614", null));
         String p = contactService.alRegistrantProblem(7360L, new RegistryAttributes(null, null, null, "L123"));
         assertTrue(p.startsWith("registryAttributes on this order"));
+    }
+
+    @Test
+    void updateContact_forwardsRegistryAttributes_andOmitsThemWhenAbsent() {
+        var captor = org.mockito.ArgumentCaptor.forClass(com.osir.mcp.models.contact.ContactCreateRequest.class);
+        when(backendClient.updateContact(eq("7360"), captor.capture(), eq("t"))).thenReturn(new ContactDetail());
+
+        contactService.updateContact("7360", null, null, null, null, null, null, null, null, null, null, null,
+                new RegistryAttributes("Person Natyror", "op", "J75831039W", null));
+        assertEquals("J75831039W", captor.getValue().getRegistryAttributes().getDocnr());
+
+        contactService.updateContact("7360", "Ledina", null, null, null, null, null, null, null, null, null, null);
+        assertNull(captor.getValue().getRegistryAttributes()); // null = backend keeps the stored set
     }
 
     @Test

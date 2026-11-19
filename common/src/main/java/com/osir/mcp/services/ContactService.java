@@ -75,8 +75,8 @@ public class ContactService {
         return problems.isEmpty() ? null
                 : (override != null ? "registryAttributes on this order" : "Contact " + registrantId)
                   + " is not valid for .al: " + String.join("; ", problems)
-                  + ". Create a new contact with complete registryAttributes (contacts cannot be updated with them), "
-                  + "or pass all of entityType, doctype, docnr (and nipt) as registryAttributes on this order.";
+                  + ". Update the contact with complete registryAttributes (all of entityType, doctype, docnr, and nipt "
+                  + "unless 'Person Natyror' - the set is replaced, not merged), or pass them all as registryAttributes on this order.";
     }
 
     public static boolean isAl(String domain) {
@@ -131,6 +131,15 @@ public class ContactService {
     public ContactResult updateContact(String contactId, String firstName, String lastName, String email,
                                         String phone, String organization, String street1, String street2,
                                         String city, String state, String postalCode, String country) {
+        return updateContact(contactId, firstName, lastName, email, phone, organization, street1, street2,
+                city, state, postalCode, country, null);
+    }
+
+    /** registryAttributes, when given, REPLACES the stored set (backend PUT has no per-field merge). */
+    public ContactResult updateContact(String contactId, String firstName, String lastName, String email,
+                                        String phone, String organization, String street1, String street2,
+                                        String city, String state, String postalCode, String country,
+                                        RegistryAttributes registryAttributes) {
         if (!authService.isAuthenticated()) {
             return new ContactResult(false, "Authentication required. Please use loginWithDevice to authenticate.");
         }
@@ -138,6 +147,7 @@ public class ContactService {
         try {
             String token = authService.getCurrentToken();
             ContactCreateRequest request = new ContactCreateRequest();
+            request.setRegistryAttributes(registryAttributes);
             request.setFirstName(firstName);
             request.setLastName(lastName);
             request.setEmail(email);

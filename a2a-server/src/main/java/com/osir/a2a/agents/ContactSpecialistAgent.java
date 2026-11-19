@@ -93,7 +93,7 @@ public class ContactSpecialistAgent extends BaseSpecialistAgent {
                         meta(task, "firstName"), meta(task, "lastName"), meta(task, "email"),
                         meta(task, "phone"), meta(task, "organization"), meta(task, "street1"),
                         meta(task, "street2"), meta(task, "city"), meta(task, "state"),
-                        meta(task, "postalCode"), meta(task, "country"));
+                        meta(task, "postalCode"), meta(task, "country"), registryAttributes(task));
                 return completeWithResult(task, "contact", result, result.isSuccess(),
                         result.isSuccess() ? "Contact updated." : result.getMessage());
             } else if ("get_domain_contacts".equals(skill) || (lower.contains("domain") && lower.contains("contact"))) {
@@ -157,7 +157,7 @@ public class ContactSpecialistAgent extends BaseSpecialistAgent {
                         List.of("contacts", "create", "registrant"),
                         List.of("Create a new registrant contact for Ana Hoxha, ana@cedarloop.com",
                                 "Add a contact for my new client")),
-                new Skill("update_contact", "Update Contact", "Update an existing contact",
+                new Skill("update_contact", "Update Contact", "Update an existing contact. For .al, entityType/doctype/docnr/nipt metadata replace the stored set (send all of them).",
                         List.of("contacts", "update", "edit"),
                         List.of("Update the email on contact C-1042 to billing@cedarloop.com",
                                 "Change the phone number on my registrant contact")),

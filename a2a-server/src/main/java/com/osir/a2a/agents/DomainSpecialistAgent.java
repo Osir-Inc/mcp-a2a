@@ -588,7 +588,7 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
                 new Skill("register_domain", "Register Domain",
                         "Register a new domain name. Metadata: domain, years, nameservers (required), registrantId (saved contact id). "
                                 + "For .al: registrantId is required and that contact needs entityType, doctype, docnr (and nipt unless "
-                                + "'Person Natyror') - set them with create_contact; the domain then waits in pendingCreate for AKEP approval.",
+                                + "'Person Natyror') - set them with create_contact or update_contact; the domain then waits in pendingCreate for AKEP approval.",
                         List.of("domains", "register", "purchase"),
                         List.of("Register mapleworks.dev for me", "I want to buy northpine.com")),
                 new Skill("get_domain_info", "Get Domain Info",

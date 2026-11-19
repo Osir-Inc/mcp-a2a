@@ -1,5 +1,5 @@
 group 'com.osir.mcp'
-version '2.5.7'
+version '2.5.8'
 
 subprojects {
     apply plugin: 'java'

@@ -85,16 +85,16 @@ class ContactMCPServerTest {
     @Test
     void updateContact_delegatesToService() {
         ContactResult expected = new ContactResult(true, "Updated");
-        when(contactService.updateContact("c-1", "Jane", null, null, null, null, null, null, null, null, null, null))
+        when(contactService.updateContact("c-1", "Jane", null, null, null, null, null, null, null, null, null, null, null))
                 .thenReturn(expected);
-        assertSame(expected, mcpServer.updateContact("c-1", "Jane", null, null, null, null, null, null, null, null, null, null, null, mockConnection));
+        assertSame(expected, mcpServer.updateContact("c-1", "Jane", null, null, null, null, null, null, null, null, null, null, null, null, mockConnection));
     }
 
     @Test
     void updateContact_handlesException() {
-        when(contactService.updateContact("c-1", "Jane", null, null, null, null, null, null, null, null, null, null))
+        when(contactService.updateContact("c-1", "Jane", null, null, null, null, null, null, null, null, null, null, null))
                 .thenThrow(new RuntimeException("Fail"));
-        assertFalse(mcpServer.updateContact("c-1", "Jane", null, null, null, null, null, null, null, null, null, null, null, mockConnection).isSuccess());
+        assertFalse(mcpServer.updateContact("c-1", "Jane", null, null, null, null, null, null, null, null, null, null, null, null, mockConnection).isSuccess());
     }
 
     @Test

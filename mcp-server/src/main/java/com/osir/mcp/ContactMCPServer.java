@@ -93,7 +93,8 @@ public class ContactMCPServer {
         }
     }
 
-    @Tool(description = "updateContact: Update an existing contact's information. Requires authentication. Only the fields you provide are changed; omitted fields keep their current values. Get the contactId from listContacts. Returns the updated contact.",
+    @Tool(description = "updateContact: Update an existing contact's information. Requires authentication. Only the fields you provide are changed; omitted fields keep their current values. Get the contactId from listContacts. Returns the updated contact. "
+            + "To make a contact usable as a .al registrant, send registryAttributes (see createContact).",
             annotations = @Tool.Annotations(
                     title = "Update contact",
                     readOnlyHint = false,
@@ -113,10 +114,11 @@ public class ContactMCPServer {
             @ToolArg(required = false, description = "New state, province, or region.") String state,
             @ToolArg(required = false, description = "New postal or ZIP code.") String postalCode,
             @ToolArg(required = false, description = "New country as a 2-letter ISO 3166-1 alpha-2 code, e.g. 'US'.") String country,
+            @ToolArg(required = false, description = "Registry-specific fields (.al / AKEP: entityType, doctype, docnr, nipt). REPLACES the whole stored set, so send every field, not just the changed one. Omit to keep the current ones.") RegistryAttributes registryAttributes,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
         try {
             return contactService.updateContact(contactId, firstName, lastName, email, phone, organization,
-                    street1, street2, city, state, postalCode, country);
+                    street1, street2, city, state, postalCode, country, registryAttributes);
         } catch (Exception e) {
             Log.errorf(e, "Error updating contact: %s", e.getMessage());
             return new ContactResult(false, "Failed to update contact: " + e.getMessage());
