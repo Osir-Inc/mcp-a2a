@@ -121,8 +121,13 @@ public class DomainService {
     }
 
     public DomainTransferResult transferDomain(String domain, String authCode, RegistrantInfo registrantInfo) {
+        return transferDomain(domain, authCode, registrantInfo, null);
+    }
+
+    public DomainTransferResult transferDomain(String domain, String authCode, RegistrantInfo registrantInfo,
+                                               Long registrantId) {
         try {
-            TransferInitiateResult transferResult = transferService.initiateTransfer(domain, authCode);
+            TransferInitiateResult transferResult = transferService.initiateTransfer(domain, authCode, registrantId, registrantInfo);
 
             DomainTransferResult result = new DomainTransferResult(
                     domain,

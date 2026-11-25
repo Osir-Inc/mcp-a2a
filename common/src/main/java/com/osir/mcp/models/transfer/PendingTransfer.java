@@ -1,10 +1,19 @@
 package com.osir.mcp.models.transfer;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class PendingTransfer {
     private String domain;
     private String status;
+    @JsonAlias({"transferInitiatedDate", "createdAt"})
     private String requestDate;
+    @JsonAlias("facingRegistrar")
     private String currentRegistrar;
+    @JsonAlias({"expectedCompletionDate", "expiresAt"})
     private String expectedCompletion;
 
     public PendingTransfer() {}

@@ -1,9 +1,14 @@
 package com.osir.mcp.models.transfer;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TransferInitiateResponse {
     private boolean success;
     private String message;
     private String domain;
+    @JsonAlias("orderId")
     private String transferId;
     private String status;
 

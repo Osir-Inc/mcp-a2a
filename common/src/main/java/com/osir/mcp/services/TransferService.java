@@ -32,10 +32,12 @@ public class TransferService {
             TransferQuoteResponse response = backendClient.getTransferQuote(domain, token);
             TransferQuoteResult result = new TransferQuoteResult(true, "Transfer quote retrieved successfully");
             result.setDomain(response.getDomain());
-            result.setTransferPrice(response.getTransferPrice());
+            if (response.getTotalFees() != null) {
+                result.setTransferPrice(String.format(java.util.Locale.US, "%.2f", response.getTotalFees() / 100.0));
+            }
             result.setCurrency(response.getCurrency());
             result.setExtensionYears(response.getExtensionYears());
-            result.setNewExpirationDate(response.getNewExpirationDate());
+            result.setQuoteExpiry(response.getQuoteExpiry());
             return result;
         } catch (Exception e) {
             LOG.errorf(e, "Error getting transfer quote for %s: %s", domain, e.getMessage());
@@ -44,13 +46,18 @@ public class TransferService {
     }
 
     public TransferInitiateResult initiateTransfer(String domain, String authCode) {
+        return initiateTransfer(domain, authCode, null, null);
+    }
+
+    public TransferInitiateResult initiateTransfer(String domain, String authCode, Long registrantId,
+                                                   com.osir.mcp.models.contact.RegistrantInfo registrant) {
         if (!authService.isAuthenticated()) {
             return new TransferInitiateResult(false, "Authentication required. Please use loginWithDevice to authenticate.");
         }
 
         try {
             String token = authService.getCurrentToken();
-            TransferInitiateRequest request = new TransferInitiateRequest(domain, authCode);
+            TransferInitiateRequest request = new TransferInitiateRequest(domain, authCode, registrantId, registrant);
             TransferInitiateResponse response = backendClient.initiateTransfer(request, token);
             TransferInitiateResult result = new TransferInitiateResult(response.isSuccess(),
                     response.isSuccess() ? "Transfer initiated successfully" : response.getMessage());

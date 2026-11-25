@@ -1,10 +1,17 @@
 package com.osir.mcp.models.transfer;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TransferStatusResponse {
     private String domain;
     private String status;
+    @JsonAlias({"transferInitiatedDate", "createdAt"})
     private String requestDate;
+    @JsonAlias("facingRegistrar")
     private String currentRegistrar;
+    @JsonAlias({"expectedCompletionDate", "expiresAt"})
     private String expectedCompletion;
 
     public TransferStatusResponse() {}

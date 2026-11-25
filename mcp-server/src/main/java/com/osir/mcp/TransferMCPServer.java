@@ -25,7 +25,7 @@ public class TransferMCPServer {
     @Inject
     PendingActionStore pendingActionStore;
 
-    @Tool(description = "getTransferQuote: Get a transfer price quote for a domain. Requires authentication. Returns transfer price, currency, extension years, and new expiration date. Call before initiateTransfer to show the user the cost.",
+    @Tool(description = "getTransferQuote: Get a transfer price quote for a domain. Requires authentication. Returns the total transfer price (what initiateTransfer charges, fees included), currency, years added to the registration, and when the quote expires. Call before initiateTransfer to show the user the cost.",
             structuredContent = true,
             annotations = @Tool.Annotations(
                     title = "Get transfer quote",

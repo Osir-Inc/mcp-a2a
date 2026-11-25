@@ -1,5 +1,8 @@
 package com.osir.mcp.models.transfer;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class TransferInitiateResult {
     private boolean success;
     private String message;

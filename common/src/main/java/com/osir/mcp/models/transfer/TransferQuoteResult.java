@@ -1,13 +1,17 @@
 package com.osir.mcp.models.transfer;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+// NON_NULL: the generated output schema types every field, so a null one fails validation.
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class TransferQuoteResult {
     private boolean success;
     private String message;
     private String domain;
     private String transferPrice;
     private String currency;
-    private String extensionYears;
-    private String newExpirationDate;
+    private Integer extensionYears;
+    private String quoteExpiry;
 
     public TransferQuoteResult() {}
 
@@ -31,9 +35,9 @@ public class TransferQuoteResult {
     public String getCurrency() { return currency; }
     public void setCurrency(String currency) { this.currency = currency; }
 
-    public String getExtensionYears() { return extensionYears; }
-    public void setExtensionYears(String extensionYears) { this.extensionYears = extensionYears; }
+    public Integer getExtensionYears() { return extensionYears; }
+    public void setExtensionYears(Integer extensionYears) { this.extensionYears = extensionYears; }
 
-    public String getNewExpirationDate() { return newExpirationDate; }
-    public void setNewExpirationDate(String newExpirationDate) { this.newExpirationDate = newExpirationDate; }
+    public String getQuoteExpiry() { return quoteExpiry; }
+    public void setQuoteExpiry(String quoteExpiry) { this.quoteExpiry = quoteExpiry; }
 }

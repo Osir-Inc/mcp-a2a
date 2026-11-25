@@ -42,7 +42,13 @@ public class DomainRegistrationRequest {
     public int getYears() { return years; }
     public void setYears(int years) { this.years = years; }
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public RegistrantInfo getRegistrant() { return registrant; }
+
+    /** Sent to the backend flat; see {@link RegistrantInfo#toBackend()}. */
+    @com.fasterxml.jackson.annotation.JsonProperty("registrant")
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    public java.util.Map<String, Object> getBackendRegistrant() { return registrant == null ? null : registrant.toBackend(); }
     public void setRegistrant(RegistrantInfo registrant) { this.registrant = registrant; }
 
     public ContactInfo getAdminContact() { return adminContact; }

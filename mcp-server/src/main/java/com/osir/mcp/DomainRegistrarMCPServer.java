@@ -228,7 +228,8 @@ public class DomainRegistrarMCPServer {
 
     // Domain Transfer Tools
     @RequiresAuth
-    @Tool(description = "transferDomain: Stage transfer of a domain from another registrar to OSIR. Deducts from account balance. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve.",
+    @Tool(description = "transferDomain: Stage transfer of a domain from another registrar to OSIR. Deducts from account balance. Returns an actionId: present the summary to the user, then call executeConfirmedAction with the actionId if they approve. "
+            + "Owner: pass registrantId (a saved contact from createContact/listContacts) or an inline registrantInfo.",
             annotations = @Tool.Annotations(
                     title = "Transfer a domain",
                     readOnlyHint = false,
@@ -238,14 +239,19 @@ public class DomainRegistrarMCPServer {
     public ConfirmationRequiredResult transferDomain(
             @ToolArg(description = "Fully qualified domain name to transfer, like \"example.com\", without scheme.") String domain,
             @ToolArg(description = "EPP authorization code obtained from the current registrar.") String authCode,
-            @ToolArg(description = "ICANN registrant contact of the domain owner: firstName, lastName, email, phone (+CC.number), and address (street, city, postalCode, country as 2-letter ISO code).") RegistrantInfo registrantInfo,
+            @ToolArg(required = false, description = "Inline registrant contact of the domain owner: firstName, lastName, email, phone (+CC.number), and address (street1, city, postalCode, country as 2-letter ISO code). Omit when passing registrantId.") RegistrantInfo registrantInfo,
+            @ToolArg(required = false, description = "id of a saved contact (createContact/listContacts) to use as registrant, and as admin/tech/billing contact. Wins over registrantInfo.") Long registrantId,
             @ToolArg(name = RequiresAuth.SESSION_KEY, description = RequiresAuth.SESSION_KEY_DESC, required = false) String sessionKey, McpConnection connection) {
+        if (registrantId == null && registrantInfo == null) {
+            // Backend would silently fall back to the account's default contact.
+            throw new ToolCallException("transferDomain needs the owner: pass registrantId (a saved contact) or registrantInfo.");
+        }
         return pendingActionStore.stage(
                 "transferDomain",
                 "Transfer domain '" + domain + "' to OSIR, deducts transfer fee from account balance",
                 connection.id(),
                 DestructiveOpRateLimiter.Bucket.FINANCIAL,
-                () -> domainService.transferDomain(domain, authCode, registrantInfo)
+                () -> domainService.transferDomain(domain, authCode, registrantInfo, registrantId)
         );
     }
 

@@ -38,27 +38,87 @@ class TransferServiceTest {
     // ===== getQuote =====
 
     @Test
-    void getQuote_success() {
+    void getQuote_success() throws Exception {
         when(authService.isAuthenticated()).thenReturn(true);
         when(authService.getCurrentToken()).thenReturn(TEST_TOKEN);
 
-        TransferQuoteResponse response = new TransferQuoteResponse();
-        response.setDomain(TEST_DOMAIN);
-        response.setTransferPrice("12.99");
-        response.setCurrency("USD");
-        response.setExtensionYears("1");
-        response.setNewExpirationDate("2027-02-19");
+        // Backend DomainTransferQuote as served: cents, totalFees = totalCost + icannFee + serviceFee
+        TransferQuoteResponse response = MAPPER.readValue("""
+                {"domain":"example.com","extension":"com","transferYears":1,"pricePerYear":1099,
+                 "totalCost":1099,"currency":"USD","requiresAuthCode":true,"extensionYears":1,
+                 "icannFee":20,"registryFee":0,"serviceFee":0,"totalFees":1119,
+                 "quoteExpiry":"2026-11-25T10:20:00","promoApplied":false}""", TransferQuoteResponse.class);
         when(backendClient.getTransferQuote(TEST_DOMAIN, TEST_TOKEN)).thenReturn(response);
 
         TransferQuoteResult result = transferService.getQuote(TEST_DOMAIN);
 
         assertTrue(result.isSuccess());
         assertEquals(TEST_DOMAIN, result.getDomain());
-        assertEquals("12.99", result.getTransferPrice());
+        assertEquals("11.19", result.getTransferPrice());
         assertEquals("USD", result.getCurrency());
-        assertEquals("1", result.getExtensionYears());
-        assertEquals("2027-02-19", result.getNewExpirationDate());
+        assertEquals(1, result.getExtensionYears());
+        assertEquals("2026-11-25T10:20:00", result.getQuoteExpiry());
     }
+
+    @Test
+    void transferResults_omitNullFields() throws Exception {
+        // A null field fails the MCP output schema ("Instance type null is invalid") - live bug on getTransferQuote
+        String json = MAPPER.writeValueAsString(new TransferQuoteResult(false, "nope"));
+        assertFalse(json.contains("null"), json);
+        assertFalse(MAPPER.writeValueAsString(new TransferStatusResult(false, "nope")).contains("null"));
+        assertFalse(MAPPER.writeValueAsString(new TransferInitiateResult(false, "nope")).contains("null"));
+        assertFalse(MAPPER.writeValueAsString(new PendingTransfer()).contains("null"));
+    }
+
+    @Test
+    void statusAndInitiate_readBackendFieldNames() throws Exception {
+        TransferStatusResponse status = MAPPER.readValue("""
+                {"domain":"example.com","status":"PENDING","transferType":"GAINING",
+                 "transferInitiatedDate":"2026-11-20T09:00","expectedCompletionDate":"2026-11-25T09:00",
+                 "facingRegistrar":"GoDaddy","customerId":"c1"}""", TransferStatusResponse.class);
+        assertEquals("2026-11-20T09:00", status.getRequestDate());
+        assertEquals("2026-11-25T09:00", status.getExpectedCompletion());
+        assertEquals("GoDaddy", status.getCurrentRegistrar());
+
+        PendingTransfer pending = MAPPER.readValue("""
+                {"domain":"example.com","status":"PENDING","transferType":"GAINING",
+                 "createdAt":"2026-11-20T09:00","expiresAt":"2026-11-25T09:00","facingRegistrar":"GoDaddy"}""",
+                PendingTransfer.class);
+        assertEquals("2026-11-20T09:00", pending.getRequestDate());
+        assertEquals("2026-11-25T09:00", pending.getExpectedCompletion());
+
+        TransferInitiateResponse initiate = MAPPER.readValue("""
+                {"domain":"example.com","success":true,"message":"ok","status":"PENDING",
+                 "orderId":"ORD-1","totalCost":1119,"environment":"prod"}""", TransferInitiateResponse.class);
+        assertEquals("ORD-1", initiate.getTransferId());
+    }
+
+    @Test
+    void inlineRegistrant_sentFlatAsBackendRegistrantDto() throws Exception {
+        // Backend RegistrantDTO is flat; a nested "address" was dropped, isValid() failed, default contact won.
+        var info = new com.osir.mcp.models.contact.RegistrantInfo("Ana", "Hoxha", "ana@example.com", "+355.42123456",
+                new com.osir.mcp.models.contact.Address("Rr. Durresit 1", "Tirana", null, "1001", "AL"));
+
+        var transfer = MAPPER.readTree(MAPPER.writeValueAsString(
+                new TransferInitiateRequest(TEST_DOMAIN, TEST_AUTH_CODE, 7360L, info)));
+        assertEquals(7360, transfer.get("registrantId").asInt());
+        assertEquals("Rr. Durresit 1", transfer.at("/registrant/street1").asText());
+        assertEquals("AL", transfer.at("/registrant/country").asText());
+        assertFalse(transfer.get("registrant").has("address"));
+        assertFalse(transfer.get("registrant").has("state")); // nulls dropped
+
+        var reg = MAPPER.readTree(MAPPER.writeValueAsString(
+                new com.osir.mcp.models.domain.DomainRegistrationRequest(TEST_DOMAIN, 1, info)));
+        assertEquals("Tirana", reg.at("/registrant/city").asText());
+        assertFalse(reg.get("registrant").has("address"));
+        assertFalse(reg.has("backendRegistrant"));
+
+        // Bare initiate keeps the old body: no owner keys at all
+        var bare = MAPPER.readTree(MAPPER.writeValueAsString(new TransferInitiateRequest(TEST_DOMAIN, TEST_AUTH_CODE)));
+        assertFalse(bare.has("registrantId") || bare.has("registrant"));
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
 
     @Test
     void getQuote_notAuthenticated() {

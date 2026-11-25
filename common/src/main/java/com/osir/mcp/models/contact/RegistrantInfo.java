@@ -50,4 +50,28 @@ public class RegistrantInfo {
 
     public Address getAddress() { return address; }
     public void setAddress(Address address) { this.address = address; }
+
+    /**
+     * The backend's RegistrantDTO is flat (street1/city/country at top level) and drops anything else, so the
+     * nested {@code address} never reached it and {@code isValid()} failed: the order fell back to the account's
+     * default contact. Fax has no backend field.
+     */
+    public java.util.Map<String, Object> toBackend() {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("firstName", firstName);
+        m.put("lastName", lastName);
+        m.put("organization", organization);
+        m.put("email", email);
+        m.put("phone", phone);
+        if (address != null) {
+            m.put("street1", address.getStreet1());
+            m.put("street2", address.getStreet2());
+            m.put("city", address.getCity());
+            m.put("state", address.getState());
+            m.put("postalCode", address.getPostalCode());
+            m.put("country", address.getCountry());
+        }
+        m.values().removeIf(java.util.Objects::isNull);
+        return m;
+    }
 }

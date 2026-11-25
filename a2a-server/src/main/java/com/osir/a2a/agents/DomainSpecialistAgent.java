@@ -353,17 +353,24 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
                 "(?:auth|epp|authorization)\\s*(?:code)?\\s*[:\\s]?\\s*([\\w-]+)",
                 Pattern.CASE_INSENSITIVE);
         Matcher authMatcher = authPattern.matcher(text);
-        if (!authMatcher.find()) {
+        String authCode = meta(task, "authCode");
+        if (authCode == null && authMatcher.find()) authCode = authMatcher.group(1);
+        if (authCode == null) {
             task.transitionTo(TaskState.INPUT_REQUIRED);
             task.addMessage(new Message("agent",
                     "Please provide the authorization/EPP code for transferring " + domain + "."));
             return task;
         }
 
-        String authCode = authMatcher.group(1);
+        String registrantId = meta(task, "registrantId");
+        if (registrantId == null || !registrantId.matches("\\d{1,18}")) {
+            // Without it the backend silently makes the account's default contact the owner. A2A has no inline registrant.
+            return askForInput(task, "Who should own " + domain + " after the transfer? Send metadata registrantId: the "
+                    + "numeric id of a saved contact (list_contacts, or create_contact to make one).");
+        }
         // The auth code is frozen with the rest: it is already in this task's message history either
         // way, so staging adds no exposure it did not already have.
-        return stage(task, "transfer_domain", Map.of("domain", domain, "authCode", authCode),
+        return stage(task, "transfer_domain", Map.of("domain", domain, "authCode", authCode, "registrantId", registrantId),
                 "Transfer " + domain + " to OSIR. This CHARGES THE ACCOUNT a transfer fee (which adds a "
                         + "year to the registration) and starts a registry process that takes up to 5 days "
                         + "and cannot be cancelled once the losing registrar approves it.",
@@ -412,7 +419,8 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
                         result.getMessage());
             }
             case "transfer_domain" -> {
-                var result = transferService.initiateTransfer(domain, String.valueOf(p.get("authCode")));
+                var result = transferService.initiateTransfer(domain, String.valueOf(p.get("authCode")),
+                        Long.valueOf(String.valueOf(p.get("registrantId"))), null); // validated \d{1,18} at stage time
                 return completeWithResult(task, "transfer-result", result, result.isSuccess(),
                         result.getMessage());
             }
@@ -616,7 +624,7 @@ public class DomainSpecialistAgent extends BaseSpecialistAgent {
                         List.of("domains", "suggestions", "brainstorm"),
                         List.of("Suggest some domain names for my bakery", "Give me alternatives to coolstartup.io")),
                 new Skill("transfer_domain", "Transfer Domain",
-                        "Transfer a domain from another registrar",
+                        "Transfer a domain from another registrar. Metadata: domain, authCode (EPP code), registrantId (saved contact id that will own it).",
                         List.of("domains", "transfer", "epp"),
                         List.of("Transfer quietriver.org to OSIR, the auth code is QX7-2291",
                                 "Move my domain from GoDaddy to you")),
