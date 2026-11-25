@@ -20,12 +20,23 @@ Human-submitted; everything below is prepared. Bump `server.json` version AND
 
 ## 1. Official MCP Registry (registry.modelcontextprotocol.io)
 
-1. Verify the `com.osir` namespace: publish the DNS TXT record the registry CLI asks for
-   on `osir.com` (namespace ownership proof). One-time.
-2. `npx @modelcontextprotocol/registry-cli publish server.json` (or the current publish flow
-   per https://github.com/modelcontextprotocol/registry docs).
-3. Republish requires a HIGHER `version` than the last accepted one - this is why the version
-   bump rule exists (a republish at a stale version is refused).
+Listed as `com.osir/domain-registrar` (last published: 2.5.6 with icons, 2026-11-18).
+
+1. Namespace `com.osir/*` is proven by HTTP auth: `https://osir.com/.well-known/mcp-registry-auth`
+   (served by the osir.com site). The matching Ed25519 `key.pem` is kept gitignored in the
+   osir.com repo under `scripts/mcp-registry/`, on the maintainer's machine only.
+2. Publish with [`mcp-publisher`](https://github.com/modelcontextprotocol/registry/releases)
+   from the repo root (it reads `./server.json`):
+   ```bash
+   PRIVATE_KEY="$(openssl pkey -in key.pem -noout -text | grep -A3 'priv:' | tail -n +2 | tr -d ' :\n')"
+   mcp-publisher login http --domain osir.com --private-key "$PRIVATE_KEY"
+   mcp-publisher validate      # checks against the live registry
+   mcp-publisher publish
+   ```
+3. Republish requires a HIGHER `version` than the last accepted one, and it must equal the live
+   `serverInfo.version` - so publish after the release is deployed.
+4. `description` is capped at 100 characters (a longer one fails `validate` with 422).
+5. `server.json` is not in the Docker images: publishing needs no rebuild or deploy.
 
 ## 2. Claude connector directory (Anthropic)
 
