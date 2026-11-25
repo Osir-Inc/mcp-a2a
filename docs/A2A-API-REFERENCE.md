@@ -228,7 +228,7 @@ Returns an array of all specialist agent cards:
 | `lock_domain` | Enable registrar lock |
 | `unlock_domain` | Remove registrar lock |
 | `suggest_domains` | Generate domain name suggestions |
-| `transfer_domain` | Transfer from another registrar (requires auth code) |
+| `transfer_domain` | Transfer from another registrar. Metadata: `domain`, `authCode` (or in the text), `registrantId` (saved contact that will own it; asked for if missing) |
 | `enable_privacy` | Enable WHOIS privacy protection |
 | `disable_privacy` | Disable WHOIS privacy protection |
 | `enable_autorenew` | Enable automatic renewal |

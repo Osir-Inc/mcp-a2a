@@ -18,6 +18,14 @@
 - [ ] **Custom domains for `*.osir.app` static sites** — customers will ask ("I want it on my own domain"). Needs C2 route support for a customer domain → app mapping; the MCP side already has registerDomain + DNS tools to complete the story.
 - [ ] Version history / revert beyond the last deploy — only if clients ask (`osirAppGetSource` covers the last version).
 
+## Domain transfer (v2.5.10, 2026-11-25)
+
+- [x] **Transfer models matched the backend** — quote/status/pending/initiate read fields the backend never sent; `getTransferQuote` failed the MCP output schema on a null. Tests now parse backend-shaped JSON.
+- [x] **Owner on transfer + inline registrant** — `transferDomain` takes `registrantId`/`registrantInfo`; `RegistrantInfo.toBackend()` flattens to the backend `RegistrantDTO` (registerDomain had the same silent default-contact fallback).
+- [ ] **A2A login-required skills without a token** answer "An error occurred while processing your request" instead of "log in first" (seen on `list_domains`, `get_transfer_status`, `list_pending_transfers`).
+- [ ] **.al transfers** — `transferDomain` does not run `ContactService.alRegistrantProblem` before staging, unlike `registerDomain`.
+- [ ] **Public github lacks Skipper's v2.5.9 build fix** (`--pull`/`UPGRADE_STAMP` in build-and-deploy.bat + both Dockerfile.jvm): only `osir`-authored commits go there. Re-commit as `osir` if the public repo should build the same.
+
 ## A2A (needs a decision, not just code)
 
 - [x] **A2A confirmation gate — Layer A** (2026-09-04) — `ConfirmationGate` stages every billable or

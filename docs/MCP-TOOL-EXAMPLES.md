@@ -329,7 +329,9 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
 }'
 ```
 
-### transferDomain (legacy v1)
+### transferDomain
+
+Stages the transfer (confirm with `executeConfirmedAction`). Owner: `registrantId` (a saved contact, also used as admin/tech/billing) or an inline `registrantInfo`. With neither, the tool refuses, because the backend would silently give the domain to the account's default contact. Since v2.5.10 the inline contact is sent to the backend flat; before that it was dropped.
 
 ```bash
 curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
@@ -1068,6 +1070,13 @@ curl -X POST $SESSION_URL -H "Content-Type: application/json" -d '{
     "arguments": { "domain": "example.com" }
   }
 }'
+```
+
+Result (v2.5.10+). `transferPrice` is the backend's `totalFees` (transfer + ICANN + service fee) in currency units, which is what `initiateTransfer` charges.
+
+```json
+{ "success": true, "message": "Transfer quote retrieved successfully", "domain": "example.com",
+  "transferPrice": "11.19", "currency": "USD", "extensionYears": 1, "quoteExpiry": "2026-11-25T10:20:00" }
 ```
 
 ### initiateTransfer
